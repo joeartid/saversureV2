@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { isLoggedIn, setToken } from "@/lib/auth";
+import { getTenantId } from "@/lib/tenant";
 
 interface ScanResult {
   status: string;
@@ -28,10 +29,17 @@ export default function ScanCodePage() {
   const [lineLoading, setLineLoading] = useState(false);
   const [displayCode, setDisplayCode] = useState(code);
 
+  // Detect if code looks like ref1 (alphanumeric, no dash/prefix) vs compact HMAC code
+  const isRef1Like = /^[A-Za-z0-9]{6,12}$/.test(code) && !code.includes("-");
+
   useEffect(() => {
-    api.get<{ ref1: string }>(`/api/v1/public/resolve-ref1?code=${encodeURIComponent(code)}`)
-      .then((d) => { if (d.ref1) setDisplayCode(d.ref1); })
-      .catch(() => {});
+    if (isRef1Like) {
+      setDisplayCode(code);
+    } else {
+      api.get<{ ref1: string }>(`/api/v1/public/resolve-ref1?code=${encodeURIComponent(code)}`)
+        .then((d) => { if (d.ref1) setDisplayCode(d.ref1); })
+        .catch(() => {});
+    }
 
     if (isLoggedIn()) {
       doScan();
@@ -43,7 +51,8 @@ export default function ScanCodePage() {
   const doScan = async () => {
     setPhase("scanning");
     try {
-      const data = await api.post<ScanResult>("/api/v1/scan", { code });
+      const body = isRef1Like ? { ref1: code } : { code };
+      const data = await api.post<ScanResult>("/api/v1/scan", body);
       setResult(data);
       setPhase("success");
     } catch (err: unknown) {
@@ -54,8 +63,13 @@ export default function ScanCodePage() {
 
   const handleLineLogin = async () => {
     setLineLoading(true);
+    setErrorMsg("");
     try {
-      const data = await api.get<{ url: string }>("/api/v1/auth/line");
+      const tenantId = getTenantId();
+      const url = tenantId
+        ? `/api/v1/auth/line?tenant_id=${encodeURIComponent(tenantId)}`
+        : "/api/v1/auth/line";
+      const data = await api.get<{ url: string }>(url);
       localStorage.setItem("scan_redirect_code", code);
       window.location.href = data.url;
     } catch {
@@ -104,6 +118,12 @@ export default function ScanCodePage() {
           {phase === "login" && (
             <div className="space-y-3">
               <p className="text-sm text-gray-600 text-center mb-4">เข้าสู่ระบบเพื่อรับแต้มสะสม</p>
+
+              {errorMsg && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+                  <p className="text-sm text-red-600">{errorMsg}</p>
+                </div>
+              )}
 
               <button
                 onClick={handleLineLogin}

@@ -82,6 +82,24 @@ func (h *Handler) UpdateCurrent(c *gin.Context) {
 	c.JSON(http.StatusOK, t)
 }
 
+func (h *Handler) ResolveSlug(c *gin.Context) {
+	slug := c.Query("slug")
+	if slug == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "slug query parameter is required"})
+		return
+	}
+	t, err := h.svc.GetBySlug(c.Request.Context(), slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant_not_found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"tenant_id": t.ID,
+		"name":      t.Name,
+		"slug":      t.Slug,
+	})
+}
+
 func (h *Handler) Update(c *gin.Context) {
 	id := c.Param("id")
 	var input UpdateInput

@@ -2,7 +2,9 @@ package code
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -57,6 +59,58 @@ func (h *Handler) ResolveRef1(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+func (h *Handler) ResolveRedirect(c *gin.Context) {
+	code := c.Param("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing_code"})
+		return
+	}
+
+	tenantID, err := h.svc.ResolveTenantFromCode(c.Request.Context(), code)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "code_not_found", "message": "This code does not match any brand"})
+		return
+	}
+
+	var slug string
+	err = h.svc.db.QueryRow(c.Request.Context(),
+		`SELECT slug FROM tenants WHERE id = $1`, tenantID,
+	).Scan(&slug)
+	if err != nil || slug == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant_not_found"})
+		return
+	}
+
+	redirectURL := fmt.Sprintf("https://%s.svsu.me/s/%s", slug, code)
+	c.Redirect(http.StatusFound, redirectURL)
+}
+
+// ResolveRedirectV2 handles qr.svsu.me/{shortcode}/{ref1} as a NoRoute fallback.
+// Parses path like "/jh/A6FPZKTQL6" → shortcode="jh", ref1="A6FPZKTQL6"
+func (h *Handler) ResolveRedirectV2(c *gin.Context) {
+	path := strings.TrimPrefix(c.Request.URL.Path, "/")
+	parts := strings.SplitN(path, "/", 3)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		return
+	}
+
+	shortcode := strings.ToLower(parts[0])
+	ref1 := parts[1]
+
+	var slug string
+	err := h.svc.db.QueryRow(c.Request.Context(),
+		`SELECT slug FROM tenants WHERE shortcode = $1 AND status = 'active'`, shortcode,
+	).Scan(&slug)
+	if err != nil || slug == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+		return
+	}
+
+	redirectURL := fmt.Sprintf("https://%s.svsu.me/s/%s", slug, ref1)
+	c.Redirect(http.StatusFound, redirectURL)
 }
 
 func (h *Handler) Scan(c *gin.Context) {

@@ -17,8 +17,15 @@ class ApiError extends Error {
 }
 
 function getAuthHeader(): Record<string, string> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("access_token");
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const tenantOverride = localStorage.getItem("active_tenant_override");
+  if (tenantOverride) headers["X-Tenant-ID"] = tenantOverride;
+
+  return headers;
 }
 
 function handle401(res: Response): void {

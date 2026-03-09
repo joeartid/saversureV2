@@ -1443,9 +1443,9 @@ function RollsPage() {
       {/* QC Review Dialog */}
       {qcDialog && (
         <DialogOverlay onClose={() => setQcDialog(null)}>
-          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-6 w-[540px] max-w-full md-elevation-3">
+          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-6 w-[600px] max-w-full md-elevation-3 max-h-[90vh] overflow-y-auto">
             <h2 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-1">QC Review</h2>
-            <p className="text-[13px] text-[var(--md-on-surface-variant)] mb-5">ตรวจสอบการ mapping ของม้วนนี้</p>
+            <p className="text-[13px] text-[var(--md-on-surface-variant)] mb-5">ตรวจสอบหลักฐานที่โรงงานส่งมา แล้วอนุมัติหรือปฏิเสธ</p>
 
             {/* Roll info */}
             <div className="grid grid-cols-2 gap-3 p-4 bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] mb-5">
@@ -1457,13 +1457,65 @@ function RollsPage() {
               <InfoRow label="Mapped at" value={formatDate(qcDialog.mapped_at)} />
             </div>
 
-            {/* Evidence upload */}
+            {/* Factory evidence photos — สิ่งสำคัญที่ QC ต้องดู */}
+            <div className="mb-5">
+              <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-[0.4px] mb-2">
+                หลักฐานที่โรงงานส่งมา ({qcDialog.mapping_evidence_urls?.length || 0} รูป)
+              </p>
+              {!qcDialog.mapping_evidence_urls || qcDialog.mapping_evidence_urls.length === 0 ? (
+                <div className="flex items-center gap-2 p-3 rounded-[var(--md-radius-sm)] bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-amber-600 flex-shrink-0">
+                    <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+                  </svg>
+                  <p className="text-[12px] text-amber-700 dark:text-amber-400">โรงงานไม่ได้แนบรูปหลักฐานมา</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {qcDialog.mapping_evidence_urls.map((url, i) => (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                      className="relative w-24 h-24 rounded-[var(--md-radius-sm)] overflow-hidden border-2 border-[var(--md-outline-variant)] hover:border-[var(--md-primary)] transition-colors group block"
+                    >
+                      <img src={url} alt={`factory-evidence-${i}`} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 16H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h12c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1zm-4.44-6.19l-2.35 3.02-1.56-1.88c-.2-.25-.57-.24-.76.02l-1.74 2.33c-.24.32-.02.78.39.78h8.98c.4 0 .63-.46.37-.78l-2.55-3.46c-.19-.26-.57-.27-.78-.03z" />
+                        </svg>
+                      </div>
+                      <span className="absolute bottom-0 right-0 bg-black/50 text-white text-[10px] px-1 rounded-tl">{i + 1}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+              {qcDialog.mapping_note && (
+                <p className="mt-2 text-[12px] text-[var(--md-on-surface-variant)] italic">
+                  หมายเหตุจากโรงงาน: &ldquo;{qcDialog.mapping_note}&rdquo;
+                </p>
+              )}
+            </div>
+
+            {/* QC Note — บังคับกรณี Reject */}
             <div className="mb-4">
-              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 uppercase tracking-[0.4px]">หลักฐาน (รูปถ่าย) *</label>
-              <div className="flex flex-wrap gap-2 mb-2">
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 uppercase tracking-[0.4px]">
+                หมายเหตุ QC <span className="text-[var(--md-error)]">(บังคับกรณี Reject)</span>
+              </label>
+              <textarea
+                value={qcForm.note}
+                onChange={(e) => setQcForm({ ...qcForm, note: e.target.value })}
+                rows={2}
+                className="w-full px-4 py-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 resize-none"
+                placeholder="ระบุเหตุผลถ้า Reject หรือบันทึก QC เพิ่มเติม..."
+              />
+            </div>
+
+            {/* QC evidence upload — optional */}
+            <div className="mb-5">
+              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 uppercase tracking-[0.4px]">
+                รูปถ่าย QC เพิ่มเติม <span className="text-[var(--md-on-surface-variant)] font-normal normal-case">(ไม่บังคับ)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
                 {qcForm.evidence_urls.map((url, i) => (
                   <div key={i} className="relative w-16 h-16 rounded-[var(--md-radius-sm)] overflow-hidden border border-[var(--md-outline-variant)]">
-                    <img src={url} alt={`evidence-${i}`} className="w-full h-full object-cover" />
+                    <img src={url} alt={`qc-evidence-${i}`} className="w-full h-full object-cover" />
                     <button
                       onClick={() => setQcForm((prev) => ({ ...prev, evidence_urls: prev.evidence_urls.filter((_, j) => j !== i) }))}
                       className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-bl"
@@ -1481,18 +1533,6 @@ function RollsPage() {
               </div>
             </div>
 
-            {/* Note */}
-            <div className="mb-5">
-              <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1.5 uppercase tracking-[0.4px]">หมายเหตุ</label>
-              <textarea
-                value={qcForm.note}
-                onChange={(e) => setQcForm({ ...qcForm, note: e.target.value })}
-                rows={2}
-                className="w-full px-4 py-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 resize-none"
-                placeholder="หมายเหตุ QC (บังคับกรณี reject)"
-              />
-            </div>
-
             <div className="flex justify-end gap-3">
               <button onClick={() => setQcDialog(null)} className="h-[40px] px-5 text-[14px] font-medium text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container)] rounded-[var(--md-radius-xl)] transition-all">
                 Cancel
@@ -1506,7 +1546,7 @@ function RollsPage() {
               </button>
               <button
                 onClick={() => handleSubmitQc("approve")}
-                disabled={submitting || qcForm.evidence_urls.length === 0}
+                disabled={submitting}
                 className="h-[40px] px-6 text-[14px] font-medium bg-green-600 text-white rounded-[var(--md-radius-xl)] hover:bg-green-700 disabled:opacity-50 transition-all"
               >
                 {submitting ? "Processing..." : "Approve"}

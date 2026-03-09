@@ -75,3 +75,46 @@ func (h *Handler) Delete(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
+
+func (h *Handler) ListProducts(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	factoryID := c.Param("id")
+
+	products, err := h.svc.ListProducts(c.Request.Context(), tenantID, factoryID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": products})
+}
+
+func (h *Handler) AssignProduct(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	factoryID := c.Param("id")
+
+	var body struct {
+		ProductID string `json:"product_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.svc.AssignProduct(c.Request.Context(), tenantID, factoryID, body.ProductID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "assigned"})
+}
+
+func (h *Handler) RemoveProduct(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	factoryID := c.Param("id")
+	productID := c.Param("product_id")
+
+	if err := h.svc.RemoveProduct(c.Request.Context(), tenantID, factoryID, productID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "removed"})
+}

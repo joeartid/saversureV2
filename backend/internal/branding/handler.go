@@ -9,10 +9,11 @@ import (
 
 type Handler struct {
 	svc *Service
+	db  *pgxpool.Pool
 }
 
 func NewHandler(db *pgxpool.Pool) *Handler {
-	return &Handler{svc: NewService(db)}
+	return &Handler{svc: NewService(db), db: db}
 }
 
 func (h *Handler) Get(c *gin.Context) {
@@ -50,5 +51,30 @@ func (h *Handler) GetPublic(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	c.JSON(http.StatusOK, settings)
+}
+
+func (h *Handler) GetBySlug(c *gin.Context) {
+	slug := c.Query("slug")
+	if slug == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slug query parameter is required"})
+		return
+	}
+
+	var tenantID string
+	err := h.db.QueryRow(c.Request.Context(),
+		`SELECT id FROM tenants WHERE slug = $1 AND status = 'active'`, slug,
+	).Scan(&tenantID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tenant_not_found"})
+		return
+	}
+
+	settings, err := h.svc.Get(c.Request.Context(), tenantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	settings.TenantID = tenantID
 	c.JSON(http.StatusOK, settings)
 }

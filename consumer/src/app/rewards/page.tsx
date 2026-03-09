@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import BottomNav from "@/components/BottomNav";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
+
+const QRCodeSVG = dynamic(
+  () => import("qrcode.react").then((m) => m.QRCodeSVG),
+  { ssr: false }
+);
 
 interface BalanceItem {
   currency: string;
@@ -195,22 +201,25 @@ export default function RewardsPage() {
       )}
 
       {redeemResult?.coupon_code && (
-        <div className="mx-5 mt-4 bg-white border border-[#1976d2] rounded-[var(--radius-md)] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[12px] text-[var(--on-surface-variant)]">Coupon Code</p>
-              <p className="mt-1 text-[20px] font-bold text-[#1976d2] font-mono break-all">{redeemResult.coupon_code}</p>
-              <p className="mt-1 text-[11px] text-[var(--on-surface-variant)]">บันทึกไว้ในประวัติการแลกแล้ว</p>
+        <div className="mx-5 mt-4 bg-white border-2 border-[#1976d2] rounded-2xl p-5">
+          <p className="text-center text-[13px] font-medium text-[#1976d2] mb-4">Coupon Code ของคุณ</p>
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-white rounded-xl shadow-sm border">
+              <QRCodeSVG value={redeemResult.coupon_code} size={160} />
             </div>
+          </div>
+          <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
+            <p className="text-[18px] font-bold text-[#1976d2] font-mono tracking-wider break-all">{redeemResult.coupon_code}</p>
             <button
-              onClick={() => navigator.clipboard.writeText(redeemResult.coupon_code || "")}
-              className="shrink-0 h-[36px] px-4 bg-[#1976d2] text-white rounded-[var(--radius-xl)] text-[12px] font-medium"
+              onClick={() => { navigator.clipboard.writeText(redeemResult.coupon_code || ""); }}
+              className="shrink-0 ml-3 h-[36px] px-4 bg-[#1976d2] text-white rounded-xl text-[12px] font-medium"
             >
               คัดลอก
             </button>
           </div>
-          <Link href="/history/redeems" className="inline-block mt-3 text-[12px] text-[#1976d2] font-medium">
-            ดูประวัติการแลก
+          <p className="text-[11px] text-center text-[var(--on-surface-variant)] mt-3">แสดง QR Code นี้เพื่อใช้สิทธิ์ หรือกรอกรหัสด้านบน</p>
+          <Link href="/history/redeems" className="block text-center mt-3 text-[12px] text-[#1976d2] font-medium underline">
+            ดูประวัติการแลกทั้งหมด
           </Link>
         </div>
       )}

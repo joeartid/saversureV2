@@ -369,9 +369,7 @@ func (s *Service) QCReview(ctx context.Context, tenantID, rollID, actorID string
 
 	switch input.Action {
 	case "approve":
-		if len(input.EvidenceURLs) == 0 {
-			return nil, ErrEvidenceRequired
-		}
+		// รูปหลักฐานของ QC เป็น optional — QC ดูจากรูปที่โรงงาน map มาแล้วตัดสินใจ
 		if r.MappedBy != nil && *r.MappedBy == actorID {
 			return nil, ErrSamePersonQC
 		}

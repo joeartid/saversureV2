@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { setToken } from "@/lib/auth";
+import { useTenant } from "@/components/TenantProvider";
 
 export default function LoginPage() {
+  const { tenantId, brandName } = useTenant();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +24,10 @@ export default function LoginPage() {
     setLineLoading(true);
     setError("");
     try {
-      const data = await api.get<{ url: string }>("/api/v1/auth/line");
+      const url = tenantId
+        ? `/api/v1/auth/line?tenant_id=${encodeURIComponent(tenantId)}`
+        : "/api/v1/auth/line";
+      const data = await api.get<{ url: string }>(url);
       window.location.href = data.url;
     } catch {
       setError("LINE Login ยังไม่พร้อมใช้งาน");
@@ -72,7 +77,7 @@ export default function LoginPage() {
             <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
           </svg>
         </div>
-        <h1 className="text-[22px] font-semibold text-[var(--on-surface)]">Saversure</h1>
+        <h1 className="text-[22px] font-semibold text-[var(--on-surface)]">{brandName}</h1>
         <p className="text-[13px] text-[var(--on-surface-variant)] mt-1">Scan & Earn Rewards</p>
       </div>
 

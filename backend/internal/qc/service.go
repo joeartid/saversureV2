@@ -10,12 +10,14 @@ import (
 var ErrRef2NotFound = errors.New("ref2 not found")
 
 type VerifyResult struct {
+	Valid       bool    `json:"valid"`
+	ChecksumOK bool    `json:"checksum_ok"`
 	BatchID     string  `json:"batch_id"`
+	BatchPrefix string  `json:"batch_prefix"`
 	CampaignID  string  `json:"campaign_id"`
-	Prefix      string  `json:"prefix"`
 	Serial      int64   `json:"serial"`
 	Ref2        string  `json:"ref2"`
-	Status      string  `json:"batch_status"`
+	Status      string  `json:"status"`
 	ProductName string  `json:"product_name,omitempty"`
 	RollID      *string `json:"roll_id,omitempty"`
 	RollNumber  *int    `json:"roll_number,omitempty"`
@@ -54,9 +56,11 @@ func (h *Handler) resolveRef2(ctx context.Context, tenantID, ref2 string) (*Veri
 	}
 
 	result := &VerifyResult{
+		Valid:       true,
+		ChecksumOK: true,
 		BatchID:     batchID,
+		BatchPrefix: prefix,
 		CampaignID:  campaignID,
-		Prefix:      prefix,
 		Serial:      serial,
 		Ref2:        ref2,
 		Status:      batchStatus,

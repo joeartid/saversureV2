@@ -186,7 +186,7 @@ func (s *Service) CreateExport(ctx context.Context, tenantID, actorID, apiBase s
 
 	baseURL := cfg.ScanBaseURL
 	if baseURL == "" {
-		baseURL = "https://scan.saversure.com"
+		baseURL = "https://qr.svsu.me"
 	}
 	hmacLen := cfg.HMACLength
 	if hmacLen <= 0 {
@@ -196,6 +196,9 @@ func (s *Service) CreateExport(ctx context.Context, tenantID, actorID, apiBase s
 	if lotSize <= 0 {
 		lotSize = 10000
 	}
+
+	var shortcode *string
+	s.db.QueryRow(ctx, `SELECT shortcode FROM tenants WHERE id = $1`, tenantID).Scan(&shortcode)
 
 	// Load factory export config
 	var factoryCfg codegen.FactoryExportConfig
@@ -233,7 +236,12 @@ func (s *Service) CreateExport(ctx context.Context, tenantID, actorID, apiBase s
 	for _, r := range rolls {
 		var recs []codegen.ExportRecord
 		for serial := r.SerialStart; serial <= r.SerialEnd; serial++ {
-			recs = append(recs, s.buildRecord(serial, bi, cfg, baseURL, hmacLen, lotSize))
+			rec := s.buildRecord(serial, bi, cfg, baseURL, hmacLen, lotSize)
+			if shortcode != nil && *shortcode != "" {
+				cleanBase := strings.TrimSuffix(baseURL, "/s")
+				rec.URL = fmt.Sprintf("%s/%s/%s", cleanBase, *shortcode, rec.Ref1)
+			}
+			recs = append(recs, rec)
 		}
 		allRollRecords = append(allRollRecords, codegen.RollRecords{
 			RollNumber: r.RollNumber,
@@ -586,9 +594,13 @@ func (s *Service) SampleCodes(ctx context.Context, tenantID, rollID string, coun
 	campaignSettings := s.fetchCampaignSettings(ctx, bi.CampaignID, tenantID)
 	cfg := codegen.ConfigFromTenantSettings(tenantSettings).MergeWith(codegen.ConfigFromCampaignSettings(campaignSettings))
 
+	// Fetch tenant shortcode for V2 URL format
+	var shortcode *string
+	s.db.QueryRow(ctx, `SELECT shortcode FROM tenants WHERE id = $1`, tenantID).Scan(&shortcode)
+
 	baseURL := cfg.ScanBaseURL
 	if baseURL == "" {
-		baseURL = "https://scan.saversure.com"
+		baseURL = "https://qr.svsu.me"
 	}
 	hmacLen := cfg.HMACLength
 	if hmacLen <= 0 {
@@ -604,7 +616,6 @@ func (s *Service) SampleCodes(ctx context.Context, tenantID, rollID string, coun
 		count = total
 	}
 
-	// Pick evenly spaced samples across the roll
 	step := 1
 	if total > count {
 		step = total / count
@@ -616,7 +627,12 @@ func (s *Service) SampleCodes(ctx context.Context, tenantID, rollID string, coun
 		if serial > serialEnd {
 			serial = serialEnd
 		}
-		records = append(records, s.buildRecord(serial, bi, cfg, baseURL, hmacLen, lotSize))
+		rec := s.buildRecord(serial, bi, cfg, baseURL, hmacLen, lotSize)
+		if shortcode != nil && *shortcode != "" {
+			cleanBase := strings.TrimSuffix(baseURL, "/s")
+			rec.URL = fmt.Sprintf("%s/%s/%s", cleanBase, *shortcode, rec.Ref1)
+		}
+		records = append(records, rec)
 	}
 	return records, nil
 }

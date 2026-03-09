@@ -19,24 +19,69 @@ type LINEConfig struct {
 }
 
 type LINEService struct {
-	db     *pgxpool.Pool
-	auth   *Service
-	config LINEConfig
+	db             *pgxpool.Pool
+	auth           *Service
+	fallbackConfig LINEConfig
 }
 
 func NewLINEService(db *pgxpool.Pool, authSvc *Service, cfg LINEConfig) *LINEService {
-	return &LINEService{db: db, auth: authSvc, config: cfg}
+	return &LINEService{db: db, auth: authSvc, fallbackConfig: cfg}
+}
+
+func (s *LINEService) configForTenant(ctx context.Context, tenantID string) LINEConfig {
+	var rawSettings string
+	err := s.db.QueryRow(ctx,
+		`SELECT COALESCE(settings, '{}'::jsonb)::text FROM tenants WHERE id = $1`, tenantID,
+	).Scan(&rawSettings)
+	if err != nil {
+		return s.fallbackConfig
+	}
+	var settings map[string]any
+	_ = json.Unmarshal([]byte(rawSettings), &settings)
+
+	lineMap, ok := settings["line"].(map[string]any)
+	if !ok {
+		return s.fallbackConfig
+	}
+	cfg := LINEConfig{}
+	if v, ok := lineMap["channel_id"].(string); ok && v != "" {
+		cfg.ChannelID = v
+	}
+	if v, ok := lineMap["channel_secret"].(string); ok && v != "" {
+		cfg.ChannelSecret = v
+	}
+	if v, ok := lineMap["callback_url"].(string); ok && v != "" {
+		cfg.CallbackURL = v
+	}
+	if cfg.ChannelID == "" {
+		return s.fallbackConfig
+	}
+	return cfg
 }
 
 func (s *LINEService) IsConfigured() bool {
-	return s.config.ChannelID != "" && s.config.ChannelSecret != ""
+	return s.fallbackConfig.ChannelID != "" && s.fallbackConfig.ChannelSecret != ""
+}
+
+func (s *LINEService) IsConfiguredForTenant(ctx context.Context, tenantID string) bool {
+	cfg := s.configForTenant(ctx, tenantID)
+	return cfg.ChannelID != "" && cfg.ChannelSecret != ""
 }
 
 func (s *LINEService) AuthorizationURL(state string) string {
+	return s.authorizationURLWithConfig(s.fallbackConfig, state)
+}
+
+func (s *LINEService) AuthorizationURLForTenant(ctx context.Context, tenantID, state string) string {
+	cfg := s.configForTenant(ctx, tenantID)
+	return s.authorizationURLWithConfig(cfg, state)
+}
+
+func (s *LINEService) authorizationURLWithConfig(cfg LINEConfig, state string) string {
 	params := url.Values{
 		"response_type": {"code"},
-		"client_id":     {s.config.ChannelID},
-		"redirect_uri":  {s.config.CallbackURL},
+		"client_id":     {cfg.ChannelID},
+		"redirect_uri":  {cfg.CallbackURL},
 		"state":         {state},
 		"scope":         {"profile openid email"},
 	}
@@ -59,12 +104,21 @@ type lineProfile struct {
 }
 
 func (s *LINEService) ExchangeCode(ctx context.Context, code string) (*lineTokenResponse, error) {
+	return s.exchangeCodeWithConfig(ctx, s.fallbackConfig, code)
+}
+
+func (s *LINEService) ExchangeCodeForTenant(ctx context.Context, tenantID, code string) (*lineTokenResponse, error) {
+	cfg := s.configForTenant(ctx, tenantID)
+	return s.exchangeCodeWithConfig(ctx, cfg, code)
+}
+
+func (s *LINEService) exchangeCodeWithConfig(ctx context.Context, cfg LINEConfig, code string) (*lineTokenResponse, error) {
 	data := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
-		"redirect_uri":  {s.config.CallbackURL},
-		"client_id":     {s.config.ChannelID},
-		"client_secret": {s.config.ChannelSecret},
+		"redirect_uri":  {cfg.CallbackURL},
+		"client_id":     {cfg.ChannelID},
+		"client_secret": {cfg.ChannelSecret},
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.line.me/oauth2/v2.1/token", strings.NewReader(data.Encode()))
@@ -117,7 +171,7 @@ func (s *LINEService) GetProfile(ctx context.Context, accessToken string) (*line
 }
 
 func (s *LINEService) LoginOrRegister(ctx context.Context, tenantID, code, ipAddr string) (*TokenPair, error) {
-	tok, err := s.ExchangeCode(ctx, code)
+	tok, err := s.ExchangeCodeForTenant(ctx, tenantID, code)
 	if err != nil {
 		return nil, fmt.Errorf("exchange code: %w", err)
 	}

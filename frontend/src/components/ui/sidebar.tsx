@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout, getUser } from "@/lib/auth";
+import { useTenantContext } from "@/lib/tenant-context";
 
 interface NavItem {
   href: string;
@@ -28,6 +29,16 @@ const navGroups: NavGroup[] = [
         icon: (
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
             <path d="M13 3v6h8V3m-8 18h8V11h-8M3 21h8v-6H3m0-2h8V3H3v10z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/ops-center",
+        label: "Ops Center",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
           </svg>
         ),
       },
@@ -302,6 +313,16 @@ const navGroups: NavGroup[] = [
     label: "ระบบ",
     items: [
       {
+        href: "/tenants",
+        label: "Tenants",
+        roles: ["super_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z" />
+          </svg>
+        ),
+      },
+      {
         href: "/audit",
         label: "Audit Log",
         roles: ["super_admin"],
@@ -321,6 +342,8 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<ReturnType<typeof getUser>>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const { tenants, activeTenant, isSuperAdmin, switchTenant } = useTenantContext();
 
   useEffect(() => {
     setUser(getUser());
@@ -372,6 +395,71 @@ export default function Sidebar() {
           </div>
         )}
       </div>
+
+      {/* Tenant Switcher (super_admin only) */}
+      {isSuperAdmin && tenants.length > 0 && !collapsed && (
+        <div className="px-3 pb-3">
+          <div className="relative">
+            <button
+              onClick={() => setSwitcherOpen(!switcherOpen)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--md-radius-md)] border border-[var(--md-outline-variant)] hover:border-[var(--md-primary)] bg-[var(--md-surface-container)] transition-all duration-200"
+            >
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ backgroundColor: activeTenant ? "#4caf50" : "#9e9e9e" }}>
+                {activeTenant?.shortcode?.toUpperCase() || "?"}
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-[13px] font-medium text-[var(--md-on-surface)] truncate">
+                  {activeTenant?.name || "Select Brand"}
+                </p>
+                <p className="text-[10px] text-[var(--md-on-surface-variant)] truncate">
+                  {activeTenant?.slug || ""}{activeTenant?.shortcode ? ` · ${activeTenant.shortcode}` : ""}
+                </p>
+              </div>
+              <svg viewBox="0 0 24 24" fill="currentColor" className={`w-4 h-4 text-[var(--md-on-surface-variant)] transition-transform ${switcherOpen ? "rotate-180" : ""}`}>
+                <path d="M7 10l5 5 5-5z" />
+              </svg>
+            </button>
+
+            {switcherOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-[var(--md-surface)] rounded-[var(--md-radius-md)] md-elevation-3 border border-[var(--md-outline-variant)] max-h-[240px] overflow-y-auto">
+                {tenants.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { switchTenant(t.id); setSwitcherOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-[var(--md-surface-container)] transition-colors first:rounded-t-[var(--md-radius-md)] last:rounded-b-[var(--md-radius-md)] ${t.id === activeTenant?.id ? "bg-[var(--md-primary-light)]" : ""}`}
+                  >
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0" style={{ backgroundColor: t.id === activeTenant?.id ? "var(--md-primary)" : "#78909c" }}>
+                      {t.shortcode?.toUpperCase() || t.name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-[var(--md-on-surface)] truncate">{t.name}</p>
+                      <p className="text-[10px] text-[var(--md-on-surface-variant)]">{t.slug}{t.shortcode ? ` · ${t.shortcode}` : ""}</p>
+                    </div>
+                    {t.id === activeTenant?.id && (
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[var(--md-primary)] flex-shrink-0">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isSuperAdmin && tenants.length > 0 && collapsed && (
+        <div className="px-2 pb-2">
+          <div
+            className="w-[48px] h-[48px] mx-auto rounded-[var(--md-radius-md)] flex items-center justify-center text-[12px] font-bold text-white cursor-pointer hover:ring-2 hover:ring-[var(--md-primary)] transition-all"
+            style={{ backgroundColor: "#4caf50" }}
+            title={activeTenant ? `${activeTenant.name} (${activeTenant.shortcode})` : "Select Brand"}
+            onClick={() => { setCollapsed(false); setSwitcherOpen(true); }}
+          >
+            {activeTenant?.shortcode?.toUpperCase() || "?"}
+          </div>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-2 pb-2 overflow-y-auto overflow-x-hidden">
@@ -464,7 +552,7 @@ export default function Sidebar() {
                     {user?.role?.replace("_", " ") || "Unknown"}
                   </p>
                   <p className="text-[11px] text-[var(--md-on-surface-variant)] truncate">
-                    {user?.tenant_id?.slice(0, 8) || ""}
+                    {activeTenant?.name || user?.tenant_id?.slice(0, 8) || ""}
                   </p>
                 </div>
               </div>

@@ -19,6 +19,16 @@ interface Factory {
   created_at: string;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  sku: string | null;
+  image_url: string | null;
+  points_per_scan: number;
+  status: string;
+  assigned_at?: string;
+}
+
 const factoryTypeLabels: Record<string, string> = {
   general: "ทั่วไป",
   sticker_printer: "โรงพิมพ์สติ๊กเกอร์",
@@ -45,6 +55,14 @@ export default function FactoriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
+
+  // Product assignment panel
+  const [productPanelFactory, setProductPanelFactory] = useState<Factory | null>(null);
+  const [assignedProducts, setAssignedProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [productPanelLoading, setProductPanelLoading] = useState(false);
 
   const emptyForm = {
     name: "",
@@ -110,6 +128,7 @@ export default function FactoriesPage() {
     });
     setEditId(f.id);
     setShowForm(true);
+    setProductPanelFactory(null);
   };
 
   const handleToggleStatus = async (f: Factory) => {
@@ -138,6 +157,67 @@ export default function FactoriesPage() {
     }
   };
 
+  // ---- Product Panel ----
+
+  const openProductPanel = async (f: Factory) => {
+    setProductPanelFactory(f);
+    setShowForm(false);
+    setProductSearch("");
+    setProductPanelLoading(true);
+    try {
+      const [assigned, allRes] = await Promise.all([
+        api.get<{ data: Product[] }>(`/api/v1/factories/${f.id}/products`),
+        api.get<{ data: Product[] }>("/api/v1/products?status=active&limit=300"),
+      ]);
+      setAssignedProducts(assigned.data || []);
+      setAllProducts(allRes.data || []);
+    } catch {
+      /* ignore */
+    } finally {
+      setProductPanelLoading(false);
+    }
+  };
+
+  const refreshProductPanel = async () => {
+    if (!productPanelFactory) return;
+    const assigned = await api.get<{ data: Product[] }>(`/api/v1/factories/${productPanelFactory.id}/products`);
+    setAssignedProducts(assigned.data || []);
+  };
+
+  const handleAssignProduct = async (productId: string) => {
+    if (!productPanelFactory) return;
+    setAssignLoading(true);
+    try {
+      await api.post(`/api/v1/factories/${productPanelFactory.id}/products`, { product_id: productId });
+      await refreshProductPanel();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed";
+      alert(msg);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleRemoveProduct = async (productId: string) => {
+    if (!productPanelFactory) return;
+    if (!confirm("ลบสินค้าออกจากโรงงานนี้?")) return;
+    try {
+      await api.delete(`/api/v1/factories/${productPanelFactory.id}/products/${productId}`);
+      await refreshProductPanel();
+    } catch {
+      alert("Failed");
+    }
+  };
+
+  const assignedIds = new Set(assignedProducts.map((p) => p.id));
+  const filteredAll = allProducts.filter((p) => {
+    const q = productSearch.toLowerCase();
+    return (
+      !assignedIds.has(p.id) &&
+      (p.name.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q))
+    );
+  });
+
   const fieldClass =
     "w-full h-[48px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2 transition-all";
 
@@ -160,6 +240,7 @@ export default function FactoriesPage() {
               setForm(emptyForm);
             } else {
               setShowForm(true);
+              setProductPanelFactory(null);
             }
           }}
           className="h-[40px] px-5 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] transition-all flex items-center gap-2"
@@ -265,11 +346,11 @@ export default function FactoriesPage() {
               <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">เบอร์โทร</label>
               <input
                 type="text"
-              placeholder="Contact Phone"
-              value={form.contact_phone}
-              onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
-              className={fieldClass}
-            />
+                placeholder="Contact Phone"
+                value={form.contact_phone}
+                onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
+                className={fieldClass}
+              />
             </div>
             <div>
               <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 tracking-[0.3px]">อีเมล</label>
@@ -303,8 +384,158 @@ export default function FactoriesPage() {
         </div>
       )}
 
+      {/* Product Assignment Panel */}
+      {productPanelFactory && (
+        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-xl)] md-elevation-2 p-6 mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">
+                สินค้าของโรงงาน: {productPanelFactory.name}
+              </h2>
+              <p className="text-[13px] text-[var(--md-on-surface-variant)] mt-0.5">
+                กำหนดว่าโรงงานนี้ผลิต/จัดการสินค้าอะไรได้บ้าง — factory user จะเห็นเฉพาะสินค้าที่ assign ให้
+              </p>
+            </div>
+            <button
+              onClick={() => setProductPanelFactory(null)}
+              className="text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)] transition-colors"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+              </svg>
+            </button>
+          </div>
+
+          {productPanelLoading ? (
+            <div className="py-8 text-center text-[var(--md-on-surface-variant)]">
+              <svg className="animate-spin w-5 h-5 mx-auto mb-2" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              กำลังโหลด...
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-6">
+              {/* Left: Assigned products */}
+              <div>
+                <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-[0.4px] mb-3">
+                  สินค้าที่ assign แล้ว ({assignedProducts.length})
+                </p>
+                {assignedProducts.length === 0 ? (
+                  <div className="border border-dashed border-[var(--md-outline-variant)] rounded-[var(--md-radius-md)] p-6 text-center text-[13px] text-[var(--md-on-surface-variant)]">
+                    ยังไม่มีสินค้า — เลือกจากรายการขวา
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                    {assignedProducts.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-3 p-3 bg-[var(--md-surface-container)] rounded-[var(--md-radius-md)] group"
+                      >
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            alt={p.name}
+                            className="w-10 h-10 rounded-[6px] object-cover flex-shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-[6px] bg-[var(--md-surface-dim)] flex items-center justify-center flex-shrink-0">
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--md-on-surface-variant)] opacity-40">
+                              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-[var(--md-on-surface)] leading-tight truncate">
+                            {p.name}
+                          </p>
+                          <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                            {p.sku || "—"} · {p.points_per_scan} pts
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveProduct(p.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--md-error)] hover:bg-[var(--md-error-light)] rounded-[6px] p-1"
+                          title="ลบออก"
+                        >
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right: All products to add */}
+              <div>
+                <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-[0.4px] mb-3">
+                  เพิ่มสินค้า
+                </p>
+                <input
+                  type="text"
+                  placeholder="ค้นหาชื่อสินค้า หรือ SKU..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="w-full h-[40px] px-3 mb-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[13px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] transition-all"
+                />
+                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                  {filteredAll.length === 0 ? (
+                    <p className="text-center text-[13px] text-[var(--md-on-surface-variant)] py-4">
+                      {productSearch ? "ไม่พบสินค้าที่ค้นหา" : "สินค้าทุกรายการถูก assign แล้ว"}
+                    </p>
+                  ) : (
+                    filteredAll.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-3 p-3 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-md)] hover:border-[var(--md-primary)] hover:bg-[var(--md-primary-light)] transition-all group cursor-pointer"
+                        onClick={() => !assignLoading && handleAssignProduct(p.id)}
+                      >
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            alt={p.name}
+                            className="w-10 h-10 rounded-[6px] object-cover flex-shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-[6px] bg-[var(--md-surface-dim)] flex items-center justify-center flex-shrink-0">
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--md-on-surface-variant)] opacity-40">
+                              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-[var(--md-on-surface)] leading-tight truncate">
+                            {p.name}
+                          </p>
+                          <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                            {p.sku || "—"} · {p.points_per_scan} pts
+                          </p>
+                        </div>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--md-primary)]">
+                            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                          </svg>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
-        <table className="w-full min-w-[800px]">
+        <table className="w-full min-w-[900px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
@@ -325,9 +556,6 @@ export default function FactoriesPage() {
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
                 Status
               </th>
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
-                Created
-              </th>
               <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
                 Actions
               </th>
@@ -336,7 +564,7 @@ export default function FactoriesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
+                <td colSpan={7} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
                   <svg className="animate-spin w-5 h-5 mx-auto" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -345,7 +573,7 @@ export default function FactoriesPage() {
               </tr>
             ) : factories.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
+                <td colSpan={7} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">
                   No factories yet
                 </td>
               </tr>
@@ -353,7 +581,9 @@ export default function FactoriesPage() {
               factories.map((f) => (
                 <tr
                   key={f.id}
-                  className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors"
+                  className={`border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors ${
+                    productPanelFactory?.id === f.id ? "bg-[var(--md-primary-light)]" : ""
+                  }`}
                 >
                   <td className="px-5 py-3">
                     <div>
@@ -402,11 +632,18 @@ export default function FactoriesPage() {
                       {f.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-[12px] text-[var(--md-on-surface-variant)]">
-                    {new Date(f.created_at).toLocaleDateString()}
-                  </td>
                   <td className="px-5 py-3">
                     <div className="flex gap-1 justify-end">
+                      <button
+                        onClick={() => openProductPanel(f)}
+                        className={`h-[26px] px-2.5 text-[11px] font-medium rounded-[6px] transition-all ${
+                          productPanelFactory?.id === f.id
+                            ? "text-white bg-[var(--md-primary)]"
+                            : "text-[var(--md-secondary)] bg-[var(--md-secondary-container,#e8def8)] hover:opacity-80"
+                        }`}
+                      >
+                        สินค้า
+                      </button>
                       <button
                         onClick={() => handleEdit(f)}
                         className="h-[26px] px-2.5 text-[11px] font-medium rounded-[6px] text-[var(--md-primary)] bg-[var(--md-primary-light)] hover:opacity-80 transition-all"

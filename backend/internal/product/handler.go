@@ -21,11 +21,19 @@ func (h *Handler) List(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	status := c.Query("status")
+	factoryID := c.Query("factory_id")
+
+	// factory_user อัตโนมัติ filter ตาม factory ของตัวเอง (ถ้าไม่ได้ระบุ factory_id มา)
+	role := c.GetString("role")
+	if role == "factory_user" && factoryID == "" {
+		factoryID = c.GetString("factory_id")
+	}
 
 	products, total, err := h.svc.List(c.Request.Context(), tenantID, ListFilter{
-		Status: status,
-		Limit:  limit,
-		Offset: offset,
+		Status:    status,
+		FactoryID: factoryID,
+		Limit:     limit,
+		Offset:    offset,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

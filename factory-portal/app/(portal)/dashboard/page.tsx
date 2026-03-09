@@ -15,6 +15,10 @@ interface Stats {
   total: number;
 }
 
+// total = pending_print + printed + mapped + qc_approved + qc_rejected + distributed + recalled
+// 4 card แสดงเฉพาะ printed+mapped+qc_approved+qc_rejected (กำลังดำเนินการ)
+// pending_print/distributed/recalled แสดงแยกในหัวข้อรวม
+
 const statCards = [
   {
     key: "printed" as keyof Stats,
@@ -94,12 +98,34 @@ export default function DashboardPage() {
             <p className="text-[48px] font-bold text-[var(--md-primary)] leading-none">
               {stats.total.toLocaleString()}
             </p>
-            <p className="text-[13px] text-[var(--md-on-surface-variant)] mt-2">
-              จัดส่งแล้ว {stats.distributed.toLocaleString()} ม้วน
-            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+              {stats.pending_print > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[12px] text-gray-500 dark:text-gray-400">
+                  <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
+                  รอพิมพ์ {stats.pending_print.toLocaleString()} ม้วน
+                  <span className="text-[11px] opacity-60">(ยังดำเนินการไม่ได้)</span>
+                </span>
+              )}
+              {stats.distributed > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[12px] text-emerald-600 dark:text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                  จัดส่งแล้ว {stats.distributed.toLocaleString()} ม้วน
+                </span>
+              )}
+              {stats.recalled > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-[12px] text-purple-600 dark:text-purple-400">
+                  <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
+                  เรียกคืนแล้ว {stats.recalled.toLocaleString()} ม้วน
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--md-on-surface-variant)]">
+                <span className="w-2 h-2 rounded-full bg-[var(--md-primary)] inline-block" />
+                กำลังดำเนินการ {(stats.printed + stats.mapped + stats.qc_approved + stats.qc_rejected).toLocaleString()} ม้วน
+              </span>
+            </div>
           </div>
 
-          {/* Stat cards */}
+          {/* Active stat cards — ไม่รวม pending_print/distributed/recalled */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             {statCards.map(({ key, label, sublabel, bg, text, border, icon }) => (
               <Link

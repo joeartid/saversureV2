@@ -32,9 +32,10 @@ type Product struct {
 }
 
 type ListFilter struct {
-	Status string
-	Limit  int
-	Offset int
+	Status    string
+	FactoryID string // ถ้าระบุ จะ filter เฉพาะสินค้าที่ assign ให้ factory นั้น
+	Limit     int
+	Offset    int
 }
 
 type CreateInput struct {
@@ -58,6 +59,11 @@ type UpdateInput struct {
 func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Product, int64, error) {
 	if f.Limit <= 0 {
 		f.Limit = 50
+	}
+
+	// ถ้ามี factory_id filter ให้ join factory_products
+	if f.FactoryID != "" {
+		return s.listByFactory(ctx, tenantID, f)
 	}
 
 	where := "tenant_id = $1"
@@ -97,6 +103,55 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Pr
 			return nil, 0, fmt.Errorf("scan product: %w", err)
 		}
 		products = append(products, p)
+	}
+	return products, total, nil
+}
+
+func (s *Service) listByFactory(ctx context.Context, tenantID string, f ListFilter) ([]Product, int64, error) {
+	args := []any{f.FactoryID, tenantID}
+	argN := 3
+	extraWhere := ""
+	if f.Status != "" {
+		extraWhere = fmt.Sprintf(" AND p.status = $%d", argN)
+		args = append(args, f.Status)
+		argN++
+	}
+
+	var total int64
+	_ = s.db.QueryRow(ctx,
+		fmt.Sprintf(`SELECT COUNT(*) FROM factory_products fp
+		 JOIN products p ON p.id = fp.product_id
+		 WHERE fp.factory_id = $1 AND fp.tenant_id = $2%s`, extraWhere),
+		args...,
+	).Scan(&total)
+
+	query := fmt.Sprintf(
+		`SELECT p.id, p.tenant_id, p.name, p.sku, p.description, p.image_url, p.points_per_scan, p.status, p.created_at::text
+		 FROM factory_products fp
+		 JOIN products p ON p.id = fp.product_id
+		 WHERE fp.factory_id = $1 AND fp.tenant_id = $2%s
+		 ORDER BY p.name ASC LIMIT $%d OFFSET $%d`,
+		extraWhere, argN, argN+1,
+	)
+	args = append(args, f.Limit, f.Offset)
+
+	rows, err := s.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list products by factory: %w", err)
+	}
+	defer rows.Close()
+
+	var products []Product
+	for rows.Next() {
+		var p Product
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.SKU, &p.Description,
+			&p.ImageURL, &p.PointsPerScan, &p.Status, &p.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan product: %w", err)
+		}
+		products = append(products, p)
+	}
+	if products == nil {
+		products = []Product{}
 	}
 	return products, total, nil
 }

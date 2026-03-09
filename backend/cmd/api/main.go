@@ -31,7 +31,9 @@ import (
 	"saversure/internal/engine"
 	"saversure/internal/export"
 	"saversure/internal/factory"
+	"saversure/internal/fulfillment"
 	"saversure/internal/gamification"
+	"saversure/internal/linebot"
 	"saversure/internal/geo"
 	"saversure/internal/inventory"
 	"saversure/internal/ledger"
@@ -39,7 +41,9 @@ import (
 	mw "saversure/internal/middleware"
 	"saversure/internal/news"
 	"saversure/internal/notification"
+	"saversure/internal/opsdigest"
 	"saversure/internal/otp"
+	"saversure/internal/platform"
 	"saversure/internal/profile"
 	"saversure/internal/product"
 	"saversure/internal/promotion"
@@ -159,11 +163,22 @@ func main() {
 	gamifyHandler := gamification.NewHandler(db)
 	tierHandler := tier.NewHandler(db)
 	brandingHandler := branding.NewHandler(db)
+	linebotSvc := linebot.NewService(db)
+	linebotHandler := linebot.NewHandler(linebotSvc)
+	fulfillmentSvc := fulfillment.NewService(db)
+	fulfillmentHandler := fulfillment.NewHandler(fulfillmentSvc)
 	geoSvc := geo.NewService(db)
 	geoHandler := geo.NewHandler(geoSvc)
+	opsDigestSvc := opsdigest.NewService(db)
+	opsDigestHandler := opsdigest.NewHandler(opsDigestSvc)
+	platformIdentitySvc := platform.NewIdentityService(db)
+	platformLedgerSvc := platform.NewLedgerService(db)
+	platformExchangeSvc := platform.NewExchangeService(db, platformIdentitySvc, platformLedgerSvc)
+	platformHandler := platform.NewHandler(platformIdentitySvc, platformLedgerSvc, platformExchangeSvc)
 
 	var uploadHandler *upload.Handler
 	var exportHandler *export.Handler
+	var mediaProxy *upload.ProxyHandler
 	if cfg.MinIO.AccessKey != "" {
 		uh, err := upload.NewHandler(upload.Config{
 			Endpoint:  cfg.MinIO.Endpoint,
@@ -178,6 +193,11 @@ func main() {
 		} else {
 			uploadHandler = uh
 			slog.Info("MinIO connected", "endpoint", cfg.MinIO.Endpoint)
+		}
+
+		// Media proxy — ให้ browser ดึงไฟล์จาก MinIO ผ่าน backend
+		if ph, phErr := upload.NewProxyHandler(cfg.MinIO.Endpoint, cfg.MinIO.AccessKey, cfg.MinIO.SecretKey, cfg.MinIO.UseSSL); phErr == nil {
+			mediaProxy = ph
 		}
 
 		mc, mcErr := minioClient(cfg)
@@ -202,16 +222,29 @@ func main() {
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "ok",
+		dbOK := db.Ping(context.Background()) == nil
+		status := "ok"
+		httpCode := http.StatusOK
+		if !dbOK {
+			status = "degraded"
+			httpCode = http.StatusServiceUnavailable
+		}
+		c.JSON(httpCode, gin.H{
+			"status":  status,
 			"service": "saversure-api",
 			"version": "2.0.0",
+			"db":      dbOK,
 		})
 	})
 
 	// Public download (no auth required)
 	if exportHandler != nil {
 		r.GET("/api/v1/exports/download/:token", exportHandler.Download)
+	}
+
+	// Media proxy — ให้ browser ดึงไฟล์จาก MinIO ผ่าน backend (public, no auth)
+	if mediaProxy != nil {
+		r.GET("/media/:bucket/*objectPath", mediaProxy.ServeFile)
 	}
 
 	api := r.Group("/api/v1")
@@ -246,6 +279,16 @@ func main() {
 
 	// --- Public utilities (no auth) ---
 	api.GET("/public/resolve-ref1", codeHandler.ResolveRef1)
+	api.GET("/public/tenant-by-slug", tenantHandler.ResolveSlug)
+	api.GET("/public/branding-by-slug", brandingHandler.GetBySlug)
+
+	// --- QR Redirect ---
+	// Legacy: qr.svsu.me/s/:code → resolve from batch prefix
+	r.GET("/s/:code", codeHandler.ResolveRedirect)
+
+	// V2: qr.svsu.me/{shortcode}/{ref1} → resolve from brand shortcode
+	// Uses NoRoute fallback because /:shortcode/:ref1 would conflict with /health, /api, etc.
+	r.NoRoute(codeHandler.ResolveRedirectV2)
 
 	// --- Protected routes ---
 	protected := api.Group("")
@@ -442,7 +485,9 @@ func main() {
 	{
 		staffRoutes.GET("", staffHandler.List)
 		staffRoutes.POST("", staffHandler.Create)
+		staffRoutes.GET("/:id", staffHandler.Get)
 		staffRoutes.PATCH("/:id", staffHandler.Update)
+		staffRoutes.POST("/:id/reset-password", staffHandler.ResetPassword)
 		staffRoutes.DELETE("/:id", staffHandler.Delete)
 	}
 
@@ -486,6 +531,10 @@ func main() {
 		factoryRoutes.POST("", factoryHandler.Create)
 		factoryRoutes.PATCH("/:id", factoryHandler.Update)
 		factoryRoutes.DELETE("/:id", factoryHandler.Delete)
+		// Factory Product assignments (admin only)
+		factoryRoutes.GET("/:id/products", factoryHandler.ListProducts)
+		factoryRoutes.POST("/:id/products", factoryHandler.AssignProduct)
+		factoryRoutes.DELETE("/:id/products/:product_id", factoryHandler.RemoveProduct)
 	}
 
 	// News Management (Admin)
@@ -580,6 +629,33 @@ func main() {
 		brandingRoutes.PUT("", brandingHandler.Update)
 	}
 
+	// LINE Bot (Admin)
+	linebotRoutes := tenanted.Group("/linebot")
+	linebotRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		linebotRoutes.POST("/send", linebotHandler.SendMessage)
+		linebotRoutes.POST("/broadcast", linebotHandler.Broadcast)
+		linebotRoutes.POST("/rich-menu", linebotHandler.CreateRichMenu)
+		linebotRoutes.GET("/rich-menu", linebotHandler.ListRichMenus)
+	}
+
+	// Ops Digest (Admin)
+	opsRoutes := tenanted.Group("/ops")
+	opsRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		opsRoutes.GET("/digest", opsDigestHandler.GetDigest)
+		opsRoutes.GET("/alerts", opsDigestHandler.GetAlerts)
+	}
+
+	// Fulfillment (Admin)
+	fulfillmentRoutes := tenanted.Group("/fulfillment")
+	fulfillmentRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		fulfillmentRoutes.GET("", fulfillmentHandler.List)
+		fulfillmentRoutes.PATCH("/:id", fulfillmentHandler.UpdateStatus)
+		fulfillmentRoutes.POST("/bulk-update", fulfillmentHandler.BulkUpdate)
+	}
+
 	// API Keys (Admin)
 	apiKeyRoutes := tenanted.Group("/api-keys")
 	apiKeyRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
@@ -619,6 +695,23 @@ func main() {
 		badgeRoutes.GET("", gamifyHandler.ListBadges)
 		badgeRoutes.POST("", gamifyHandler.CreateBadge)
 		badgeRoutes.DELETE("/:id", gamifyHandler.DeleteBadge)
+	}
+
+	// Platform / Cross-Tenant (Consumer)
+	platformRoutes := tenanted.Group("/platform")
+	{
+		platformRoutes.GET("/identity", platformHandler.GetMyPlatformIdentity)
+		platformRoutes.POST("/link", platformHandler.LinkIdentity)
+		platformRoutes.POST("/exchange", platformHandler.Exchange)
+		platformRoutes.GET("/balance", platformHandler.GetPlatformBalance)
+		platformRoutes.GET("/history", platformHandler.GetPlatformHistory)
+	}
+
+	// Platform Admin (Super Admin)
+	platformAdminRoutes := tenanted.Group("/platform/admin")
+	platformAdminRoutes.Use(mw.RequireRole("super_admin"))
+	{
+		platformAdminRoutes.GET("/users/:id", platformHandler.GetPlatformUser)
 	}
 
 	// File Upload (requires MinIO)

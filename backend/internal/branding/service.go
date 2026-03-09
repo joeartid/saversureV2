@@ -17,9 +17,10 @@ func NewService(db *pgxpool.Pool) *Service {
 }
 
 type BrandingSettings struct {
-	LogoURL     string `json:"logo_url"`
-	FaviconURL  string `json:"favicon_url"`
-	BrandName   string `json:"brand_name"`
+	TenantID     string `json:"tenant_id,omitempty"`
+	LogoURL      string `json:"logo_url"`
+	FaviconURL   string `json:"favicon_url"`
+	BrandName    string `json:"brand_name"`
 	PrimaryColor string `json:"primary_color"`
 	AccentColor  string `json:"accent_color"`
 	BGColor      string `json:"bg_color"`

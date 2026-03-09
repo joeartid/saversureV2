@@ -230,6 +230,73 @@ func joinStr(parts []string, sep string) string {
 	return result
 }
 
+// ---- Factory Products (many-to-many) ----
+
+type FactoryProduct struct {
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	SKU          *string `json:"sku"`
+	ImageURL     *string `json:"image_url"`
+	PointsPerScan int    `json:"points_per_scan"`
+	Status       string  `json:"status"`
+	AssignedAt   string  `json:"assigned_at"`
+}
+
+func (s *Service) ListProducts(ctx context.Context, tenantID, factoryID string) ([]FactoryProduct, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT p.id, p.name, p.sku, p.image_url, p.points_per_scan, p.status, fp.created_at::text
+		 FROM factory_products fp
+		 JOIN products p ON p.id = fp.product_id
+		 WHERE fp.factory_id = $1 AND fp.tenant_id = $2
+		 ORDER BY p.name ASC`,
+		factoryID, tenantID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list factory products: %w", err)
+	}
+	defer rows.Close()
+
+	var products []FactoryProduct
+	for rows.Next() {
+		var p FactoryProduct
+		if err := rows.Scan(&p.ID, &p.Name, &p.SKU, &p.ImageURL, &p.PointsPerScan, &p.Status, &p.AssignedAt); err != nil {
+			return nil, fmt.Errorf("scan factory product: %w", err)
+		}
+		products = append(products, p)
+	}
+	if products == nil {
+		products = []FactoryProduct{}
+	}
+	return products, nil
+}
+
+func (s *Service) AssignProduct(ctx context.Context, tenantID, factoryID, productID string) error {
+	_, err := s.db.Exec(ctx,
+		`INSERT INTO factory_products (factory_id, product_id, tenant_id)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (factory_id, product_id) DO NOTHING`,
+		factoryID, productID, tenantID,
+	)
+	if err != nil {
+		return fmt.Errorf("assign product: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) RemoveProduct(ctx context.Context, tenantID, factoryID, productID string) error {
+	result, err := s.db.Exec(ctx,
+		`DELETE FROM factory_products WHERE factory_id = $1 AND product_id = $2 AND tenant_id = $3`,
+		factoryID, productID, tenantID,
+	)
+	if err != nil {
+		return fmt.Errorf("remove product: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("assignment not found")
+	}
+	return nil
+}
+
 func (s *Service) Delete(ctx context.Context, tenantID, id string) error {
 	result, err := s.db.Exec(ctx,
 		`DELETE FROM factories WHERE id = $1 AND tenant_id = $2`,

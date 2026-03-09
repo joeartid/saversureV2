@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import BottomNav from "@/components/BottomNav";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
+
+const QrScanner = dynamic(() => import("@/components/QrScanner"), { ssr: false });
 
 interface ScanResult {
   status: string;
@@ -13,24 +17,51 @@ interface ScanResult {
 }
 
 export default function ScanPage() {
-  const [mode, setMode] = useState<"qr" | "manual">("manual");
+  const router = useRouter();
+  const [mode, setMode] = useState<"qr" | "manual">("qr");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
   const [error, setError] = useState("");
   const [locationStatus, setLocationStatus] = useState<"idle" | "getting" | "ok" | "denied">("idle");
+  const [scannerKey, setScannerKey] = useState(0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const extractRef1FromUrl = (text: string): string => {
+    try {
+      const url = new URL(text);
+      // V2 format: qr.svsu.me/{shortcode}/{ref1}
+      const parts = url.pathname.replace(/^\//, "").split("/");
+      if (parts.length === 2 && parts[0].length <= 5 && parts[1].length >= 6) {
+        return parts[1];
+      }
+      // Legacy format: /s/{code}
+      if (parts.length === 2 && parts[0] === "s") {
+        return parts[1];
+      }
+      // Query format: ?code=X
+      const codeParam = url.searchParams.get("code");
+      if (codeParam) return codeParam;
+    } catch {
+      // Not a URL — treat as raw code/ref1
+    }
+    return text;
+  };
+
+  const handleQrScan = (decodedText: string) => {
     if (!isLoggedIn()) {
-      setError("กรุณาเข้าสู่ระบบก่อน");
+      localStorage.setItem("scan_redirect_code", extractRef1FromUrl(decodedText));
+      router.push("/login");
       return;
     }
-    const trimmed = code.trim();
-    if (!trimmed) {
-      setError("กรุณากรอกรหัส");
-      return;
-    }
+    const ref1 = extractRef1FromUrl(decodedText);
+    setCode(ref1);
+    setMode("manual");
+    submitScan(ref1);
+  };
+
+  const submitScan = async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
 
     setLoading(true);
     setError("");
@@ -65,10 +96,13 @@ export default function ScanPage() {
         longitude = coords.lng;
       }
 
-      const body: { code?: string; ref1?: string; latitude?: number; longitude?: number } = {
-        code: trimmed,
-        ref1: trimmed,
-      };
+      const isRef1 = /^[A-Za-z0-9]{6,12}$/.test(trimmed) && !trimmed.includes("-");
+      const body: { code?: string; ref1?: string; latitude?: number; longitude?: number } = {};
+      if (isRef1) {
+        body.ref1 = trimmed;
+      } else {
+        body.code = trimmed;
+      }
       if (latitude != null) body.latitude = latitude;
       if (longitude != null) body.longitude = longitude;
 
@@ -80,6 +114,19 @@ export default function ScanPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoggedIn()) {
+      setError("กรุณาเข้าสู่ระบบก่อน");
+      return;
+    }
+    if (!code.trim()) {
+      setError("กรุณากรอกรหัส");
+      return;
+    }
+    submitScan(code);
   };
 
   return (
@@ -111,28 +158,31 @@ export default function ScanPage() {
         </div>
 
         {mode === "qr" ? (
-          <div className="bg-white rounded-[var(--radius-lg)] elevation-1 p-8 text-center">
-            <div className="w-48 h-48 mx-auto bg-[var(--surface-container)] rounded-[var(--radius-lg)] flex items-center justify-center mb-4">
-              <svg viewBox="0 0 24 24" fill="var(--on-surface-variant)" className="w-16 h-16 opacity-30">
-                <path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5z" />
-              </svg>
-            </div>
-            <p className="text-[14px] text-[var(--on-surface-variant)]">
-              สแกนด้วยกล้องต้องใช้ LINE LIFF หรือ Native API
+          <div className="bg-white rounded-[var(--radius-lg)] elevation-1 p-4">
+            <QrScanner
+              key={scannerKey}
+              onScan={handleQrScan}
+              onError={(err) => setError(err)}
+            />
+            <p className="text-[12px] text-[var(--on-surface-variant)] mt-3 text-center">
+              จัดให้ QR Code อยู่ในกรอบสี่เหลี่ยม
             </p>
-            <p className="text-[12px] text-[var(--on-surface-variant)] mt-1 opacity-70">
-              เร็วๆ นี้ — ใช้ &quot;กรอกรหัส&quot; ก่อน
-            </p>
-            <a
-              href="#"
-              className="mt-4 inline-block text-[13px] text-[var(--primary)] font-medium underline"
-              onClick={(e) => {
-                e.preventDefault();
-                setMode("manual");
-              }}
-            >
-              ไปที่กรอกรหัสด้วยตนเอง
-            </a>
+            {result && (
+              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                <p className="text-sm text-green-700 font-medium">สแกนสำเร็จ! +{result.points_earned} คะแนน</p>
+              </div>
+            )}
+            {error && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+                <p className="text-sm text-red-600">{error}</p>
+                <button
+                  onClick={() => { setError(""); setScannerKey(k => k + 1); }}
+                  className="mt-2 text-xs text-[var(--primary)] underline"
+                >
+                  สแกนอีกครั้ง
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-[var(--radius-lg)] elevation-1 p-5">
@@ -176,7 +226,7 @@ export default function ScanPage() {
                 onClick={() => setMode("qr")}
                 className="text-[var(--primary)] underline"
               >
-                สแกนด้วยกล้อง (เร็วๆ นี้)
+                สแกนด้วยกล้อง
               </button>
             </p>
           </div>

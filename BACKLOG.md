@@ -4,7 +4,7 @@
 > เปรียบเทียบจาก V1 + ปรับปรุง + ฟีเจอร์ใหม่
 >
 > สร้างเมื่อ: 2026-03-04
-> อัปเดตล่าสุด: 2026-03-06
+> อัปเดตล่าสุด: 2026-03-08
 > อ้างอิง: V1 repos (jlc-group), saversure-charter-v2.docx, batch-qr-creator-01
 
 ---
@@ -98,6 +98,38 @@
 | Roll Lifecycle | ✅ | ✅ | Pipeline view, Map Product, QC approval + evidence, separation of duties |
 | V1 Product Import | ✅ | — | 150 สินค้า import + cleaned |
 
+### เสร็จเพิ่ม (2026-03-06 — 2026-03-07)
+
+| Module | Backend | Admin UI | Consumer UI | หมายเหตุ |
+|--------|---------|----------|-------------|----------|
+| Roll Management UX | — | ✅ | — | Filter bar, sorting, clickable inline filter, pagination |
+| Collapsible Sidebar | — | ✅ | — | Hamburger menu, collapsed icons, localStorage persist |
+| Export Improvements | ✅ | ✅ | — | Large batch export (>500K), tab-based export history, cross-batch prevention |
+| Workflow Help Popup | — | ✅ | — | แบรนด์/โรงงานพิมพ์/โรงงานแปะ flow diagram |
+| Responsive Tables | — | ✅ | — | overflow-x-auto, min-w สำหรับ mobile/tablet |
+| Filter Staff from Customers | ✅ | — | — | Customer list/detail/dashboard แสดงเฉพาะ api_client |
+| Staff Creation Fix | ✅ | ✅ | — | แก้ factory dropdown, API validation |
+| Product Image Upload | ✅ | ✅ | — | Upload ไฟล์รูปตรง + URL input, labels ครบทุกช่อง |
+| V1 Product Image Migration | ✅ | — | — | ดึงรูปจาก legacy S3 → upload MinIO → อัพเดท V2 |
+| QC Verify Fix | ✅ | ✅ | — | แก้ field mismatch (valid/checksum_ok), แสดง product/roll info |
+
+### เสร็จเพิ่ม (2026-03-07 — 2026-03-08)
+
+| Module | Backend | Admin UI | Consumer UI | หมายเหตุ |
+|--------|---------|----------|-------------|----------|
+| LINE Login | ✅ | — | ✅ | OAuth 2.1 flow, LINE profile sync, auto-register |
+| LINE Login per Tenant | ✅ | — | ✅ | LINE credentials จาก tenant settings (fallback env) |
+| Custom Domain (svsu.me) | ✅ | — | — | Cloudflare Tunnel: api/admin/qr/consumer subdomains |
+| Wildcard Subdomain | ✅ | — | — | `*.svsu.me` → consumer frontend |
+| Consumer Tenant Detection | ✅ | — | ✅ | Detect brand จาก hostname (ไม่ใช่ env var) |
+| Dynamic Branding | ✅ | — | ✅ | Fetch branding API → apply CSS vars, logo, favicon, title |
+| QR Redirect | ✅ | — | — | `qr.svsu.me/s/{code}` → resolve brand → redirect |
+| Public Branding API | ✅ | — | — | `GET /api/v1/public/branding-by-slug?slug=X` (no auth) |
+| Public Tenant Resolve | ✅ | — | — | `GET /api/v1/public/tenant-by-slug?slug=X` (no auth) |
+| Consumer Homepage Fix | — | — | ✅ | แก้ toLocaleString error, SSR hydration |
+| Scan URL (qr.svsu.me) | ✅ | ✅ | — | เปลี่ยน scan_base_url → `qr.svsu.me`, QR preview ใช้ domain |
+| Ref1 Display on Scan | ✅ | — | ✅ | แสดง ref1 ก่อน login + หลัง scan สำเร็จ |
+
 ### ข้อเสนอแนะหลังสำรวจ V2 + Legacy (2026-03-06)
 
 > สำรวจเทียบจาก `saversure-legacy` เพิ่มเติมแล้ว พบว่า V2 พร้อมมากในด้าน architecture และ security แต่ยังมีบาง flow ที่ควรปิดให้ “ใช้งานจริงครบวงจร” ก่อนงาน external dependency อย่าง LINE/LIFF แบบเต็มรูปแบบ
@@ -151,20 +183,40 @@
 
 #### หมายเหตุ backlog ที่ควรอัปเดตสถานะ
 
-- `Batch Status/Recall UI buttons` — ทำแล้วใน admin batches page
-- `Select factory/product during batch creation` — ทำแล้วใน admin batches page
-- `Roll Lifecycle` / `Export redesign` / `Factory portal` — ควรถือเป็น phase ที่เสร็จแล้ว และใช้เป็นฐานสำหรับ phase ถัดไป
+- `Batch Status/Recall UI buttons` — ✅ ทำแล้วใน admin batches page
+- `Select factory/product during batch creation` — ✅ ทำแล้วใน admin batches page
+- `Roll Lifecycle` / `Export redesign` / `Factory portal` — ✅ เสร็จแล้ว ใช้เป็นฐาน phase ถัดไป
+- `LINE Login` — ✅ ทำเสร็จแล้ว (OAuth 2.1, per-tenant, auto-register)
+- `Custom domain (svsu.me)` — ✅ ทำเสร็จแล้ว (Cloudflare Tunnel, wildcard)
+- `Multi-Brand consumer frontend` — ✅ ทำเสร็จแล้ว (hostname detection, dynamic branding)
+- `Staff/Customer separation` — ✅ ทำเสร็จแล้ว (filter by role)
+- `Roll Management UX` — ✅ ทำเสร็จแล้ว (sort, filter, sidebar, responsive)
+
+#### Top 5 ปรับสถานะ (จาก 2026-03-06 recommendations)
+
+1. **ปิด Reward Redemption Flow ให้จบจริง** — ⬜ ยังไม่ได้ทำ
+2. **ทำ Camera Scan แบบ Web Fallback ก่อน LIFF** — ⬜ ยังไม่ได้ทำ
+3. **เพิ่ม Fulfillment Flow หลังแลก + PDF Delivery Notes** — ⬜ ยังไม่ได้ทำ
+4. **ทำ Daily Ops Digest + Admin Alerts** — ⬜ ยังไม่ได้ทำ
+5. **ทำ Production Safety Baseline** — ⬜ ยังไม่ได้ทำ (tests, CI/CD, metrics)
 
 ---
 
 ## สิ่งที่ยังเหลือ (Requires External Dependencies)
 
-### LINE Login / LIFF (ต้องการ LINE credentials)
+### LINE Login / LIFF
 
-**สถานะ:** ❌ รอ credentials
+**สถานะ:** ✅ LINE Login ทำเสร็จแล้ว | ⬜ LIFF ยังไม่ได้ทำ
 
-**งานที่ต้องทำ:**
-- [ ] Backend: `POST /api/v1/auth/line` — verify LINE ID token → JWT
+**เสร็จแล้ว:**
+- [x] Backend: `GET /api/v1/auth/line` — OAuth 2.1 authorization URL
+- [x] Backend: `POST /api/v1/auth/line/callback` — exchange code → JWT
+- [x] Backend: LINE credentials per tenant (tenant settings fallback env)
+- [x] Consumer: LINE Login button + callback flow
+- [x] Consumer: auto-register from LINE profile (display_name, picture)
+- [x] DB: email/password_hash nullable for LINE-only users
+
+**ยังไม่ได้ทำ:**
 - [ ] Backend: LINE LIFF middleware
 - [ ] Config: LIFF Channel ID, LIFF App URL per tenant
 - [ ] Consumer: LIFF init + login flow
@@ -172,7 +224,7 @@
 
 ### LINE Bot & Notify (ต้องการ LINE credentials)
 
-**สถานะ:** ❌ รอ credentials
+**สถานะ:** ❌ ยังไม่ได้ทำ
 
 **งานที่ต้องทำ:**
 - [ ] Backend: LINE Messaging API client
@@ -180,20 +232,137 @@
 - [ ] Admin UI: Send LINE from customer detail
 - [ ] Consumer: LINE push notifications
 
-### White-Label Consumer App
+### White-Label Consumer App (Multi-Brand)
 
-**สถานะ:** ❌ ต้องมี LINE OA per tenant + custom domain
+**สถานะ:** ✅ ส่วนใหญ่เสร็จแล้ว
 
-**งานที่ต้องทำ:**
-- [ ] Custom domain per tenant
-- [ ] LIFF per tenant
-- [ ] Tenant detection from domain/subdomain
+**เสร็จแล้ว:**
+- [x] Custom domain: `svsu.me` + Cloudflare Tunnel
+- [x] Wildcard subdomain: `*.svsu.me` → consumer
+- [x] Tenant detection from hostname (subdomain → slug → tenant_id)
+- [x] Dynamic branding: fetch branding API → apply CSS vars, logo, favicon
+- [x] LINE credentials per tenant (stored in tenant settings)
+- [x] QR redirect: `qr.svsu.me/s/{code}` → resolve brand → redirect
+
+**ยังไม่ได้ทำ:**
+- [ ] LIFF per tenant (ต้อง LINE OA per brand)
+- [ ] Rich menu per brand
+
+---
+
+## Multi-Brand Strategy & Central Platform (วางแผนแล้ว — ยังไม่ implement)
+
+> สรุปจากการพูดคุยเมื่อ 2026-03-08
+> สถานะ: **อยู่ระหว่างวางแผน** — ยังไม่เปลี่ยนโค้ด
+
+### Domain Structure
+
+```
+svsu.me (V2 — Multi-Brand Platform)
+├── api.svsu.me           → Shared Backend API (multi-tenant)
+├── admin.svsu.me         → Shared Admin Panel (tenant selector inside)
+├── qr.svsu.me            → QR Redirect (resolve brand → redirect)
+│   └── /jh/A6FPZKTQL6    → URL มี brand shortcode + ref1
+│   └── /b2/XXXXXXXXXX    → แต่ละ brand มี shortcode ต่างกัน
+├── julasherb.svsu.me     → Consumer: Jula'sHerb
+├── brand2.svsu.me        → Consumer: Brand 2
+├── brand3.svsu.me        → Consumer: Brand 3
+└── app.svsu.me           → (อนาคต) Saversure Central App
+
+saversure.com (Legacy V1 — Jula'sHerb only)
+├── julaherb.saversure.com      → V1 Consumer (รันอยู่)
+├── admin-web.julaherb.saversure.com → V1 Admin (รันอยู่)
+└── qr.saversure.com            → V1 QR Scan (รันอยู่)
+```
+
+### QR Scan URL Format (ตกลงแล้ว)
+
+**รูปแบบ:** `qr.svsu.me/{brand_shortcode}/{ref1}`
+
+**ตัวอย่าง:**
+- `qr.svsu.me/jh/A6FPZKTQL6` → Jula'sHerb, ref1 = `A6FPZKTQL6`
+- `qr.svsu.me/b2/XXXXXXXXXX` → Brand 2
+
+**Flow การทำงาน:**
+1. ลูกค้าสแกน QR → เข้า `qr.svsu.me/jh/A6FPZKTQL6`
+2. Backend resolve `jh` → tenant slug = `julasherb`
+3. Redirect ไป `julasherb.svsu.me/s/A6FPZKTQL6`
+4. Consumer frontend แสดงหน้าสะสมแต้ม + branding ของ Jula'sHerb
+
+**ข้อดีของรูปแบบนี้:**
+- URL อ่านง่าย, ref1 สั้น (ไม่มี brand prefix ใน ref1)
+- ลูกค้าที่ซื้อสินค้ารู้อยู่แล้วว่าเป็นแบรนด์ไหน (สติ๊กเกอร์มีลายแบรนด์)
+- Backend สามารถ resolve brand จาก shortcode ใน URL ได้เลย
+- ไม่มีปัญหา ref1 ซ้ำข้ามแบรนด์ (resolve จาก URL path ไม่ใช่ ref1)
+
+### LINE Integration (per Brand)
+
+**จำนวน LINE OA ที่ต้องมี: 3 OA = 3 แบรนด์**
+
+| Brand | LINE OA | หน้าที่ |
+|-------|---------|---------|
+| Jula'sHerb | @julasherb | Consumer login, push notification, rich menu → `julasherb.svsu.me` |
+| Brand 2 | @brand2 | Consumer login, push notification, rich menu → `brand2.svsu.me` |
+| Brand 3 | @brand3 | Consumer login, push notification, rich menu → `brand3.svsu.me` |
+
+- LINE Login credentials เก็บใน tenant settings (ระบบรองรับแล้ว)
+- Rich Menu แต่ละ OA ชี้ไปหน้า consumer ของ brand นั้น
+- LIFF (ถ้าจะใช้): ต้องสร้าง LIFF App per LINE OA
+
+### Central Saversure Platform (อนาคต)
+
+**Vision:** แอปส่วนกลาง `app.svsu.me` (หรือ Saversure app) ที่:
+1. ลูกค้าเห็นแต้มของแต่ละ brand แยกกัน (Jula'sHerb 500 pts, Brand2 200 pts)
+2. แลก Brand Point → Saversure Point ตามอัตราที่กำหนด
+3. Saversure ส่วนกลางจัดกิจกรรม (ชิงโชค, แจกของรางวัล) ด้วย Saversure Point
+4. ลูกค้าเชื่อม LINE account เดียวกับหลาย brand ได้
+
+**สถานะระบบปัจจุบัน:**
+- ✅ Multi-tenant isolation (แต้มแยกตาม tenant อยู่แล้ว)
+- ✅ Point ledger per tenant
+- ✅ LINE Login per tenant
+- ⬜ Cross-tenant user identity (ผูก user ข้ามแบรนด์ด้วย LINE user_id / เบอร์โทร)
+- ⬜ "Saversure Point" (platform-level currency)
+- ⬜ Point Exchange Engine (Brand Point → Saversure Point)
+- ⬜ Central activity/lucky draw (platform-level campaigns)
+- ⬜ Central app frontend (app.svsu.me)
+
+**Technical Requirements (ยังไม่ implement):**
+```
+1. cross_tenant_identity table
+   - platform_user_id (UUID)
+   - tenant_id + user_id → link to per-brand user
+   - identity_key (line_user_id / phone)
+   - ลูกค้าคนเดียวมีหลาย tenant user records
+
+2. platform_point_ledger
+   - สกุล: "saversure_point"
+   - credit/debit เหมือน per-tenant ledger
+   - reference_type: "brand_exchange" (แลกจาก brand point มา)
+
+3. Point Exchange API
+   - POST /api/v1/exchange
+   - body: { from_tenant_id, amount, rate }
+   - debit brand points → credit saversure points (atomic)
+
+4. Central campaigns / lucky draw
+   - campaigns ที่ tenant_id = null (platform-level)
+   - ใช้ saversure_point แทน brand point
+```
 
 ---
 
 ## สิ่งที่ยังเหลือ (Nice-to-have / Future)
 
 ### Admin Enhancements
+- [x] Roll Management UX: filter bar, sorting, clickable filters, pagination
+- [x] Collapsible sidebar (hamburger menu, localStorage persist)
+- [x] Export improvements (large batch, export history tab, cross-batch prevention)
+- [x] Workflow help popup (brand/factory flow diagram)
+- [x] Responsive tables (mobile/tablet scrollable)
+- [x] Product image upload (file + URL)
+- [x] Product form labels (ครบทุกช่อง)
+- [x] QC Verify result display (product, roll, status info)
 - [ ] Bulk status update for transactions
 - [ ] Export PDF delivery notes
 - [ ] Admin notification bell + dropdown
@@ -202,6 +371,10 @@
 - [ ] Suspicious scan review tools (remark, flag, action playbook)
 
 ### Consumer Enhancements
+- [x] LINE Login (OAuth flow, auto-register)
+- [x] Dynamic branding (CSS vars, logo, favicon per brand)
+- [x] Tenant detection from hostname
+- [x] Ref1 display on scan page (before + after login)
 - [ ] QR camera scanner (native/LIFF)
 - [ ] Deep link flow (scan QR → LIFF → auto-verify)
 - [ ] Web camera scanner fallback (non-LIFF)
@@ -211,6 +384,13 @@
 - [ ] Smart scan landing based on device/context
 
 ### Backend Enhancements
+- [x] LINE Login per tenant (credentials from tenant settings)
+- [x] Public branding/tenant APIs (no auth needed)
+- [x] QR redirect endpoint (`/s/:code` → resolve brand → redirect)
+- [x] Filter staff from customer lists (api_client role only)
+- [x] Staff creation fix (factory dropdown, validation)
+- [x] V1 product image migration (S3 → MinIO)
+- [ ] **QR URL format: brand shortcode in path** (qr.svsu.me/jh/A6FPZKTQL6) — ยังไม่ implement
 - [ ] Leaderboard refresh job (cron)
 - [ ] Fraud detection rules (real-time)
   - สแกนเกิน X ครั้ง/วัน → ระงับ
@@ -222,6 +402,9 @@
 - [ ] Fulfillment workflow after redeem (prepare / shipping / completed)
 - [ ] Dynamic coupon token with single-use / expiry / audit log
 - [ ] Factory SLA metrics + export health metrics
+- [ ] Cross-tenant user identity (central platform)
+- [ ] Platform point ledger (Saversure Point)
+- [ ] Point Exchange Engine (Brand → Saversure Point)
 
 ### Phase 6 — Non-Functional (Ongoing)
 
@@ -245,25 +428,6 @@
 
 ---
 
-## Database Migrations Summary
-
-| # | File | Description |
-|---|------|-------------|
-| 001 | core_schema | tenants, users, user_roles, campaigns, batches, codes, rewards, etc. |
-| 002 | lucky_draw | lucky_draw_campaigns, prizes, tickets, winners |
-| 003 | news_support | news, support_cases, support_messages |
-| 004 | products_factories | products, factories, batch FK links |
-| 005 | donation_notification | donations, donation_histories, notifications |
-| 006 | configurable_point_types | point_currencies, currency columns |
-| 007 | api_keys_webhooks | api_keys, webhooks, webhook_logs |
-| 008 | gamification | missions, user_missions, badges, user_badges, leaderboard |
-| 009 | flash_reward_tiers | reward_tiers, flash columns, tenant branding |
-| 010 | consumer_enhancements | user profile fields, user_addresses, coupon_codes, scan enhancements |
-| 011 | performance_indexes | Performance indexes for all high-traffic tables |
-| 012 | pdpa_deletion_requested | deletion_requested_at column on users |
-
----
-
 ## API Endpoints Summary
 
 ### Auth (Public)
@@ -275,6 +439,8 @@ POST   /api/v1/auth/login-phone        — Phone login
 POST   /api/v1/auth/refresh            — Refresh token
 POST   /api/v1/otp/request             — Request OTP
 POST   /api/v1/otp/verify              — Verify OTP
+GET    /api/v1/auth/line               — LINE Login authorization URL (per tenant)
+POST   /api/v1/auth/line/callback      — LINE Login callback (exchange code → JWT)
 ```
 
 ### Admin APIs
@@ -355,8 +521,16 @@ GET    /api/v1/public/leaderboard
 GET    /api/v1/public/badges
 GET    /api/v1/public/tiers
 GET    /api/v1/public/branding
+GET    /api/v1/public/branding-by-slug  — Branding by tenant slug (multi-brand)
+GET    /api/v1/public/tenant-by-slug    — Resolve tenant from slug
+GET    /api/v1/public/resolve-ref1      — Convert compact code → ref1
 GET    /api/v1/public/rewards
 GET    /api/v1/public/rewards/:id
+```
+
+### QR Redirect (Root-level)
+```
+GET    /s/:code                         — Resolve code → brand → redirect to consumer
 ```
 
 ### Consumer (Authenticated) APIs
@@ -530,10 +704,10 @@ CRUD   /api/v1/support/my-cases
 
 | # | File | Description |
 |---|------|-------------|
-| 001 | core_schema | tenants, users, user_roles, campaigns, batches, codes, rewards, etc. |
-| 002 | lucky_draw | lucky_draw_campaigns, prizes, tickets, winners |
-| 003 | news_support | news, support_cases, support_messages |
-| 004 | products_factories | products, factories, batch FK links |
+| 001 | initial_schema | tenants, users, user_roles, campaigns, batches, codes, rewards, etc. |
+| 002 | add_tracking_and_status | lucky_draw_campaigns, prizes, tickets, winners |
+| 003 | products_factories | products, factories |
+| 004 | news_support_luckydraw | news, support_cases, support_messages, lucky draw |
 | 005 | donation_notification | donations, donation_histories, notifications |
 | 006 | configurable_point_types | point_currencies, currency columns |
 | 007 | api_keys_webhooks | api_keys, webhooks, webhook_logs |
@@ -543,6 +717,16 @@ CRUD   /api/v1/support/my-cases
 | 011 | performance_indexes | Performance indexes for all high-traffic tables |
 | 012 | pdpa_deletion_requested | deletion_requested_at column on users |
 | 013 | rolls | rolls table, batch codes_per_roll, roll lifecycle indexes |
+| 014 | promotions | promotion rules, campaign promotions |
+| 015 | promotion_enhancements | promotion enhancements |
+| 016 | promotion_bonus_rules | promotion bonus rules |
+| 017 | customer_v1_fields | V1 customer fields (province, occupation, customer_flag, v1_user_id) |
+| 018 | ref2_running_number | ref2 running number fields |
+| 019 | export_redesign | export_logs redesign (batches array, roll tracking) |
+| 020 | factory_export_format | factory export format settings |
+| 021 | factory_user_link | factory-user link (staff → factory assignment) |
+| 022 | redemption_coupon_code | redemption coupon code fields |
+| 023 | line_login_nullable_email | email/password_hash nullable for LINE-only users |
 
 ---
 

@@ -32,7 +32,8 @@ interface Roll {
 interface Product {
   id: string;
   name: string;
-  sku: string;
+  sku: string | null;
+  image_url: string | null;
   points_per_scan: number;
 }
 
@@ -78,6 +79,8 @@ function RollsPage() {
   const [mapForm, setMapForm] = useState({ product_id: "", evidence_urls: [] as string[], note: "" });
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
+  const [productPickerOpen, setProductPickerOpen] = useState(false);
 
   const fetchRolls = useCallback(async () => {
     setLoading(true);
@@ -102,8 +105,16 @@ function RollsPage() {
 
   const handleOpenMap = (roll: Roll) => {
     setMapForm({ product_id: roll.product_id || "", evidence_urls: [], note: "" });
+    setProductSearch("");
+    setProductPickerOpen(false);
     setMapDialog(roll);
   };
+
+  const selectedProduct = products.find((p) => p.id === mapForm.product_id);
+  const filteredProducts = products.filter((p) => {
+    const q = productSearch.toLowerCase();
+    return p.name.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
+  });
 
   const handleUploadEvidence = async (file: File) => {
     setUploading(true);
@@ -298,23 +309,116 @@ function RollsPage() {
             </p>
 
             <div className="space-y-4">
-              {/* Product select */}
+              {/* Product picker */}
               <div>
                 <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] uppercase tracking-[0.4px] mb-1.5">
                   สินค้า *
                 </label>
-                <select
-                  value={mapForm.product_id}
-                  onChange={(e) => setMapForm((prev) => ({ ...prev, product_id: e.target.value }))}
-                  className={fieldClass}
+
+                {/* Selected product preview */}
+                <button
+                  type="button"
+                  onClick={() => setProductPickerOpen((v) => !v)}
+                  className="w-full flex items-center gap-3 h-[56px] px-3 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] bg-[var(--md-surface)] hover:border-[var(--md-primary)] transition-all text-left"
                 >
-                  <option value="">— เลือกสินค้า —</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} {p.sku ? `(${p.sku})` : ""} — {p.points_per_scan} pts
-                    </option>
-                  ))}
-                </select>
+                  {selectedProduct ? (
+                    <>
+                      {selectedProduct.image_url ? (
+                        <img
+                          src={selectedProduct.image_url}
+                          alt={selectedProduct.name}
+                          className="w-9 h-9 rounded-[6px] object-cover flex-shrink-0"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-[6px] bg-[var(--md-surface-dim)] flex items-center justify-center flex-shrink-0">
+                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--md-on-surface-variant)] opacity-40">
+                            <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-medium text-[var(--md-on-surface)] leading-tight truncate">
+                          {selectedProduct.name}
+                        </p>
+                        <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                          {selectedProduct.sku || "—"} · {selectedProduct.points_per_scan} pts
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-[14px] text-[var(--md-on-surface-variant)] flex-1">
+                      — เลือกสินค้า —
+                    </span>
+                  )}
+                  <svg viewBox="0 0 24 24" fill="currentColor" className={`w-5 h-5 text-[var(--md-on-surface-variant)] flex-shrink-0 transition-transform ${productPickerOpen ? "rotate-180" : ""}`}>
+                    <path d="M7 10l5 5 5-5z" />
+                  </svg>
+                </button>
+
+                {/* Dropdown list */}
+                {productPickerOpen && (
+                  <div className="mt-1 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] bg-[var(--md-surface)] shadow-lg overflow-hidden">
+                    <div className="p-2 border-b border-[var(--md-outline-variant)]">
+                      <input
+                        type="text"
+                        placeholder="ค้นหาชื่อสินค้า หรือ SKU..."
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        autoFocus
+                        className="w-full h-[36px] px-3 rounded-[6px] text-[13px] text-[var(--md-on-surface)] bg-[var(--md-surface-dim)] outline-none focus:ring-1 focus:ring-[var(--md-primary)] transition-all"
+                      />
+                    </div>
+                    <div className="max-h-[260px] overflow-y-auto">
+                      {filteredProducts.length === 0 ? (
+                        <p className="text-center py-6 text-[13px] text-[var(--md-on-surface-variant)]">ไม่พบสินค้า</p>
+                      ) : (
+                        filteredProducts.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setMapForm((prev) => ({ ...prev, product_id: p.id }));
+                              setProductPickerOpen(false);
+                              setProductSearch("");
+                            }}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--md-surface-dim)] transition-colors text-left ${
+                              mapForm.product_id === p.id ? "bg-[var(--md-primary-light)]" : ""
+                            }`}
+                          >
+                            {p.image_url ? (
+                              <img
+                                src={p.image_url}
+                                alt={p.name}
+                                className="w-10 h-10 rounded-[6px] object-cover flex-shrink-0"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-[6px] bg-[var(--md-surface-container)] flex items-center justify-center flex-shrink-0">
+                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--md-on-surface-variant)] opacity-40">
+                                  <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+                                </svg>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-semibold text-[var(--md-on-surface)] leading-tight truncate">
+                                {p.name}
+                              </p>
+                              <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-0.5">
+                                {p.sku || "ไม่มี SKU"} · <span className="font-medium text-[var(--md-primary)]">{p.points_per_scan} pts</span>
+                              </p>
+                            </div>
+                            {mapForm.product_id === p.id && (
+                              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-[var(--md-primary)] flex-shrink-0">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                              </svg>
+                            )}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Evidence upload */}

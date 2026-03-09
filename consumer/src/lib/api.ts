@@ -1,5 +1,6 @@
+import { getTenantId } from "@/lib/tenant";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID || "";
 
 interface RequestOptions {
   method?: string;
@@ -19,13 +20,14 @@ class ApiError extends Error {
 
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("consumer_token") : null;
+  const tenantId = getTenantId();
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...options.headers,
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  if (TENANT_ID) headers["X-Tenant-ID"] = TENANT_ID;
+  if (tenantId) headers["X-Tenant-ID"] = tenantId;
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
 
   const res = await fetch(`${API_BASE}${endpoint}`, {

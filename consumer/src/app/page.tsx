@@ -5,6 +5,7 @@ import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import { isLoggedIn, getUser } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { useTenant } from "@/components/TenantProvider";
 
 interface PointBalance {
   current: number;
@@ -13,6 +14,7 @@ interface PointBalance {
 }
 
 export default function HomePage() {
+  const { branding } = useTenant();
   const [loggedIn, setLoggedIn] = useState(false);
   const [points, setPoints] = useState<number>(0);
   const [user, setUser] = useState<{ user_id: string } | null>(null);
@@ -39,11 +41,15 @@ export default function HomePage() {
               {loggedIn ? `User ${user?.user_id?.slice(0, 6)}` : "Guest"}
             </h1>
           </div>
-          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5">
-              <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
-            </svg>
-          </div>
+          {branding?.logo_url ? (
+            <img src={branding.logo_url} alt={branding.brand_name || ""} className="w-10 h-10 rounded-full object-cover" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5">
+                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+              </svg>
+            </div>
+          )}
         </div>
 
         {/* Points card */}

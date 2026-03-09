@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { setToken } from "@/lib/auth";
+import { getTenantId } from "@/lib/tenant";
 import { Suspense } from "react";
 
 function LineCallbackInner() {
@@ -25,7 +26,7 @@ function LineCallbackInner() {
       return;
     }
 
-    const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || "00000000-0000-0000-0000-000000000001";
+    const tenantId = getTenantId() || "00000000-0000-0000-0000-000000000001";
 
     api
       .post<{ access_token: string }>("/api/v1/auth/line/callback", {

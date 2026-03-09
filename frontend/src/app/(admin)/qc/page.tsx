@@ -8,8 +8,15 @@ interface VerifyResult {
   checksum_ok: boolean;
   batch_id?: string;
   batch_prefix?: string;
+  campaign_id?: string;
   serial?: number;
+  ref2?: string;
   status?: string;
+  product_name?: string;
+  roll_id?: string;
+  roll_number?: number;
+  roll_status?: string;
+  roll_product_name?: string;
   message?: string;
 }
 
@@ -165,14 +172,35 @@ export default function QCVerifyPage() {
                 <span className="text-[var(--md-on-surface-variant)]">Serial</span>
                 <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.serial?.toLocaleString()}</span>
               </div>
+              {result.product_name && (
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-[var(--md-on-surface-variant)]">Campaign</span>
+                  <span className="font-medium text-[var(--md-on-surface)]">{result.product_name}</span>
+                </div>
+              )}
               <div className="flex justify-between text-[13px]">
-                <span className="text-[var(--md-on-surface-variant)]">Status</span>
+                <span className="text-[var(--md-on-surface-variant)]">Batch Status</span>
                 <span className="font-medium text-[var(--md-on-surface)] capitalize">{result.status}</span>
               </div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-[var(--md-on-surface-variant)]">Batch ID</span>
-                <span className="font-mono text-[11px] text-[var(--md-on-surface-variant)]">{result.batch_id?.slice(0, 12)}...</span>
-              </div>
+              {result.roll_number != null && (
+                <>
+                  <div className="h-px bg-black/10 my-1" />
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-[var(--md-on-surface-variant)]">Roll #</span>
+                    <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.batch_prefix} #{result.roll_number}</span>
+                  </div>
+                  {result.roll_product_name && (
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-[var(--md-on-surface-variant)]">สินค้า (Map)</span>
+                      <span className="font-medium text-[var(--md-on-surface)]">{result.roll_product_name}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-[var(--md-on-surface-variant)]">Roll Status</span>
+                    <span className="font-medium text-[var(--md-on-surface)] capitalize">{result.roll_status}</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

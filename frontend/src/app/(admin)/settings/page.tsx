@@ -19,6 +19,7 @@ interface Tenant {
   id: string;
   name: string;
   slug: string;
+  shortcode?: string;
   settings?: Record<string, unknown>;
   ref2_next?: number;
   status: string;
@@ -28,10 +29,10 @@ const defaultCodeExport: CodeExportConfig = {
   ref1_length: 10,
   ref1_format: "alphanumeric",
   ref1_min_value: 1000000000,
-  scan_base_url: "https://scan.saversure.com",
+  scan_base_url: "https://qr.svsu.me",
   lot_size: 10000,
-  url_format: "query",
-  compact_code: false,
+  url_format: "path",
+  compact_code: true,
   hmac_length: 8,
   max_url_length: 0,
 };
@@ -140,7 +141,9 @@ export default function SettingsPage() {
               <div>
                 <h2 className="text-[16px] font-medium text-[var(--md-on-surface)]">{tenant.name}</h2>
                 <p className="text-[13px] text-[var(--md-on-surface-variant)]">
-                  Slug: <span className="font-mono">{tenant.slug}</span> &middot; ID: <span className="font-mono">{tenant.id.slice(0, 8)}</span>
+                  Slug: <span className="font-mono">{tenant.slug}</span>
+                  {tenant.shortcode && <> &middot; Shortcode: <span className="font-mono font-bold text-[var(--md-primary)]">{tenant.shortcode}</span></>}
+                  &middot; ID: <span className="font-mono">{tenant.id.slice(0, 8)}</span>
                 </p>
               </div>
             </div>
@@ -258,10 +261,36 @@ export default function SettingsPage() {
                     value={form.scan_base_url ?? ""}
                     onChange={(e) => setForm({ ...form, scan_base_url: e.target.value })}
                     className={fieldClass}
-                    placeholder="https://scan.saversure.com"
+                    placeholder="https://qr.svsu.me"
                   />
                   <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-1">URL ฐานสำหรับ QR scan (ใช้ใน export)</p>
                 </div>
+
+                {/* QR URL Format Preview */}
+                {tenant.shortcode && (
+                  <div className="md:col-span-2 p-4 rounded-[var(--md-radius-md)] border border-[var(--md-primary)]/30 bg-[var(--md-primary-light,#e8f0fe)]">
+                    <p className="text-[12px] font-medium text-[var(--md-on-surface)] mb-2">QR URL Format (Multi-Brand)</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-mono text-[14px] text-[var(--md-primary)] font-medium">
+                        {(form.scan_base_url || "https://qr.svsu.me").replace(/\/s$/, "")}/{tenant.shortcode}/{"<ref1>"}
+                      </span>
+                    </div>
+                    <p className="font-mono text-[13px] text-[var(--md-on-surface-variant)] mb-1">
+                      ตัวอย่าง: {(form.scan_base_url || "https://qr.svsu.me").replace(/\/s$/, "")}/{tenant.shortcode}/A6FPZKTQL6
+                    </p>
+                    <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                      เมื่อลูกค้าสแกน QR → ระบบจะ redirect ไป {tenant.slug}.svsu.me/s/ref1 อัตโนมัติ
+                    </p>
+                  </div>
+                )}
+
+                {!tenant.shortcode && (
+                  <div className="md:col-span-2 p-4 rounded-[var(--md-radius-md)] border border-[var(--md-error)]/30 bg-[var(--md-error-light,#fce8e6)]">
+                    <p className="text-[13px] text-[var(--md-error)]">
+                      ⚠ ยังไม่มี shortcode สำหรับ tenant นี้ — กรุณาติดต่อ super admin เพื่อตั้งค่า shortcode (เช่น &quot;jh&quot; สำหรับ Jula&apos;sHerb)
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Compact QR URL section */}
@@ -339,39 +368,45 @@ export default function SettingsPage() {
 
                 {/* URL Length Budget Preview */}
                 {(() => {
-                  const baseUrl = form.scan_base_url || "https://scan.saversure.com";
-                  const isCompact = form.compact_code;
-                  const isPath = form.url_format === "path";
+                  const baseUrl = (form.scan_base_url || "https://qr.svsu.me").replace(/\/s$/, "");
+                  const shortcode = tenant?.shortcode || "xx";
                   const hmacLen = form.hmac_length ?? 8;
                   const maxLen = form.max_url_length ?? 0;
+                  const isCompact = form.compact_code;
 
-                  const samplePrefix = "JH";
+                  const sampleRef1 = "A6FPZKTQL6";
+                  const samplePrefix = shortcode.toUpperCase();
                   const sampleSerial = isCompact ? "FXsk" : "10000001";
                   const sampleHmac = "abcdef01".slice(0, hmacLen);
+
+                  const newFormatUrl = `${baseUrl}/${shortcode}/${sampleRef1}`;
+
                   const sampleCode = isCompact
                     ? `${samplePrefix}${sampleSerial}${sampleHmac}`
                     : `SV2026-${sampleSerial}-${sampleHmac}`;
-                  const sampleUrl = isPath
-                    ? `${baseUrl}/${sampleCode}`
-                    : `${baseUrl}?code=${sampleCode}`;
-                  const urlLen = sampleUrl.length;
-                  const ok = maxLen === 0 || urlLen <= maxLen;
 
-                  const baseUrlLen = baseUrl.length + (isPath ? 1 : 6);
-                  const codeLen = sampleCode.length;
-                  const remaining = maxLen > 0 ? maxLen - baseUrlLen : null;
+                  const urlLen = newFormatUrl.length;
+                  const ok = maxLen === 0 || urlLen <= maxLen;
 
                   return (
                     <div className={`mt-4 p-4 rounded-[var(--md-radius-sm)] border ${ok ? "border-[var(--md-success,#4caf50)] bg-[var(--md-success-light,#e8f5e9)]" : "border-[var(--md-error)] bg-[var(--md-error-light)]"}`}>
                       <p className="text-[12px] font-medium text-[var(--md-on-surface)] mb-2">URL Preview</p>
-                      <p className="font-mono text-[13px] text-[var(--md-on-surface)] break-all mb-2">{sampleUrl}</p>
+                      <div className="space-y-2 mb-2">
+                        <div>
+                          <span className="text-[10px] text-[var(--md-on-surface-variant)] uppercase">QR Scan URL (ลิงค์ใน QR Code)</span>
+                          <p className="font-mono text-[13px] text-[var(--md-primary)] font-medium break-all">{newFormatUrl}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-[var(--md-on-surface-variant)] uppercase">Internal HMAC Code (ใช้ verify ภายใน)</span>
+                          <p className="font-mono text-[12px] text-[var(--md-on-surface-variant)] break-all">{sampleCode}</p>
+                        </div>
+                      </div>
                       <div className="flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-[var(--md-on-surface-variant)]">
-                        <span>Base URL: {baseUrlLen} chars</span>
-                        <span>Code: {codeLen} chars</span>
+                        <span>URL: {urlLen} chars</span>
+                        <span>Ref1: {sampleRef1.length} chars</span>
                         <span className={`font-medium ${ok ? "text-[var(--md-success,#4caf50)]" : "text-[var(--md-error)]"}`}>
-                          Total: {urlLen} chars {maxLen > 0 && `/ ${maxLen} limit`} {ok ? "OK" : "OVER"}
+                          {maxLen > 0 ? `${urlLen} / ${maxLen} limit — ${ok ? "OK" : "OVER"}` : "No length limit"}
                         </span>
-                        {remaining !== null && <span>Budget for code: {remaining} chars</span>}
                       </div>
                     </div>
                   );

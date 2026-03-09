@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useTenantContext } from "@/lib/tenant-context";
 
 interface BrandingSettings {
   logo_url: string;
@@ -34,6 +35,8 @@ export default function BrandingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [previewScreen, setPreviewScreen] = useState<"home" | "scan" | "rewards">("home");
+  const { activeTenant } = useTenantContext();
 
   const fetchBranding = async () => {
     try {
@@ -306,55 +309,170 @@ export default function BrandingPage() {
           </div>
         </form>
 
-        <div className="xl:w-[360px] flex-shrink-0">
-          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 sticky top-8">
-            <h3 className="text-[14px] font-medium text-[var(--md-on-surface-variant)] mb-4 tracking-[0.4px] uppercase">
-              Preview
-            </h3>
-            <div
-              className="rounded-[var(--md-radius-lg)] overflow-hidden border border-[var(--md-outline-variant)]"
-              style={{ backgroundColor: form.bg_color || "#ffffff" }}
-            >
-              <div
-                className="px-4 py-3 flex items-center gap-3"
-                style={{ backgroundColor: form.header_bg || form.primary_color || "#1976d2" }}
-              >
-                {form.logo_url ? (
-                  <img
-                    src={form.logo_url}
-                    alt="Logo"
-                    className="h-8 w-auto object-contain"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                ) : (
-                  <div
-                    className="w-8 h-8 rounded-[var(--md-radius-sm)] flex items-center justify-center text-white text-[12px] font-medium"
-                    style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
-                  >
-                    ?
+        <div className="xl:w-[380px] flex-shrink-0">
+          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-5 sticky top-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[14px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
+                Consumer Preview
+              </h3>
+              {activeTenant?.slug && (
+                <a
+                  href={`https://${activeTenant.slug}.svsu.me`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-[var(--md-primary)] hover:underline"
+                >
+                  เปิดจริง &rarr;
+                </a>
+              )}
+            </div>
+
+            {/* Screen Tabs */}
+            <div className="flex gap-1 mb-3 p-1 bg-[var(--md-surface-variant,#f0f0f0)] rounded-[var(--md-radius-md)]">
+              {(["home", "scan", "rewards"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setPreviewScreen(s)}
+                  className={`flex-1 h-[30px] rounded-[var(--md-radius-sm)] text-[11px] font-medium transition-all ${
+                    previewScreen === s
+                      ? "bg-white text-[var(--md-on-surface)] shadow-sm"
+                      : "text-[var(--md-on-surface-variant)] hover:text-[var(--md-on-surface)]"
+                  }`}
+                >
+                  {s === "home" ? "หน้าหลัก" : s === "scan" ? "สแกน QR" : "รางวัล"}
+                </button>
+              ))}
+            </div>
+
+            {/* Phone Frame */}
+            <div className="mx-auto w-[300px] rounded-[28px] border-[3px] border-gray-800 bg-gray-800 p-[2px] shadow-xl">
+              <div className="rounded-[24px] overflow-hidden" style={{ backgroundColor: form.bg_color || "#ffffff" }}>
+                {/* Status bar */}
+                <div className="h-[28px] bg-gray-800 flex items-center justify-between px-5">
+                  <span className="text-[10px] text-gray-400">9:41</span>
+                  <div className="flex gap-1">
+                    <div className="w-3 h-2 rounded-sm border border-gray-400" />
+                    <svg viewBox="0 0 16 12" className="w-3 h-3 text-gray-400"><path fill="currentColor" d="M1 8h2v4H1zm4-3h2v7H5zm4-3h2v10H9zm4-2h2v12h-2z"/></svg>
+                  </div>
+                </div>
+
+                {/* Header */}
+                <div
+                  className="px-4 py-3 flex items-center gap-3"
+                  style={{ backgroundColor: form.header_bg || form.primary_color || "#1976d2" }}
+                >
+                  {form.logo_url ? (
+                    <img src={form.logo_url} alt="Logo" className="h-7 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  ) : (
+                    <div className="w-7 h-7 rounded-md flex items-center justify-center text-white text-[11px] font-medium" style={{ backgroundColor: "rgba(255,255,255,0.2)" }}>
+                      {form.brand_name?.[0] || "?"}
+                    </div>
+                  )}
+                  <span className="text-white font-semibold text-[14px] truncate">
+                    {form.brand_name || "Brand Name"}
+                  </span>
+                </div>
+
+                {/* Content */}
+                <div className="min-h-[420px]">
+                  {previewScreen === "home" && (
+                    <div className="p-4 space-y-3">
+                      <div className="rounded-xl p-4" style={{ backgroundColor: form.primary_color || "#1976d2", color: "#fff" }}>
+                        <p className="text-[11px] font-medium opacity-80 mb-1">ยินดีต้อนรับ</p>
+                        <p className="text-[13px] leading-relaxed">{form.welcome_text || "สะสมแต้มจากการสแกน QR Code บนสินค้า"}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-4 text-center">
+                        <p className="text-[11px] text-gray-500 mb-1">แต้มสะสม</p>
+                        <p className="text-[28px] font-bold" style={{ color: form.primary_color || "#1976d2" }}>1,250</p>
+                        <p className="text-[10px] text-gray-400">คะแนน</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg p-3 text-center border border-gray-200">
+                          <p className="text-[18px] mb-0.5">📷</p>
+                          <p className="text-[11px] font-medium text-gray-700">สแกน QR</p>
+                        </div>
+                        <div className="rounded-lg p-3 text-center border border-gray-200">
+                          <p className="text-[18px] mb-0.5">🎁</p>
+                          <p className="text-[11px] font-medium text-gray-700">แลกรางวัล</p>
+                        </div>
+                      </div>
+                      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: form.accent_color || "#ff9800" }}>
+                        <div className="p-3 text-white">
+                          <p className="text-[10px] font-medium opacity-80">โปรโมชั่นพิเศษ</p>
+                          <p className="text-[13px] font-medium mt-0.5">สแกนครบ 10 ชิ้น รับฟรี!</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {previewScreen === "scan" && (
+                    <div className="p-4 space-y-3">
+                      <div className="text-center py-2">
+                        <p className="text-[14px] font-medium text-gray-800 mb-1">สแกน QR Code</p>
+                        <p className="text-[11px] text-gray-500">เพื่อสะสมแต้ม</p>
+                      </div>
+                      <div className="aspect-square bg-gray-100 rounded-xl flex items-center justify-center border-2 border-dashed border-gray-300">
+                        <div className="text-center">
+                          <p className="text-[40px] mb-2">📸</p>
+                          <p className="text-[12px] text-gray-500">กล้องจะเปิดที่นี่</p>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[11px] text-gray-400 mb-2">หรือกรอกรหัสด้วยตนเอง</p>
+                        <div className="flex gap-2">
+                          <div className="flex-1 h-[40px] rounded-lg border border-gray-300 flex items-center px-3">
+                            <span className="text-[12px] text-gray-400">A6FPZKTQL6</span>
+                          </div>
+                          <div className="h-[40px] px-4 rounded-lg flex items-center justify-center text-white text-[12px] font-medium" style={{ backgroundColor: form.primary_color || "#1976d2" }}>
+                            ส่ง
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {previewScreen === "rewards" && (
+                    <div className="p-4 space-y-3">
+                      <p className="text-[14px] font-medium text-gray-800">รางวัลที่แลกได้</p>
+                      {[
+                        { name: "ส่วนลด 50 บาท", pts: 200, img: "🏷️" },
+                        { name: "กระเป๋าผ้า Limited", pts: 500, img: "👜" },
+                        { name: "Gift Set พิเศษ", pts: 1000, img: "🎁" },
+                      ].map((r, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
+                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-[20px]">{r.img}</div>
+                          <div className="flex-1">
+                            <p className="text-[13px] font-medium text-gray-800">{r.name}</p>
+                            <p className="text-[11px]" style={{ color: form.primary_color || "#1976d2" }}>{r.pts} แต้ม</p>
+                          </div>
+                          <div className="h-[28px] px-3 rounded-full text-[11px] font-medium text-white flex items-center" style={{ backgroundColor: form.accent_color || "#ff9800" }}>
+                            แลก
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                {form.footer_text && (
+                  <div className="px-4 py-2 border-t border-gray-200">
+                    <p className="text-[10px] text-gray-400 text-center">{form.footer_text}</p>
                   </div>
                 )}
-                <span className="text-white font-medium text-[14px] truncate">
-                  {form.brand_name || "Brand Name"}
-                </span>
-              </div>
-              <div className="p-4 space-y-4">
-                <div
-                  className="rounded-[var(--md-radius-sm)] p-4"
-                  style={{
-                    backgroundColor: form.accent_color || "#ff9800",
-                    color: "#ffffff",
-                  }}
-                >
-                  <p className="text-[12px] font-medium opacity-90 mb-1">Sample Card</p>
-                  <p className="text-[14px]">
-                    {form.welcome_text || "Welcome text will appear here"}
-                  </p>
+
+                {/* Home indicator */}
+                <div className="flex justify-center pb-2 pt-1">
+                  <div className="w-[100px] h-[4px] rounded-full bg-gray-300" />
                 </div>
               </div>
             </div>
+
+            {activeTenant && (
+              <p className="text-[11px] text-[var(--md-on-surface-variant)] text-center mt-3">
+                Preview: <span className="font-mono font-medium">{activeTenant.slug}.svsu.me</span>
+              </p>
+            )}
           </div>
         </div>
       </div>

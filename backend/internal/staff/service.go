@@ -44,6 +44,13 @@ type UpdateInput struct {
 	Role      *string `json:"role"`
 	Status    *string `json:"status"`
 	FactoryID *string `json:"factory_id"`
+	FirstName *string `json:"first_name"`
+	LastName  *string `json:"last_name"`
+	Phone     *string `json:"phone"`
+}
+
+type ResetPasswordInput struct {
+	NewPassword string `json:"new_password" binding:"required,min=6"`
 }
 
 var validStaffRoles = map[string]bool{
@@ -156,6 +163,56 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*StaffUser, er
 	return &u, nil
 }
 
+func (s *Service) Get(ctx context.Context, tenantID, id string) (*StaffUser, error) {
+	var u StaffUser
+	err := s.db.QueryRow(ctx,
+		`SELECT u.id, u.tenant_id, u.email, u.phone, u.first_name, u.last_name,
+		        ur.role, u.status, u.factory_id, f.name, u.created_at::text
+		 FROM users u
+		 JOIN user_roles ur ON ur.user_id = u.id AND ur.tenant_id = u.tenant_id
+		 LEFT JOIN factories f ON f.id = u.factory_id
+		 WHERE u.id = $1 AND u.tenant_id = $2`,
+		id, tenantID,
+	).Scan(&u.ID, &u.TenantID, &u.Email, &u.Phone, &u.FirstName, &u.LastName,
+		&u.Role, &u.Status, &u.FactoryID, &u.FactoryName, &u.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("staff not found")
+	}
+	return &u, nil
+}
+
+func (s *Service) ResetPassword(ctx context.Context, tenantID, id, newPassword string) error {
+	// ป้องกันแก้ super_admin จาก tenant อื่น
+	var role string
+	err := s.db.QueryRow(ctx,
+		`SELECT role FROM user_roles WHERE user_id = $1 AND tenant_id = $2`,
+		id, tenantID,
+	).Scan(&role)
+	if err != nil {
+		return fmt.Errorf("staff not found")
+	}
+	if role == "super_admin" {
+		return fmt.Errorf("cannot reset super_admin password via this endpoint")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	result, err := s.db.Exec(ctx,
+		`UPDATE users SET password_hash = $3, updated_at = NOW() WHERE id = $1 AND tenant_id = $2`,
+		id, tenantID, string(hash),
+	)
+	if err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("staff not found")
+	}
+	return nil
+}
+
 func (s *Service) Update(ctx context.Context, tenantID, id string, input UpdateInput) (*StaffUser, error) {
 	if input.Role != nil {
 		if !validStaffRoles[*input.Role] {
@@ -185,6 +242,23 @@ func (s *Service) Update(ctx context.Context, tenantID, id string, input UpdateI
 		)
 		if err != nil {
 			return nil, fmt.Errorf("update status: %w", err)
+		}
+	}
+
+	if input.FirstName != nil || input.LastName != nil || input.Phone != nil {
+		_, err := s.db.Exec(ctx,
+			`UPDATE users SET
+			   first_name   = COALESCE($3, first_name),
+			   last_name    = COALESCE($4, last_name),
+			   phone        = COALESCE($5, phone),
+			   display_name = COALESCE(NULLIF(TRIM(COALESCE($3, first_name) || ' ' || COALESCE($4, last_name)), ''), email),
+			   updated_at   = NOW()
+			 WHERE id = $1 AND tenant_id = $2
+			   AND id NOT IN (SELECT user_id FROM user_roles WHERE tenant_id = $2 AND role = 'super_admin')`,
+			id, tenantID, input.FirstName, input.LastName, input.Phone,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("update profile: %w", err)
 		}
 	}
 
