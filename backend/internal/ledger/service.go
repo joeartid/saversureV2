@@ -18,20 +18,20 @@ func NewService(db *pgxpool.Pool) *Service {
 }
 
 type Entry struct {
-	ID            string  `json:"id"`
-	TenantID      string  `json:"tenant_id"`
-	UserID        string  `json:"user_id"`
-	CampaignID    *string `json:"campaign_id,omitempty"`
-	EntryType     string  `json:"entry_type"`
-	Amount        int     `json:"amount"`
-	BalanceAfter  int     `json:"balance_after"`
-	Currency      string  `json:"currency"`
-	ReferenceType *string `json:"reference_type,omitempty"`
-	ReferenceID   *string `json:"reference_id,omitempty"`
-	Description   *string `json:"description"`
-	ExpiresAt     *string `json:"expires_at,omitempty"`
-	ExpiryAction  *string `json:"expiry_action,omitempty"`
-	CreatedAt     string  `json:"created_at"`
+	ID            string     `json:"id"`
+	TenantID      string     `json:"tenant_id"`
+	UserID        string     `json:"user_id"`
+	CampaignID    *string    `json:"campaign_id,omitempty"`
+	EntryType     string     `json:"entry_type"`
+	Amount        int        `json:"amount"`
+	BalanceAfter  int        `json:"balance_after"`
+	Currency      string     `json:"currency"`
+	ReferenceType *string    `json:"reference_type,omitempty"`
+	ReferenceID   *string    `json:"reference_id,omitempty"`
+	Description   *string    `json:"description"`
+	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
+	ExpiryAction  *string    `json:"expiry_action,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 type Balance struct {
@@ -72,12 +72,11 @@ func (s *Service) CreditWithExpiry(ctx context.Context, tx pgx.Tx, tenantID, use
 			 expires_at, expiry_action, source_promotion_id)
 		 VALUES ($1, $2, $3, 'credit', $4,
 			COALESCE((SELECT balance_after FROM point_ledger
-				WHERE tenant_id = $1 AND user_id = $2 AND currency = $9
+				WHERE tenant_id = $1 AND user_id = $2 AND currency = $8
 				ORDER BY created_at DESC LIMIT 1), 0) + $4,
-			$5, $6, $7, $9, $10, $11, $12)`,
+			$5, $6, $7, $8, $9, $10, $11)`,
 		tenantID, userID, campaignPtr, amount,
 		refType, refID, description,
-		// $8 skipped (old param numbering preserved for clarity)
 		currency, expiresAt, expiryActionPtr, promoIDPtr,
 	)
 	if err != nil {

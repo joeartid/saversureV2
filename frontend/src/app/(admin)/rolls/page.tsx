@@ -25,6 +25,11 @@ interface Roll {
   qc_evidence_urls: string[];
   distributed_at: string | null;
   created_at: string;
+  actual_ref2_start: number | null;
+  actual_ref2_end: number | null;
+  waste_count: number;
+  ref2_reported_at: string | null;
+  ref2_reported_by_name: string | null;
   batch_prefix: string | null;
   product_name: string | null;
   product_sku: string | null;
@@ -150,6 +155,10 @@ function RollsPage() {
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [flowHelpOpen, setFlowHelpOpen] = useState(false);
+
+  // Report Ref2 states
+  const [ref2Dialog, setRef2Dialog] = useState<Roll | null>(null);
+  const [ref2Form, setRef2Form] = useState({ actual_ref2_start: "", actual_ref2_end: "" });
 
   // Export states
   const [exportDialog, setExportDialog] = useState(false);
@@ -414,6 +423,33 @@ function RollsPage() {
       refresh();
     } catch (e) {
       alert(e instanceof Error ? e.message : "QC review failed");
+    } finally { setSubmitting(false); }
+  };
+
+  const handleOpenRef2Dialog = (r: Roll) => {
+    setRef2Form({
+      actual_ref2_start: r.actual_ref2_start != null ? String(r.actual_ref2_start) : "",
+      actual_ref2_end: r.actual_ref2_end != null ? String(r.actual_ref2_end) : "",
+    });
+    setRef2Dialog(r);
+  };
+
+  const handleSubmitRef2 = async () => {
+    if (!ref2Dialog) return;
+    const start = parseInt(ref2Form.actual_ref2_start);
+    const end = parseInt(ref2Form.actual_ref2_end);
+    if (isNaN(start) || isNaN(end)) return alert("กรุณากรอกเลข ref2 ให้ครบ");
+    if (end < start) return alert("ref2 ท้ายม้วนต้อง >= ref2 ต้นม้วน");
+    setSubmitting(true);
+    try {
+      await api.post(`/api/v1/rolls/${ref2Dialog.id}/report-ref2`, {
+        actual_ref2_start: start,
+        actual_ref2_end: end,
+      });
+      setRef2Dialog(null);
+      refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Report ref2 failed");
     } finally { setSubmitting(false); }
   };
 
@@ -885,10 +921,21 @@ function RollsPage() {
                         &quot;{r.qc_note}&quot;
                       </p>
                     )}
+                    {r.actual_ref2_start != null && r.actual_ref2_end != null ? (
+                      <div className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-400">
+                        Ref2: {r.actual_ref2_start.toLocaleString()} – {r.actual_ref2_end.toLocaleString()}
+                        {r.waste_count > 0 && <span className="text-amber-600 dark:text-amber-400 ml-1">(เสีย {r.waste_count})</span>}
+                      </div>
+                    ) : r.status !== "pending_print" ? (
+                      <p className="mt-1 text-[10px] text-gray-400 italic">ยังไม่รายงาน ref2</p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1.5 justify-end">
                       <ActionBtn label="QR" color="blue" onClick={() => handleQrPreview(r)} />
+                      {r.status !== "pending_print" && (
+                        <ActionBtn label="Ref2" color={r.actual_ref2_start != null ? "emerald" : "gray"} onClick={() => handleOpenRef2Dialog(r)} />
+                      )}
                       <ActionBtn label="Assign" color="orange" onClick={() => { setAssignFactoryId(r.factory_id || ""); setAssignDialog({ rollIds: [r.id] }); }} />
                       {r.status === "pending_print" && (
                         <ActionBtn label="Mark Printed" color="blue" onClick={() => handleMarkPrinted([r.id])} />
@@ -1550,6 +1597,84 @@ function RollsPage() {
                 className="h-[40px] px-6 text-[14px] font-medium bg-green-600 text-white rounded-[var(--md-radius-xl)] hover:bg-green-700 disabled:opacity-50 transition-all"
               >
                 {submitting ? "Processing..." : "Approve"}
+              </button>
+            </div>
+          </div>
+        </DialogOverlay>
+      )}
+
+      {/* Report Ref2 Dialog */}
+      {ref2Dialog && (
+        <DialogOverlay onClose={() => setRef2Dialog(null)}>
+          <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-6 w-[480px] max-w-full md-elevation-3">
+            <h2 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-1">รายงาน Ref2 จริงของม้วน</h2>
+            <p className="text-[13px] text-[var(--md-on-surface-variant)] mb-5">
+              กรอกเลข ref2 ต้นม้วนและท้ายม้วนที่โรงงานรายงานมาจริง เพื่อระบุช่วง code ที่ใช้ได้
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 p-4 bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] mb-5">
+              <InfoRow label="Roll #" value={`${ref2Dialog.batch_prefix || "?"} #${ref2Dialog.roll_number}`} />
+              <InfoRow label="Serial" value={`${ref2Dialog.serial_start.toLocaleString()} – ${ref2Dialog.serial_end.toLocaleString()}`} />
+              <InfoRow label="จำนวนทั้งหมด" value={`${ref2Dialog.code_count.toLocaleString()} codes`} />
+              <InfoRow label="สถานะ" value={statusConfig[ref2Dialog.status as StatusKey]?.labelTh || ref2Dialog.status} />
+            </div>
+
+            {ref2Dialog.ref2_reported_at && (
+              <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950 rounded-[var(--md-radius-sm)] text-[12px] text-emerald-700 dark:text-emerald-400">
+                รายงานแล้วโดย {ref2Dialog.ref2_reported_by_name || "—"} เมื่อ {formatDate(ref2Dialog.ref2_reported_at)}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 uppercase tracking-[0.3px]">Ref2 ต้นม้วน *</label>
+                <input
+                  type="number"
+                  value={ref2Form.actual_ref2_start}
+                  onChange={(e) => setRef2Form({ ...ref2Form, actual_ref2_start: e.target.value })}
+                  className="w-full h-[48px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2"
+                  placeholder="เช่น 200000000015"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 uppercase tracking-[0.3px]">Ref2 ท้ายม้วน *</label>
+                <input
+                  type="number"
+                  value={ref2Form.actual_ref2_end}
+                  onChange={(e) => setRef2Form({ ...ref2Form, actual_ref2_end: e.target.value })}
+                  className="w-full h-[48px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)] focus:border-2"
+                  placeholder="เช่น 200000009820"
+                />
+              </div>
+            </div>
+
+            {ref2Form.actual_ref2_start && ref2Form.actual_ref2_end && (
+              <div className="mb-5 p-3 bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)]">
+                <div className="flex justify-between text-[12px] text-[var(--md-on-surface-variant)]">
+                  <span>Code ที่ใช้ได้จริง</span>
+                  <span className="font-medium text-[var(--md-on-surface)]">
+                    {(parseInt(ref2Form.actual_ref2_end) - parseInt(ref2Form.actual_ref2_start) + 1).toLocaleString()} codes
+                  </span>
+                </div>
+                <div className="flex justify-between text-[12px] text-[var(--md-on-surface-variant)] mt-1">
+                  <span>จำนวนที่เสีย (waste)</span>
+                  <span className="font-medium text-amber-600">
+                    {Math.max(0, ref2Dialog.code_count - (parseInt(ref2Form.actual_ref2_end) - parseInt(ref2Form.actual_ref2_start) + 1)).toLocaleString()} codes
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setRef2Dialog(null)} className="h-[40px] px-5 text-[14px] font-medium text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container)] rounded-[var(--md-radius-xl)] transition-all">
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitRef2}
+                disabled={submitting || !ref2Form.actual_ref2_start || !ref2Form.actual_ref2_end}
+                className="h-[40px] px-6 text-[14px] font-medium bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] hover:bg-[var(--md-primary-dark)] disabled:opacity-50 transition-all"
+              >
+                {submitting ? "Saving..." : "บันทึก Ref2"}
               </button>
             </div>
           </div>

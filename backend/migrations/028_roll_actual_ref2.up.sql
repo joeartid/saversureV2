@@ -1,0 +1,7 @@
+-- ให้โรงงานรายงาน ref2 จริงต้น-ท้ายม้วนหลังพิมพ์เสร็จ
+-- ใช้ validate ตอนสแกนว่า code อยู่ในช่วงที่ใช้ได้จริงไหม
+ALTER TABLE rolls ADD COLUMN IF NOT EXISTS actual_ref2_start BIGINT;
+ALTER TABLE rolls ADD COLUMN IF NOT EXISTS actual_ref2_end   BIGINT;
+ALTER TABLE rolls ADD COLUMN IF NOT EXISTS waste_count       INT NOT NULL DEFAULT 0;
+ALTER TABLE rolls ADD COLUMN IF NOT EXISTS ref2_reported_at  TIMESTAMPTZ;
+ALTER TABLE rolls ADD COLUMN IF NOT EXISTS ref2_reported_by  UUID REFERENCES users(id);

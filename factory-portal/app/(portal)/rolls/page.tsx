@@ -27,6 +27,11 @@ interface Roll {
   factory_name: string | null;
   mapped_by_name: string | null;
   qc_by_name: string | null;
+  actual_ref2_start: number | null;
+  actual_ref2_end: number | null;
+  waste_count: number;
+  ref2_reported_at: string | null;
+  ref2_reported_by_name: string | null;
 }
 
 interface Product {
@@ -82,6 +87,10 @@ function RollsPage() {
   const [productSearch, setProductSearch] = useState("");
   const [productPickerOpen, setProductPickerOpen] = useState(false);
 
+  // Report Ref2
+  const [ref2Dialog, setRef2Dialog] = useState<Roll | null>(null);
+  const [ref2Form, setRef2Form] = useState({ actual_ref2_start: "", actual_ref2_end: "" });
+
   const fetchRolls = useCallback(async () => {
     setLoading(true);
     try {
@@ -115,6 +124,33 @@ function RollsPage() {
     const q = productSearch.toLowerCase();
     return p.name.toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q);
   });
+
+  const handleOpenRef2 = (roll: Roll) => {
+    setRef2Form({
+      actual_ref2_start: roll.actual_ref2_start?.toString() || "",
+      actual_ref2_end: roll.actual_ref2_end?.toString() || "",
+    });
+    setRef2Dialog(roll);
+  };
+
+  const handleSubmitRef2 = async () => {
+    if (!ref2Dialog) return;
+    const start = parseInt(ref2Form.actual_ref2_start);
+    const end = parseInt(ref2Form.actual_ref2_end);
+    if (isNaN(start) || isNaN(end)) return alert("กรุณากรอกเลข ref2 ให้ครบ");
+    if (end < start) return alert("ref2 ท้ายม้วนต้อง >= ref2 ต้นม้วน");
+    setSubmitting(true);
+    try {
+      await api.post(`/api/v1/rolls/${ref2Dialog.id}/report-ref2`, {
+        actual_ref2_start: start,
+        actual_ref2_end: end,
+      });
+      setRef2Dialog(null);
+      refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "รายงาน Ref2 ไม่สำเร็จ");
+    } finally { setSubmitting(false); }
+  };
 
   const handleUploadEvidence = async (file: File) => {
     setUploading(true);
@@ -263,17 +299,47 @@ function RollsPage() {
                         Map โดย: {r.mapped_by_name} · {formatDate(r.mapped_at)}
                       </p>
                     )}
+
+                    {/* Actual Ref2 info */}
+                    {r.actual_ref2_start != null && r.actual_ref2_end != null ? (
+                      <div className="mt-2 flex items-center gap-2 text-[12px]">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[6px] bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium">
+                          Ref2: {r.actual_ref2_start.toLocaleString()} – {r.actual_ref2_end.toLocaleString()}
+                        </span>
+                        {r.waste_count > 0 && (
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">waste {r.waste_count.toLocaleString()}</span>
+                        )}
+                      </div>
+                    ) : r.status !== "pending_print" ? (
+                      <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+                        ยังไม่ได้ระบุ Ref2 จริงของม้วนนี้
+                      </p>
+                    ) : null}
                   </div>
 
-                  {/* Action button */}
-                  {canMap(r) && (
-                    <button
-                      onClick={() => handleOpenMap(r)}
-                      className="h-[38px] px-5 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[13px] font-medium hover:opacity-90 transition-all shrink-0"
-                    >
-                      {r.status === "qc_rejected" ? "Map ใหม่" : "Map สินค้า"}
-                    </button>
-                  )}
+                  {/* Action buttons */}
+                  <div className="flex flex-col gap-2 shrink-0">
+                    {canMap(r) && (
+                      <button
+                        onClick={() => handleOpenMap(r)}
+                        className="h-[38px] px-5 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[13px] font-medium hover:opacity-90 transition-all"
+                      >
+                        {r.status === "qc_rejected" ? "Map ใหม่" : "Map สินค้า"}
+                      </button>
+                    )}
+                    {r.status !== "pending_print" && (
+                      <button
+                        onClick={() => handleOpenRef2(r)}
+                        className={`h-[32px] px-4 rounded-[var(--md-radius-xl)] text-[12px] font-medium transition-all ${
+                          r.actual_ref2_start != null
+                            ? "bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 hover:opacity-80"
+                            : "border border-amber-400 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950"
+                        }`}
+                      >
+                        {r.actual_ref2_start != null ? "แก้ Ref2" : "รายงาน Ref2"}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Evidence thumbnails */}
@@ -484,6 +550,82 @@ function RollsPage() {
                   className="flex-1 h-[48px] bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-semibold hover:opacity-90 disabled:opacity-50 transition-all"
                 >
                   {submitting ? "กำลัง Map..." : "ยืนยัน Map สินค้า"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Ref2 Dialog */}
+      {ref2Dialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRef2Dialog(null)} />
+          <div className="relative z-10 bg-[var(--md-surface)] rounded-[var(--md-radius-xl)] p-6 w-[480px] max-w-[95vw] md-elevation-3">
+            <h2 className="text-[18px] font-semibold text-[var(--md-on-surface)] mb-1">
+              รายงาน Ref2 จริงของม้วน
+            </h2>
+            <p className="text-[13px] text-[var(--md-on-surface-variant)] mb-5">
+              ระบุเลข ref2 ต้นม้วนและท้ายม้วนที่ใช้ได้จริงหลังพิมพ์
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 p-3 bg-[var(--md-surface-container,#f5f5f5)] rounded-[var(--md-radius-sm)] mb-5 text-[12px]">
+              <div><span className="text-[var(--md-on-surface-variant)]">Roll #</span> <span className="font-medium text-[var(--md-on-surface)]">{ref2Dialog.batch_prefix} #{ref2Dialog.roll_number}</span></div>
+              <div><span className="text-[var(--md-on-surface-variant)]">Serial</span> <span className="font-medium text-[var(--md-on-surface)]">{ref2Dialog.serial_start.toLocaleString()} – {ref2Dialog.serial_end.toLocaleString()}</span></div>
+              <div><span className="text-[var(--md-on-surface-variant)]">จำนวน</span> <span className="font-medium text-[var(--md-on-surface)]">{ref2Dialog.code_count.toLocaleString()} codes</span></div>
+              <div><span className="text-[var(--md-on-surface-variant)]">สถานะ</span> <span className="font-medium text-[var(--md-on-surface)]">{statusConfig[ref2Dialog.status]?.label || ref2Dialog.status}</span></div>
+            </div>
+
+            {ref2Dialog.ref2_reported_at && (
+              <p className="text-[11px] text-[var(--md-on-surface-variant)] mb-3 italic">
+                รายงานแล้วโดย {ref2Dialog.ref2_reported_by_name || "—"} เมื่อ {new Date(ref2Dialog.ref2_reported_at).toLocaleString("th-TH")}
+              </p>
+            )}
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 uppercase tracking-[0.3px]">Ref2 ต้นม้วน *</label>
+                  <input
+                    type="number"
+                    value={ref2Form.actual_ref2_start}
+                    onChange={(e) => setRef2Form({ ...ref2Form, actual_ref2_start: e.target.value })}
+                    className={fieldClass}
+                    placeholder="เช่น 200000000015"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-1 uppercase tracking-[0.3px]">Ref2 ท้ายม้วน *</label>
+                  <input
+                    type="number"
+                    value={ref2Form.actual_ref2_end}
+                    onChange={(e) => setRef2Form({ ...ref2Form, actual_ref2_end: e.target.value })}
+                    className={fieldClass}
+                    placeholder="เช่น 200000009820"
+                  />
+                </div>
+              </div>
+
+              {ref2Form.actual_ref2_start && ref2Form.actual_ref2_end && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-[var(--md-radius-sm)] text-[12px] text-blue-700 dark:text-blue-300">
+                  <p>จำนวนที่ใช้ได้จริง: <strong>{Math.max(0, parseInt(ref2Form.actual_ref2_end) - parseInt(ref2Form.actual_ref2_start) + 1).toLocaleString()}</strong> codes</p>
+                  <p>Waste: <strong>{Math.max(0, ref2Dialog.code_count - (parseInt(ref2Form.actual_ref2_end) - parseInt(ref2Form.actual_ref2_start) + 1)).toLocaleString()}</strong> codes</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setRef2Dialog(null)}
+                  className="flex-1 h-[48px] border border-[var(--md-outline)] rounded-[var(--md-radius-xl)] text-[14px] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-dim)] transition-all"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleSubmitRef2}
+                  disabled={submitting || !ref2Form.actual_ref2_start || !ref2Form.actual_ref2_end}
+                  className="flex-1 h-[48px] bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-semibold hover:opacity-90 disabled:opacity-50 transition-all"
+                >
+                  {submitting ? "กำลังบันทึก..." : "บันทึก Ref2"}
                 </button>
               </div>
             </div>

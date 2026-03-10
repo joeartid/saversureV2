@@ -99,7 +99,7 @@ export default function MissionsPage() {
         ) : (
           <div className="space-y-4">
             {missions.map((m) => {
-              const prog = progressMap[m.mission_id];
+              const prog = progressMap[m.id];
               const progress = prog?.progress ?? 0;
               const completed = !!prog?.completed_at;
               const pct = m.target > 0 ? Math.min(100, Math.round((progress / m.target) * 100)) : 0;

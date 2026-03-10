@@ -23,6 +23,8 @@ var (
 	ErrBatchNotFound      = errors.New("batch not found for this code")
 	ErrDailyQuotaExceeded = errors.New("daily scan quota exceeded")
 	ErrRollNotReady       = errors.New("roll has not passed QC approval yet")
+	ErrCodeWasted         = errors.New("this code was reported as wasted by the factory")
+	ErrProfileIncomplete  = errors.New("profile_incomplete")
 )
 
 type Service struct {
@@ -58,6 +60,15 @@ type ScanResult struct {
 // Scan validates a QR code (or ref1 manual entry) and awards points if valid.
 // Codes are NOT pre-stored in the DB; a record is created only on first scan.
 func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanInput) (*ScanResult, error) {
+	var profileCompleted bool
+	err := s.db.QueryRow(ctx,
+		`SELECT profile_completed FROM users WHERE id = $1 AND tenant_id = $2`,
+		userID, tenantID,
+	).Scan(&profileCompleted)
+	if err != nil || !profileCompleted {
+		return nil, ErrProfileIncomplete
+	}
+
 	var prefix string
 	var serial int64
 
@@ -91,7 +102,7 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 
 	// Check daily scan quota
 	var scanCount int
-	err := s.db.QueryRow(ctx,
+	err = s.db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM scan_history
 		 WHERE user_id = $1 AND tenant_id = $2
 		 AND scanned_at >= CURRENT_DATE`,
@@ -141,19 +152,21 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		return nil, ErrBatchRecalled
 	}
 
-	// Check roll status — only allow scanning if roll is QC approved or distributed
+	// Check roll status + actual ref2 range
 	var rollStatus string
 	var rollProductPoints *int
 	var productID *string
+	var rollActualRef2Start, rollActualRef2End *int64
 	err = tx.QueryRow(ctx,
-		`SELECT r.status, p.points_per_scan, r.product_id::text
+		`SELECT r.status, p.points_per_scan, r.product_id::text,
+		        r.actual_ref2_start, r.actual_ref2_end
 		 FROM rolls r
 		 LEFT JOIN products p ON p.id = r.product_id
 		 WHERE r.batch_id = $1 AND r.tenant_id = $2
 			AND $3 BETWEEN r.serial_start AND r.serial_end
 		 LIMIT 1`,
 		batchID, tenantID, serial,
-	).Scan(&rollStatus, &rollProductPoints, &productID)
+	).Scan(&rollStatus, &rollProductPoints, &productID, &rollActualRef2Start, &rollActualRef2End)
 
 	pointsPerScan := defaultPoints
 	if err == nil {
@@ -205,9 +218,21 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		ref1Val = computedRef1
 	}
 
+	var ref2Running int64
+	if ref2Start != nil {
+		ref2Running = *ref2Start + (serial - batchSerialStart)
+	}
+
+	// ถ้า roll มี actual_ref2 range → เช็คว่า code นี้อยู่ในช่วงที่ใช้ได้จริงไหม
+	if rollActualRef2Start != nil && rollActualRef2End != nil && ref2Start != nil {
+		if ref2Running < *rollActualRef2Start || ref2Running > *rollActualRef2End {
+			return nil, ErrCodeWasted
+		}
+	}
+
 	var ref2Val string
 	if ref2Start != nil {
-		ref2Val = codegen.GenerateRef2(*ref2Start + (serial - batchSerialStart))
+		ref2Val = codegen.GenerateRef2(ref2Running)
 	} else {
 		ref2Val = fmt.Sprintf("%s-%d", prefix, serial)
 	}
@@ -231,6 +256,7 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 			return nil, fmt.Errorf("check code: %w", err)
 		}
 		if codeStatus == "scanned" || codeStatus == "redeemed" {
+			_ = s.recordDuplicateScan(ctx, tenantID, userID, batchID, serial, campaignID)
 			return nil, ErrCodeUsed
 		}
 	}
@@ -275,10 +301,10 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		bonusCurrencyAmount += cb.Amount
 	}
 
-	// Record scan history with location
+	// Record scan history with location (scan_type = success)
 	_, err = tx.Exec(ctx,
-		`INSERT INTO scan_history (tenant_id, user_id, code_id, campaign_id, batch_id, points_earned, latitude, longitude, scanned_at)
-		 VALUES ($1, $2, (SELECT id FROM codes WHERE tenant_id = $1 AND batch_id = $3 AND serial_number = $4), $5, $3, $6, $7, $8, NOW())`,
+		`INSERT INTO scan_history (tenant_id, user_id, code_id, campaign_id, batch_id, points_earned, latitude, longitude, scanned_at, scan_type)
+		 VALUES ($1, $2, (SELECT id FROM codes WHERE tenant_id = $1 AND batch_id = $3 AND serial_number = $4), $5, $3, $6, $7, $8, NOW(), 'success')`,
 		tenantID, userID, batchID, serial, campaignID, totalPoints, input.Latitude, input.Longitude,
 	)
 	if err != nil {
@@ -308,6 +334,28 @@ func (s *Service) Scan(ctx context.Context, tenantID, userID string, input ScanI
 		CampaignID:          campaignID,
 		Message:             msg,
 	}, nil
+}
+
+// recordDuplicateScan logs a duplicate scan attempt (same user = duplicate_self, other user = duplicate_other).
+func (s *Service) recordDuplicateScan(ctx context.Context, tenantID, userID, batchID string, serial int64, campaignID string) error {
+	var codeID, firstScannedBy *string
+	err := s.db.QueryRow(ctx,
+		`SELECT id, scanned_by FROM codes WHERE tenant_id = $1 AND batch_id = $2 AND serial_number = $3`,
+		tenantID, batchID, serial,
+	).Scan(&codeID, &firstScannedBy)
+	if err != nil || codeID == nil {
+		return err
+	}
+	scanType := "duplicate_other"
+	if firstScannedBy != nil && *firstScannedBy == userID {
+		scanType = "duplicate_self"
+	}
+	_, err = s.db.Exec(ctx,
+		`INSERT INTO scan_history (tenant_id, user_id, code_id, campaign_id, batch_id, points_earned, scanned_at, scan_type)
+		 VALUES ($1, $2, $3, $4, $5, 0, NOW(), $6)`,
+		tenantID, userID, *codeID, campaignID, batchID, scanType,
+	)
+	return err
 }
 
 // resolveRef1ToBatch finds batch and serial from ref1 (running_number).

@@ -141,8 +141,14 @@ func (h *Handler) Scan(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "code_not_found", "message": "Code does not belong to any active campaign"})
 		case errors.Is(err, ErrDailyQuotaExceeded):
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": "quota_exceeded", "message": "Daily scan quota exceeded"})
+		case errors.Is(err, ErrCodeWasted):
+			c.JSON(http.StatusGone, gin.H{"error": "code_wasted", "message": "This code was reported as wasted during production"})
+		case errors.Is(err, ErrRollNotReady):
+			c.JSON(http.StatusPreconditionFailed, gin.H{"error": "roll_not_ready", "message": "Roll has not passed QC"})
+		case errors.Is(err, ErrProfileIncomplete):
+			c.JSON(http.StatusForbidden, gin.H{"error": "profile_incomplete", "message": "กรุณาลงทะเบียนสมาชิกก่อน"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "scan_failed"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "scan_failed", "message": err.Error()})
 		}
 		return
 	}

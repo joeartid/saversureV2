@@ -1,0 +1,5 @@
+ALTER TABLE rolls DROP COLUMN IF EXISTS actual_ref2_start;
+ALTER TABLE rolls DROP COLUMN IF EXISTS actual_ref2_end;
+ALTER TABLE rolls DROP COLUMN IF EXISTS waste_count;
+ALTER TABLE rolls DROP COLUMN IF EXISTS ref2_reported_at;
+ALTER TABLE rolls DROP COLUMN IF EXISTS ref2_reported_by;

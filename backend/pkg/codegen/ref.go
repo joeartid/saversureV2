@@ -1,6 +1,7 @@
 package codegen
 
 import (
+	"math/big"
 	"strconv"
 	"strings"
 )
@@ -66,19 +67,43 @@ func RunningNumberFromRef1(ref1 string) (int64, bool) {
 
 const base36Chars = "0123456789abcdefghijklmnopqrstuvwxyz"
 
-const obfuscateMult uint64 = 0x5851F42D4C957F2D
-const obfuscateAdd uint64 = 0x14057B7EF767814F
-const obfuscateInvMult uint64 = 0xc097ef87329e28a5
+func pow36(n int) uint64 {
+	r := uint64(1)
+	for i := 0; i < n; i++ {
+		r *= 36
+	}
+	return r
+}
+
+// LCG constants for ref1 obfuscation within base36^length space.
+// mult must be coprime with 36^n (not divisible by 2 or 3).
+var (
+	bigMult = new(big.Int).SetUint64(6364136223846793007)
+	bigAdd  = new(big.Int).SetUint64(1442695040888963407)
+)
+
+func bigMod(length int) *big.Int {
+	m := big.NewInt(36)
+	return new(big.Int).Exp(m, big.NewInt(int64(length)), nil)
+}
 
 func GenerateRef1Alphanumeric(runningNumber int64, length int) string {
-	n := uint64(runningNumber)
-	obf := n*obfuscateMult + obfuscateAdd
-	s := strings.ToUpper(base36Encode(obf))
+	mod := bigMod(length)
+	n := new(big.Int).SetInt64(runningNumber)
+	n.Mod(n, mod)
+	obf := new(big.Int).Mul(n, bigMult)
+	obf.Add(obf, bigAdd)
+	obf.Mod(obf, mod)
+	s := strings.ToUpper(base36Encode(obf.Uint64()))
 	return padToLength(s, length, rune(base36Chars[0]))
 }
 
 func RunningNumberFromRef1Alphanumeric(ref1 string) (int64, bool) {
 	ref1 = strings.ToLower(strings.TrimSpace(ref1))
+	origLen := len(ref1)
+	if origLen < 2 {
+		return 0, false
+	}
 	ref1 = strings.TrimLeft(ref1, string(base36Chars[0]))
 	if ref1 == "" {
 		return 0, false
@@ -87,8 +112,17 @@ func RunningNumberFromRef1Alphanumeric(ref1 string) (int64, bool) {
 	if !ok {
 		return 0, false
 	}
-	n := (obf - obfuscateAdd) * obfuscateInvMult
-	return int64(n), true
+	mod := bigMod(origLen)
+	bigObf := new(big.Int).SetUint64(obf)
+	bigObf.Sub(bigObf, bigAdd)
+	bigObf.Mod(bigObf, mod)
+	inv := new(big.Int).ModInverse(bigMult, mod)
+	if inv == nil {
+		return 0, false
+	}
+	n := new(big.Int).Mul(bigObf, inv)
+	n.Mod(n, mod)
+	return n.Int64(), true
 }
 
 func base36Encode(n uint64) string {

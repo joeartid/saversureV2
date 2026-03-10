@@ -10,6 +10,7 @@ interface VerifyResult {
   batch_prefix?: string;
   campaign_id?: string;
   serial?: number;
+  ref1?: string;
   ref2?: string;
   status?: string;
   product_name?: string;
@@ -17,6 +18,8 @@ interface VerifyResult {
   roll_number?: number;
   roll_status?: string;
   roll_product_name?: string;
+  roll_product_image_url?: string;
+  mapping_evidence_urls?: string[];
   message?: string;
 }
 
@@ -163,43 +166,91 @@ export default function QCVerifyPage() {
           </div>
 
           {result.valid && result.batch_id && (
-            <div className="bg-white/60 rounded-[var(--md-radius-md)] p-4 space-y-2">
-              <div className="flex justify-between text-[13px]">
-                <span className="text-[var(--md-on-surface-variant)]">Batch</span>
-                <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.batch_prefix}</span>
-              </div>
-              <div className="flex justify-between text-[13px]">
-                <span className="text-[var(--md-on-surface-variant)]">Serial</span>
-                <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.serial?.toLocaleString()}</span>
-              </div>
-              {result.product_name && (
-                <div className="flex justify-between text-[13px]">
-                  <span className="text-[var(--md-on-surface-variant)]">Campaign</span>
-                  <span className="font-medium text-[var(--md-on-surface)]">{result.product_name}</span>
+            <div className="space-y-3">
+              {/* Product image */}
+              {result.roll_product_image_url && (
+                <div className="bg-white/60 rounded-[var(--md-radius-md)] p-3 flex items-center gap-4">
+                  <img
+                    src={result.roll_product_image_url}
+                    alt={result.roll_product_name || "สินค้า"}
+                    className="w-20 h-20 object-contain rounded-[var(--md-radius-sm)] bg-white"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-medium text-[var(--md-on-surface)] truncate">
+                      {result.roll_product_name}
+                    </p>
+                    <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-0.5">
+                      สินค้าที่ Map กับม้วนนี้
+                    </p>
+                  </div>
                 </div>
               )}
-              <div className="flex justify-between text-[13px]">
-                <span className="text-[var(--md-on-surface-variant)]">Batch Status</span>
-                <span className="font-medium text-[var(--md-on-surface)] capitalize">{result.status}</span>
-              </div>
-              {result.roll_number != null && (
-                <>
-                  <div className="h-px bg-black/10 my-1" />
+
+              {/* Info table */}
+              <div className="bg-white/60 rounded-[var(--md-radius-md)] p-4 space-y-2">
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-[var(--md-on-surface-variant)]">Batch</span>
+                  <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.batch_prefix}</span>
+                </div>
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-[var(--md-on-surface-variant)]">Serial</span>
+                  <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.serial?.toLocaleString()}</span>
+                </div>
+                {result.ref1 && (
                   <div className="flex justify-between text-[13px]">
-                    <span className="text-[var(--md-on-surface-variant)]">Roll #</span>
-                    <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.batch_prefix} #{result.roll_number}</span>
+                    <span className="text-[var(--md-on-surface-variant)]">Ref1 (รหัสลูกค้า)</span>
+                    <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.ref1}</span>
                   </div>
-                  {result.roll_product_name && (
+                )}
+                {result.product_name && (
+                  <div className="flex justify-between text-[13px]">
+                    <span className="text-[var(--md-on-surface-variant)]">Campaign</span>
+                    <span className="font-medium text-[var(--md-on-surface)]">{result.product_name}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[13px]">
+                  <span className="text-[var(--md-on-surface-variant)]">Batch Status</span>
+                  <span className="font-medium text-[var(--md-on-surface)] capitalize">{result.status}</span>
+                </div>
+                {result.roll_number != null && (
+                  <>
+                    <div className="h-px bg-black/10 my-1" />
                     <div className="flex justify-between text-[13px]">
-                      <span className="text-[var(--md-on-surface-variant)]">สินค้า (Map)</span>
-                      <span className="font-medium text-[var(--md-on-surface)]">{result.roll_product_name}</span>
+                      <span className="text-[var(--md-on-surface-variant)]">Roll #</span>
+                      <span className="font-mono font-medium text-[var(--md-on-surface)]">{result.batch_prefix} #{result.roll_number}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-[13px]">
-                    <span className="text-[var(--md-on-surface-variant)]">Roll Status</span>
-                    <span className="font-medium text-[var(--md-on-surface)] capitalize">{result.roll_status}</span>
+                    {result.roll_product_name && !result.roll_product_image_url && (
+                      <div className="flex justify-between text-[13px]">
+                        <span className="text-[var(--md-on-surface-variant)]">สินค้า (Map)</span>
+                        <span className="font-medium text-[var(--md-on-surface)]">{result.roll_product_name}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-[13px]">
+                      <span className="text-[var(--md-on-surface-variant)]">Roll Status</span>
+                      <span className="font-medium text-[var(--md-on-surface)] capitalize">{result.roll_status}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Mapping evidence images */}
+              {result.mapping_evidence_urls && result.mapping_evidence_urls.length > 0 && (
+                <div className="bg-white/60 rounded-[var(--md-radius-md)] p-4">
+                  <p className="text-[12px] font-medium text-[var(--md-on-surface-variant)] mb-2 tracking-[0.4px] uppercase">
+                    หลักฐานการ Map สินค้า
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {result.mapping_evidence_urls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={url}
+                          alt={`หลักฐาน ${i + 1}`}
+                          className="w-full aspect-square object-cover rounded-[var(--md-radius-sm)] border border-black/5 hover:opacity-80 transition-opacity cursor-pointer"
+                        />
+                      </a>
+                    ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
           )}

@@ -57,5 +57,12 @@ saversure-charter-v2.zip
 consumer/node_modules/
 consumer/.next/
 
+# Runtime log files
+backend/api_err.txt
+backend/api_out.txt
+backend/api.exe~
+frontend/dev_err.txt
+frontend/dev_out.txt
+
 # Large SQL dumps (V1 backup data)
 backup/*.sql

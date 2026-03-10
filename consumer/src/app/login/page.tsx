@@ -1,169 +1,366 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { setToken } from "@/lib/auth";
+import { isLoggedIn, setToken } from "@/lib/auth";
 import { useTenant } from "@/components/TenantProvider";
+import {
+  getPendingScanTarget,
+  resolvePendingCodeFromSearch,
+  setPendingScan,
+} from "@/lib/pendingScan";
 
-export default function LoginPage() {
-  const { tenantId, brandName } = useTenant();
-  const [mode, setMode] = useState<"login" | "register">("login");
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (options: Record<string, unknown>) => void;
+          prompt: () => void;
+        };
+      };
+    };
+  }
+}
+
+interface AuthResponse {
+  access_token: string;
+  profile_completed?: boolean;
+}
+
+function LoginPageInner() {
+  const { tenantId, brandName, branding } = useTenant();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [lineLoading, setLineLoading] = useState(false);
-  const [error, setError] = useState("");
-  const router = useRouter();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState("");
+
+  const pendingCode = useMemo(
+    () => resolvePendingCodeFromSearch(searchParams),
+    [searchParams]
+  );
+
+  useEffect(() => {
+    if (pendingCode) {
+      setPendingScan(pendingCode, "qr");
+    }
+  }, [pendingCode]);
+
+  useEffect(() => {
+    if (isLoggedIn()) {
+      router.replace(getPendingScanTarget("/scan"));
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    api
+      .get<{ client_id?: string; enabled?: boolean }>(
+        `/api/v1/auth/google/config?tenant_id=${encodeURIComponent(tenantId)}`
+      )
+      .then((data) => setGoogleClientId(data.client_id || ""))
+      .catch(() => {});
+  }, [tenantId]);
+
+  const finishAuth = (tokens: AuthResponse) => {
+    setToken(tokens.access_token);
+    if (tokens.profile_completed === false) {
+      sessionStorage.setItem("return_after_register", getPendingScanTarget("/scan"));
+      router.replace("/register/complete");
+      return;
+    }
+    router.replace(getPendingScanTarget("/scan"));
+  };
 
   const handleLineLogin = async () => {
+    if (!tenantId) {
+      setError("ยังไม่พบ tenant ของแบรนด์นี้");
+      return;
+    }
+
     setLineLoading(true);
     setError("");
     try {
-      const url = tenantId
-        ? `/api/v1/auth/line?tenant_id=${encodeURIComponent(tenantId)}`
-        : "/api/v1/auth/line";
-      const data = await api.get<{ url: string }>(url);
+      const query = new URLSearchParams({ tenant_id: tenantId });
+      if (pendingCode) {
+        query.set("redirect_code", pendingCode);
+        setPendingScan(pendingCode, "line");
+      }
+      const data = await api.get<{ url: string }>(`/api/v1/auth/line?${query.toString()}`);
       window.location.href = data.url;
-    } catch {
-      setError("LINE Login ยังไม่พร้อมใช้งาน");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "LINE Login ยังไม่พร้อมใช้งาน");
       setLineLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tenantId) {
+      setError("ยังไม่พบ tenant ของแบรนด์นี้");
+      return;
+    }
+
     setLoading(true);
     setError("");
-
     try {
-      if (mode === "register") {
-        await api.post("/api/v1/auth/register", {
-          email,
-          password,
-          first_name: firstName,
-          last_name: lastName,
-          phone,
-        });
+      const data = await api.post<AuthResponse>("/api/v1/auth/login", {
+        tenant_id: tenantId,
+        email: email.trim(),
+        password,
+      });
+      if (pendingCode) {
+        setPendingScan(pendingCode, "email");
       }
-      const data = await api.post<{ access_token: string }>("/api/v1/auth/login", { email, password });
-      setToken(data.access_token);
-      const redirectCode = localStorage.getItem("scan_redirect_code");
-      if (redirectCode) {
-        localStorage.removeItem("scan_redirect_code");
-        router.push(`/s/${redirectCode}`);
-      } else {
-        router.push("/");
-      }
+      finishAuth(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(err instanceof Error ? err.message : "เข้าสู่ระบบไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGoogleLogin = async () => {
+    if (!tenantId) {
+      setError("ยังไม่พบ tenant ของแบรนด์นี้");
+      return;
+    }
+    if (!googleClientId) {
+      setError("Google Login ยังไม่ถูกตั้งค่าสำหรับแบรนด์นี้");
+      return;
+    }
+
+    setGoogleLoading(true);
+    setError("");
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const existing = document.querySelector<HTMLScriptElement>(
+          'script[src="https://accounts.google.com/gsi/client"]'
+        );
+        if (existing) {
+          resolve();
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("โหลด Google script ไม่สำเร็จ"));
+        document.head.appendChild(script);
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        window.google?.accounts?.id?.initialize({
+          client_id: googleClientId,
+          callback: async (response: { credential?: string }) => {
+            try {
+              if (!response.credential) {
+                throw new Error("ไม่ได้รับ Google credential");
+              }
+              if (pendingCode) {
+                setPendingScan(pendingCode, "google");
+              }
+              const data = await api.post<AuthResponse>("/api/v1/auth/google/login", {
+                tenant_id: tenantId,
+                id_token: response.credential,
+              });
+              finishAuth(data);
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          },
+          ux_mode: "popup",
+          context: "signin",
+        });
+        window.google?.accounts?.id?.prompt();
+      });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Google Login ไม่สำเร็จ");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const cardClass =
+    "w-full rounded-[24px] border border-white/60 bg-white/90 p-5 shadow-[0_20px_50px_rgba(18,52,29,0.12)] backdrop-blur";
   const inputClass =
-    "w-full h-[48px] px-4 border border-[var(--outline)] rounded-[var(--radius-md)] text-[14px] text-[var(--on-surface)] bg-transparent outline-none focus:border-[var(--primary)] focus:border-2 transition-all";
+    "h-12 w-full rounded-2xl border border-[var(--outline)] bg-white px-4 text-[14px] outline-none transition focus:border-[var(--primary)]";
 
   return (
-    <div className="min-h-screen flex flex-col justify-center px-6 bg-[var(--surface-dim)]">
-      <div className="text-center mb-8">
-        <div className="w-14 h-14 mx-auto rounded-[var(--radius-lg)] bg-[var(--primary)] flex items-center justify-center mb-4">
-          <svg viewBox="0 0 24 24" fill="white" className="w-7 h-7">
-            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
-          </svg>
-        </div>
-        <h1 className="text-[22px] font-semibold text-[var(--on-surface)]">{brandName}</h1>
-        <p className="text-[13px] text-[var(--on-surface-variant)] mt-1">Scan & Earn Rewards</p>
-      </div>
-
-      {/* Mode toggle */}
-      <div className="flex bg-[var(--surface-container)] rounded-[var(--radius-xl)] p-1 mb-6">
-        <button
-          onClick={() => setMode("login")}
-          className={`flex-1 h-[36px] rounded-[var(--radius-xl)] text-[13px] font-medium transition-all ${
-            mode === "login" ? "bg-white elevation-1 text-[var(--primary)]" : "text-[var(--on-surface-variant)]"
-          }`}
-        >
-          Login
-        </button>
-        <button
-          onClick={() => setMode("register")}
-          className={`flex-1 h-[36px] rounded-[var(--radius-xl)] text-[13px] font-medium transition-all ${
-            mode === "register" ? "bg-white elevation-1 text-[var(--primary)]" : "text-[var(--on-surface-variant)]"
-          }`}
-        >
-          Register
-        </button>
-      </div>
-
-      <div className="bg-white rounded-[var(--radius-lg)] elevation-2 p-6">
-        {error && (
-          <div className="mb-4 p-3 bg-[var(--error-light)] rounded-[var(--radius-sm)] text-[13px] text-[var(--error)]">
-            {error}
+    <div className="min-h-screen bg-[linear-gradient(180deg,var(--surface-dim)_0%,#ffffff_46%,#f7faf7_100%)]">
+      <div className="mx-auto flex min-h-screen w-full max-w-[520px] flex-col px-5 pb-8 pt-6">
+        <div className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,var(--primary)_0%,var(--primary-dark,#245c31)_100%)] px-5 pb-6 pt-7 text-white shadow-[0_24px_60px_rgba(31,85,45,0.28)]">
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute -right-10 top-0 h-32 w-32 rounded-full bg-white/25 blur-2xl" />
+            <div className="absolute bottom-0 left-0 h-28 w-28 rounded-full bg-white/15 blur-2xl" />
           </div>
-        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === "register" && (
-            <>
-              <input type="text" placeholder="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputClass} />
-              <input type="text" placeholder="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
-              <input type="tel" placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
-            </>
-          )}
-          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
-          <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className={inputClass} required minLength={6} />
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-[48px] bg-[var(--primary)] text-white rounded-[var(--radius-xl)] text-[15px] font-medium disabled:opacity-50 active:scale-[0.98] transition-all"
-          >
-            {loading ? "..." : mode === "login" ? "Sign In" : "Create Account"}
-          </button>
-        </form>
-      </div>
+          <div className="relative">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-white/15 ring-1 ring-white/25">
+                  {branding?.logo_url ? (
+                    <img
+                      src={branding.logo_url}
+                      alt={brandName}
+                      className="h-9 w-9 object-contain"
+                    />
+                  ) : (
+                    <span className="text-xl font-bold">{brandName.slice(0, 1)}</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-white/75">
+                    Brand Login
+                  </p>
+                  <h1 className="text-2xl font-bold leading-tight">{brandName}</h1>
+                </div>
+              </div>
+            </div>
 
-      {/* LINE Login */}
-      <div className="mt-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 h-px bg-[var(--outline-variant)]" />
-          <span className="text-[12px] text-[var(--on-surface-variant)]">หรือ</span>
-          <div className="flex-1 h-px bg-[var(--outline-variant)]" />
+            <div className="mt-8 rounded-[24px] bg-white/12 p-4 ring-1 ring-white/15">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/70">
+                พร้อมสแกนต่อ
+              </p>
+              <p className="mt-2 text-lg font-semibold leading-snug">
+                เข้าสู่ระบบหรือสมัครสมาชิก แล้วระบบจะพาคุณกลับไปที่หน้าสแกนทันที
+              </p>
+              {pendingCode && (
+                <div className="mt-4 inline-flex rounded-full bg-black/20 px-4 py-2 text-sm font-medium tracking-[0.16em]">
+                  CODE {pendingCode}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        <button
-          onClick={handleLineLogin}
-          disabled={lineLoading}
-          className="w-full h-[48px] bg-[#06C755] text-white rounded-[var(--radius-xl)] text-[15px] font-medium disabled:opacity-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-        >
-          {lineLoading ? (
-            "กำลังเชื่อมต่อ LINE..."
-          ) : (
-            <>
-              <svg viewBox="0 0 24 24" fill="white" className="w-6 h-6">
-                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
-              </svg>
-              เข้าสู่ระบบด้วย LINE
-            </>
-          )}
-        </button>
-      </div>
 
-      <div className="flex justify-center gap-4 mt-4">
-        <Link href="/otp" className="text-[13px] text-[var(--primary)]">
-          ยืนยันหมายเลขโทรศัพท์ด้วย OTP
-        </Link>
-        <Link href="/register" className="text-[13px] text-[var(--primary)]">
-          ลงทะเบียนสมาชิกใหม่
-        </Link>
+        <div className="mt-5 space-y-4">
+          {error && (
+            <div className="rounded-2xl border border-[var(--error)]/20 bg-[var(--error-light)] px-4 py-3 text-sm text-[var(--error)]">
+              {error}
+            </div>
+          )}
+
+          <div className={cardClass}>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleLineLogin}
+                disabled={lineLoading}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#06C755] px-4 text-sm font-semibold text-white transition active:scale-[0.99] disabled:opacity-60"
+              >
+                <span className="text-base">LINE</span>
+                <span>{lineLoading ? "กำลังเชื่อมต่อ..." : "เข้าสู่ระบบด้วย LINE"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={googleLoading}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[var(--outline)] bg-white px-4 text-sm font-semibold text-[var(--on-surface)] transition active:scale-[0.99] disabled:opacity-60"
+              >
+                <span className="text-base">G</span>
+                <span>{googleLoading ? "กำลังเชื่อมต่อ..." : "เข้าสู่ระบบด้วย Google"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowEmailForm((prev) => !prev)}
+                className="flex h-12 w-full items-center justify-center rounded-2xl bg-[var(--primary)]/8 px-4 text-sm font-semibold text-[var(--primary)] transition active:scale-[0.99]"
+              >
+                เข้าสู่ระบบด้วย Email
+              </button>
+            </div>
+
+            {showEmailForm && (
+              <form onSubmit={handleEmailLogin} className="mt-4 space-y-3 border-t border-[var(--outline-variant)] pt-4">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  className={inputClass}
+                  required
+                />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="รหัสผ่าน"
+                  className={inputClass}
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="h-12 w-full rounded-2xl bg-[var(--primary)] text-sm font-semibold text-white transition active:scale-[0.99] disabled:opacity-60"
+                >
+                  {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+                </button>
+              </form>
+            )}
+          </div>
+
+          <div className={cardClass}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-base font-semibold text-[var(--on-surface)]">
+                  ยังไม่มีบัญชี?
+                </p>
+                <p className="mt-1 text-sm text-[var(--on-surface-variant)]">
+                  สมัครสมาชิกใหม่ แล้วกลับไปสแกนสะสมแต้มต่อได้ทันที
+                </p>
+              </div>
+              <Link
+                href={pendingCode ? `/register?code=${encodeURIComponent(pendingCode)}` : "/register"}
+                className="shrink-0 rounded-full bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white"
+              >
+                สมัครสมาชิก
+              </Link>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-[var(--surface-container,#f5f7f4)] px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-[var(--on-surface)]">
+                  ลืมรหัสผ่าน?
+                </p>
+                <p className="text-xs text-[var(--on-surface-variant)]">
+                  รีเซ็ตรหัสผ่านด้วย OTP ผ่านเบอร์โทรศัพท์
+                </p>
+              </div>
+              <Link
+                href="/forgot-password"
+                className="rounded-full border border-[var(--outline)] px-4 py-2 text-sm font-semibold text-[var(--on-surface)]"
+              >
+                รีเซ็ต
+              </Link>
+            </div>
+          </div>
+
+          <p className="px-1 text-center text-xs leading-6 text-[var(--on-surface-variant)]">
+            เมื่อเข้าสู่ระบบสำเร็จ ระบบจะกลับไปยังหน้าสแกนหลัก และถ้ามีรหัสที่สแกนค้างไว้จะทำรายการต่อให้อัตโนมัติ
+          </p>
+        </div>
       </div>
-      <p className="text-center text-[11px] text-[var(--on-surface-variant)] mt-6 opacity-60">
-        Powered by Saversure v2.0
-      </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[var(--surface-dim)]" />}>
+      <LoginPageInner />
+    </Suspense>
   );
 }

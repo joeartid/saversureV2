@@ -31,7 +31,7 @@ func (h *Handler) GetHistory(c *gin.Context) {
 
 	entries, err := h.svc.GetHistory(c.Request.Context(), c.GetString("tenant_id"), c.GetString("user_id"), limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": err.Error()})
 		return
 	}
 

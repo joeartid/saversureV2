@@ -18,12 +18,17 @@ type Config struct {
 	HMAC      HMACConfig
 	RateLimit RateLimitConfig
 	LINE      LINEConfig
+	Google    GoogleConfig
 }
 
 type LINEConfig struct {
 	ChannelID     string
 	ChannelSecret string
 	CallbackURL   string
+}
+
+type GoogleConfig struct {
+	ClientID string
 }
 
 type SMSConfig struct {
@@ -154,6 +159,9 @@ func Load() (*Config, error) {
 			ChannelID:     getEnv("LINE_CHANNEL_ID", ""),
 			ChannelSecret: getEnv("LINE_CHANNEL_SECRET", ""),
 			CallbackURL:   getEnv("LINE_CALLBACK_URL", "http://localhost:30403/auth/line/callback"),
+		},
+		Google: GoogleConfig{
+			ClientID: getEnv("GOOGLE_CLIENT_ID", ""),
 		},
 	}
 

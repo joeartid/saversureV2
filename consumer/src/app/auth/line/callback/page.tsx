@@ -5,6 +5,10 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant";
+import {
+  getPendingScanTarget,
+  setPendingScan,
+} from "@/lib/pendingScan";
 import { Suspense } from "react";
 
 function LineCallbackInner() {
@@ -15,6 +19,7 @@ function LineCallbackInner() {
   useEffect(() => {
     const code = searchParams.get("code");
     const errorParam = searchParams.get("error");
+    const stateParam = searchParams.get("state");
 
     if (errorParam) {
       setError("LINE Login ถูกยกเลิก");
@@ -29,18 +34,26 @@ function LineCallbackInner() {
     const tenantId = getTenantId() || "00000000-0000-0000-0000-000000000001";
 
     api
-      .post<{ access_token: string }>("/api/v1/auth/line/callback", {
+      .post<{ access_token: string; profile_completed?: boolean }>("/api/v1/auth/line/callback", {
         code,
         tenant_id: tenantId,
       })
       .then((data) => {
         setToken(data.access_token);
-        const redirectCode = localStorage.getItem("scan_redirect_code");
+        const redirectCodeFromState = stateParam?.includes("|") ? stateParam.split("|").slice(1).join("|") : "";
+        const redirectCode = redirectCodeFromState || "";
         if (redirectCode) {
-          localStorage.removeItem("scan_redirect_code");
-          router.push(`/s/${redirectCode}`);
+          setPendingScan(redirectCode, "line");
+        }
+        if (data.profile_completed === false) {
+          sessionStorage.setItem("return_after_register", getPendingScanTarget("/scan"));
+          router.push("/register/complete");
+          return;
+        }
+        if (redirectCode) {
+          router.push(getPendingScanTarget("/scan"));
         } else {
-          router.push("/");
+          router.push("/scan");
         }
       })
       .catch((err) => {

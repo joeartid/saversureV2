@@ -48,12 +48,18 @@ type Roll struct {
 	QCEvidence        []string `json:"qc_evidence_urls"`
 	DistributedAt     *string  `json:"distributed_at"`
 	CreatedAt         string   `json:"created_at"`
+	ActualRef2Start   *int64   `json:"actual_ref2_start"`
+	ActualRef2End     *int64   `json:"actual_ref2_end"`
+	WasteCount        int      `json:"waste_count"`
+	Ref2ReportedAt    *string  `json:"ref2_reported_at"`
+	Ref2ReportedBy    *string  `json:"ref2_reported_by"`
 	BatchPrefix       *string  `json:"batch_prefix,omitempty"`
 	ProductName       *string  `json:"product_name,omitempty"`
 	ProductSKU        *string  `json:"product_sku,omitempty"`
 	FactoryName       *string  `json:"factory_name,omitempty"`
 	MappedByName      *string  `json:"mapped_by_name,omitempty"`
 	QCByName          *string  `json:"qc_by_name,omitempty"`
+	Ref2ReportedByName *string `json:"ref2_reported_by_name,omitempty"`
 }
 
 type ListFilter struct {
@@ -117,15 +123,18 @@ const rollSelectCols = `r.id, r.tenant_id, r.batch_id, r.roll_number,
 	r.mapped_by, r.mapped_at::text, r.mapping_evidence_urls, r.mapping_note,
 	r.qc_by, r.qc_at::text, r.qc_note, r.qc_evidence_urls,
 	r.distributed_at::text, r.created_at::text,
+	r.actual_ref2_start, r.actual_ref2_end, r.waste_count,
+	r.ref2_reported_at::text, r.ref2_reported_by,
 	b.prefix, p.name, p.sku, f.name,
-	mu.display_name, qu.display_name`
+	mu.display_name, qu.display_name, ru.display_name`
 
 const rollJoins = `FROM rolls r
 	JOIN batches b ON b.id = r.batch_id
 	LEFT JOIN products p ON p.id = r.product_id
 	LEFT JOIN factories f ON f.id = r.factory_id
 	LEFT JOIN users mu ON mu.id = r.mapped_by
-	LEFT JOIN users qu ON qu.id = r.qc_by`
+	LEFT JOIN users qu ON qu.id = r.qc_by
+	LEFT JOIN users ru ON ru.id = r.ref2_reported_by`
 
 func scanRoll(row pgx.Row) (*Roll, error) {
 	var r Roll
@@ -136,8 +145,10 @@ func scanRoll(row pgx.Row) (*Roll, error) {
 		&r.MappedBy, &r.MappedAt, &r.MappingEvidence, &r.MappingNote,
 		&r.QCBy, &r.QCAt, &r.QCNote, &r.QCEvidence,
 		&r.DistributedAt, &r.CreatedAt,
+		&r.ActualRef2Start, &r.ActualRef2End, &r.WasteCount,
+		&r.Ref2ReportedAt, &r.Ref2ReportedBy,
 		&r.BatchPrefix, &r.ProductName, &r.ProductSKU, &r.FactoryName,
-		&r.MappedByName, &r.QCByName,
+		&r.MappedByName, &r.QCByName, &r.Ref2ReportedByName,
 	)
 	if err != nil {
 		return nil, err
@@ -527,6 +538,62 @@ func (s *Service) BulkUpdateStatus(ctx context.Context, tenantID string, rollIDs
 	}
 
 	return int(tag.RowsAffected()), nil
+}
+
+type ReportRef2Input struct {
+	ActualRef2Start int64 `json:"actual_ref2_start" binding:"required"`
+	ActualRef2End   int64 `json:"actual_ref2_end" binding:"required"`
+}
+
+// ReportRef2 lets factory/admin report the actual ref2 start-end of a roll after printing.
+func (s *Service) ReportRef2(ctx context.Context, tenantID, rollID, actorID string, input ReportRef2Input) (*Roll, error) {
+	if input.ActualRef2End < input.ActualRef2Start {
+		return nil, fmt.Errorf("actual_ref2_end must be >= actual_ref2_start")
+	}
+
+	r, err := s.GetByID(ctx, tenantID, rollID)
+	if err != nil {
+		return nil, err
+	}
+
+	// คำนวณ ref2 range ที่ระบบ assign ไว้ จาก batch
+	var batchRef2Start *int64
+	var batchSerialStart int64
+	_ = s.db.QueryRow(ctx,
+		`SELECT ref2_start, serial_start FROM batches WHERE id = $1 AND tenant_id = $2`,
+		r.BatchID, tenantID,
+	).Scan(&batchRef2Start, &batchSerialStart)
+
+	if batchRef2Start == nil {
+		return nil, fmt.Errorf("batch does not have ref2 range configured")
+	}
+
+	// ref2 ที่ระบบ pre-assign ให้ roll นี้
+	expectedRef2Start := *batchRef2Start + (r.SerialStart - batchSerialStart)
+	expectedRef2End := *batchRef2Start + (r.SerialEnd - batchSerialStart)
+
+	if input.ActualRef2Start < expectedRef2Start || input.ActualRef2End > expectedRef2End {
+		return nil, fmt.Errorf("actual ref2 range (%d–%d) must be within assigned range (%d–%d)",
+			input.ActualRef2Start, input.ActualRef2End, expectedRef2Start, expectedRef2End)
+	}
+
+	actualCount := input.ActualRef2End - input.ActualRef2Start + 1
+	waste := int(r.SerialEnd-r.SerialStart+1) - int(actualCount)
+
+	_, err = s.db.Exec(ctx,
+		`UPDATE rolls SET
+			actual_ref2_start = $3, actual_ref2_end = $4,
+			waste_count = $5,
+			ref2_reported_at = NOW(), ref2_reported_by = $6,
+			updated_at = NOW()
+		 WHERE id = $1 AND tenant_id = $2`,
+		rollID, tenantID, input.ActualRef2Start, input.ActualRef2End, waste, actorID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("report ref2: %w", err)
+	}
+
+	return s.GetByID(ctx, tenantID, rollID)
 }
 
 // CreateRollsForBatch generates roll records after a batch is created.

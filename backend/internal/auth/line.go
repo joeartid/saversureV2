@@ -170,6 +170,15 @@ func (s *LINEService) GetProfile(ctx context.Context, accessToken string) (*line
 	return &profile, nil
 }
 
+// LoginOrRegisterWithToken handles LIFF login (access token already obtained from LIFF SDK).
+func (s *LINEService) LoginOrRegisterWithToken(ctx context.Context, tenantID, accessToken, ipAddr string) (*TokenPair, error) {
+	profile, err := s.GetProfile(ctx, accessToken)
+	if err != nil {
+		return nil, fmt.Errorf("get profile: %w", err)
+	}
+	return s.upsertUser(ctx, tenantID, profile, ipAddr)
+}
+
 func (s *LINEService) LoginOrRegister(ctx context.Context, tenantID, code, ipAddr string) (*TokenPair, error) {
 	tok, err := s.ExchangeCodeForTenant(ctx, tenantID, code)
 	if err != nil {
@@ -181,6 +190,10 @@ func (s *LINEService) LoginOrRegister(ctx context.Context, tenantID, code, ipAdd
 		return nil, fmt.Errorf("get profile: %w", err)
 	}
 
+	return s.upsertUser(ctx, tenantID, profile, ipAddr)
+}
+
+func (s *LINEService) upsertUser(ctx context.Context, tenantID string, profile *lineProfile, ipAddr string) (*TokenPair, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
@@ -188,15 +201,17 @@ func (s *LINEService) LoginOrRegister(ctx context.Context, tenantID, code, ipAdd
 	defer tx.Rollback(ctx)
 
 	var userID string
+	var profileCompleted bool
 	err = tx.QueryRow(ctx,
-		`SELECT id FROM users WHERE tenant_id = $1 AND line_user_id = $2 AND status = 'active'`,
+		`SELECT id, profile_completed FROM users WHERE tenant_id = $1 AND line_user_id = $2 AND status = 'active'`,
 		tenantID, profile.UserID,
-	).Scan(&userID)
+	).Scan(&userID, &profileCompleted)
 
 	if err != nil {
+		profileCompleted = false
 		err = tx.QueryRow(ctx,
-			`INSERT INTO users (tenant_id, line_user_id, line_display_name, line_picture_url, display_name, status)
-			 VALUES ($1, $2, $3, $4, $5, 'active')
+			`INSERT INTO users (tenant_id, line_user_id, line_display_name, line_picture_url, display_name, status, profile_completed)
+			 VALUES ($1, $2, $3, $4, $5, 'active', false)
 			 RETURNING id`,
 			tenantID, profile.UserID, profile.DisplayName, profile.PictureURL, profile.DisplayName,
 		).Scan(&userID)
@@ -231,5 +246,26 @@ func (s *LINEService) LoginOrRegister(ctx context.Context, tenantID, code, ipAdd
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 
-	return s.auth.generateTokenPair(userID, tenantID, "api_client", nil)
+	tokens, err := s.auth.generateTokenPair(userID, tenantID, "api_client", nil)
+	if err != nil {
+		return nil, err
+	}
+	tokens.ProfileCompleted = &profileCompleted
+	return tokens, nil
+}
+
+// LIFFIDForTenant returns the LIFF ID configured for the tenant (from tenant settings).
+func (s *LINEService) LIFFIDForTenant(ctx context.Context, tenantID string) string {
+	var rawSettings string
+	_ = s.db.QueryRow(ctx,
+		`SELECT COALESCE(settings, '{}'::jsonb)::text FROM tenants WHERE id = $1`, tenantID,
+	).Scan(&rawSettings)
+	var settings map[string]any
+	_ = json.Unmarshal([]byte(rawSettings), &settings)
+	if lineMap, ok := settings["line"].(map[string]any); ok {
+		if v, ok := lineMap["liff_id"].(string); ok {
+			return v
+		}
+	}
+	return ""
 }

@@ -129,6 +129,22 @@ func (h *Handler) QCReview(c *gin.Context) {
 	c.JSON(http.StatusOK, r)
 }
 
+func (h *Handler) ReportRef2(c *gin.Context) {
+	var input ReportRef2Input
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+		return
+	}
+
+	r, err := h.svc.ReportRef2(c.Request.Context(), c.GetString("tenant_id"), c.Param("id"), c.GetString("user_id"), input)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "report_ref2_failed", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, r)
+}
+
 func (h *Handler) UpdateStatus(c *gin.Context) {
 	var input struct {
 		Status string `json:"status" binding:"required"`

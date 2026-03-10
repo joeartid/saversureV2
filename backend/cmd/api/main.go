@@ -15,28 +15,28 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
+	"saversure/internal/apikey"
 	"saversure/internal/audit"
 	"saversure/internal/auth"
 	"saversure/internal/batch"
+	"saversure/internal/branding"
 	"saversure/internal/campaign"
 	"saversure/internal/code"
 	"saversure/internal/config"
 	"saversure/internal/coupon"
+	"saversure/internal/currency"
 	"saversure/internal/customer"
 	"saversure/internal/dashboard"
-	"saversure/internal/apikey"
-	"saversure/internal/branding"
-	"saversure/internal/currency"
 	"saversure/internal/donation"
 	"saversure/internal/engine"
 	"saversure/internal/export"
 	"saversure/internal/factory"
 	"saversure/internal/fulfillment"
 	"saversure/internal/gamification"
-	"saversure/internal/linebot"
 	"saversure/internal/geo"
 	"saversure/internal/inventory"
 	"saversure/internal/ledger"
+	"saversure/internal/linebot"
 	"saversure/internal/luckydraw"
 	mw "saversure/internal/middleware"
 	"saversure/internal/news"
@@ -44,13 +44,13 @@ import (
 	"saversure/internal/opsdigest"
 	"saversure/internal/otp"
 	"saversure/internal/platform"
-	"saversure/internal/profile"
 	"saversure/internal/product"
+	"saversure/internal/profile"
 	"saversure/internal/promotion"
 	"saversure/internal/qc"
-	"saversure/internal/roll"
 	"saversure/internal/redemption"
 	"saversure/internal/reward"
+	"saversure/internal/roll"
 	"saversure/internal/scanhistory"
 	"saversure/internal/staff"
 	"saversure/internal/support"
@@ -112,6 +112,9 @@ func main() {
 		ChannelSecret: cfg.LINE.ChannelSecret,
 		CallbackURL:   cfg.LINE.CallbackURL,
 	})
+	googleSvc := auth.NewGoogleService(db, authSvc, auth.GoogleConfig{
+		ClientID: cfg.Google.ClientID,
+	})
 	rollSvc := roll.NewService(db)
 	campaignSvc := campaign.NewService(db)
 	batchSvc := batch.NewService(db, signer, rollSvc)
@@ -132,6 +135,7 @@ func main() {
 	tenantHandler := tenant.NewHandler(tenantSvc)
 	authHandler := auth.NewHandler(authSvc)
 	lineHandler := auth.NewLINEHandler(lineSvc)
+	googleHandler := auth.NewGoogleHandler(googleSvc)
 	campaignHandler := campaign.NewHandler(campaignSvc)
 	batchHandler := batch.NewHandler(batchSvc, db)
 	inventoryHandler := inventory.NewHandler(inventorySvc)
@@ -147,6 +151,7 @@ func main() {
 	scanHistoryHandler := scanhistory.NewHandler(db)
 	transactionHandler := transaction.NewHandler(db)
 	customerHandler := customer.NewHandler(db)
+	mergeHandler := customer.NewMergeHandler(db)
 	profileHandler := profile.NewHandler(db)
 	staffHandler := staff.NewHandler(db)
 	productHandler := product.NewHandler(db)
@@ -257,8 +262,14 @@ func main() {
 		authRoutes.POST("/login", authHandler.Login)
 		authRoutes.POST("/login-phone", authHandler.LoginByPhone)
 		authRoutes.POST("/refresh", authHandler.Refresh)
+		authRoutes.POST("/password/request", authHandler.RequestPasswordReset)
+		authRoutes.POST("/password/reset", authHandler.ResetPassword)
 		authRoutes.GET("/line", lineHandler.GetAuthURL)
 		authRoutes.POST("/line/callback", lineHandler.Callback)
+		authRoutes.POST("/line/liff-token", lineHandler.LIFFLogin)
+		authRoutes.GET("/line/liff-id", lineHandler.GetLIFFID)
+		authRoutes.GET("/google/config", googleHandler.GetConfig)
+		authRoutes.POST("/google/login", googleHandler.Login)
 	}
 
 	// --- OTP (public, no auth) ---
@@ -381,6 +392,7 @@ func main() {
 		rollRoutes.POST("/:id/map", rollHandler.MapProduct)
 		rollRoutes.POST("/:id/unmap", rollHandler.Unmap)
 		rollRoutes.POST("/:id/qc", rollHandler.QCReview)
+		rollRoutes.POST("/:id/report-ref2", rollHandler.ReportRef2)
 		rollRoutes.PATCH("/:id/status", rollHandler.UpdateStatus)
 		rollRoutes.POST("/bulk-map", rollHandler.BulkMap)
 		rollRoutes.POST("/bulk-status", rollHandler.BulkUpdateStatus)
@@ -445,6 +457,7 @@ func main() {
 	scanHistoryRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
 	{
 		scanHistoryRoutes.GET("", scanHistoryHandler.List)
+		scanHistoryRoutes.GET("/alerts", scanHistoryHandler.GetAlerts)
 		scanHistoryRoutes.GET("/:id", scanHistoryHandler.GetByID)
 	}
 
@@ -462,9 +475,12 @@ func main() {
 	customerRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
 	{
 		customerRoutes.GET("", customerHandler.List)
+		customerRoutes.GET("/search", mergeHandler.SearchUsers)
 		customerRoutes.GET("/:id/detail", customerHandler.GetDetail)
 		customerRoutes.GET("/:id", customerHandler.GetByID)
 		customerRoutes.PATCH("/:id", customerHandler.Update)
+		customerRoutes.POST("/:id/transfer-line", mergeHandler.TransferLINE)
+		customerRoutes.POST("/merge", mergeHandler.Merge)
 	}
 
 	// Dashboard
@@ -761,6 +777,7 @@ func main() {
 	{
 		profileRoutes.GET("", profileHandler.GetProfile)
 		profileRoutes.PATCH("", profileHandler.UpdateProfile)
+		profileRoutes.POST("/complete", authHandler.CompleteProfile)
 		profileRoutes.GET("/addresses", profileHandler.ListAddresses)
 		profileRoutes.POST("/addresses", profileHandler.CreateAddress)
 		profileRoutes.PATCH("/addresses/:id", profileHandler.UpdateAddress)

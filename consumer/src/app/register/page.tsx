@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { setToken } from "@/lib/auth";
+import { getTenantId } from "@/lib/tenant";
+import { getPendingScanTarget, setPendingScan } from "@/lib/pendingScan";
 
 const PRIMARY = "#1976d2";
 const inputClass =
@@ -17,8 +19,9 @@ function formatPhone(phone: string) {
   return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
 }
 
-export default function RegisterPage() {
+function RegisterPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Step 1: Phone
@@ -38,7 +41,8 @@ export default function RegisterPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || "";
+  const tenantId = getTenantId() || process.env.NEXT_PUBLIC_TENANT_ID || "";
+  const pendingCode = searchParams.get("code") || "";
 
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +99,10 @@ export default function RegisterPage() {
         pdpa_consent: true,
       });
       setToken(data.access_token);
-      router.push("/");
+      if (pendingCode) {
+        setPendingScan(pendingCode, "register");
+      }
+      router.push(getPendingScanTarget("/scan"));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "ลงทะเบียนไม่สำเร็จ");
     } finally {
@@ -329,5 +336,13 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <RegisterPageInner />
+    </Suspense>
   );
 }

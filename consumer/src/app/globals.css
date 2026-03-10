@@ -1,25 +1,65 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "DB Heavent";
+  src: url("/assets/fonts/DBHeaventt-Light.woff2") format("woff2"),
+       url("/assets/fonts/DBHeaventt-Light.woff") format("woff");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DB Heavent";
+  src: url("/assets/fonts/DBHeavent.woff2") format("woff2"),
+       url("/assets/fonts/DBHeavent.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DB Heavent";
+  src: url("/assets/fonts/DBHeavent-Bold.woff2") format("woff2"),
+       url("/assets/fonts/DBHeavent-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --primary: #1976d2;
-  --primary-dark: #1557b0;
-  --primary-light: #e8f0fe;
+  --primary: #1a9444;
+  --primary-dark: #3C9B4D;
+  --primary-light: rgba(148, 201, 69, 0.15);
   --on-primary: #ffffff;
+
   --surface: #ffffff;
-  --surface-dim: #f8f9fa;
-  --surface-container: #f1f3f4;
-  --on-surface: #202124;
-  --on-surface-variant: #5f6368;
-  --outline: #dadce0;
-  --outline-variant: #e8eaed;
-  --success: #34a853;
-  --success-light: #e6f4ea;
-  --error: #ea4335;
+  --surface-dim: #f8f8f8;
+  --surface-container: #f5f5f6;
+  --on-surface: #333333;
+  --on-surface-variant: rgba(0, 0, 0, 0.45);
+
+  --outline: #e0e0e0;
+  --outline-variant: #f0f0f0;
+
+  --success: #94c945;
+  --success-dark: #3C9B4D;
+  --success-light: rgba(148, 201, 69, 0.25);
+
+  --error: #FD3642;
   --error-light: #fce8e6;
+
   --warning: #f9ab00;
   --warning-light: #fef7e0;
+
   --info: #4285f4;
   --info-light: #e8f0fe;
+
+  --green-gradient: linear-gradient(277.42deg, #3C9B4D -13.4%, #7DBD48 80.19%);
+  --scan-btn-gradient: linear-gradient(165.99deg, #cce7a5 -80.77%, #94c945 90.02%);
+
+  --j-brown: #603814;
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -30,15 +70,19 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  font-family: "Inter", "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "DB Heavent", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--on-surface);
   background: var(--surface-dim);
   -webkit-font-smoothing: antialiased;
-  max-width: 480px;
+  max-width: 560px;
   margin: 0 auto;
+  line-height: 1;
+  word-spacing: 1px;
+  font-size: 16px;
 }
 
 .elevation-1 {
@@ -47,4 +91,12 @@ body {
 
 .elevation-2 {
   box-shadow: 0 2px 6px rgba(60,64,67,.15), 0 1px 4px rgba(60,64,67,.1);
+}
+
+.bg-j-green-gradient {
+  background: var(--green-gradient);
+}
+
+.text-j-green {
+  color: #3c9b4d;
 }

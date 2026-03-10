@@ -21,36 +21,37 @@ func NewService(db *pgxpool.Pool) *Service {
 
 // Profile matches users table columns (migration 010)
 type Profile struct {
-	ID           string  `json:"id"`
-	TenantID     string  `json:"tenant_id"`
-	Email        string  `json:"email"`
-	Phone        *string `json:"phone"`
-	DisplayName  string  `json:"display_name"`
-	FirstName    *string `json:"first_name"`
-	LastName     *string `json:"last_name"`
-	BirthDate    *string `json:"birth_date"`
-	Gender       *string `json:"gender"`
-	AvatarURL    *string `json:"avatar_url"`
-	PhoneVerified bool   `json:"phone_verified"`
-	LastLoginAt  *string `json:"last_login_at"`
+	ID               string  `json:"id"`
+	TenantID         string  `json:"tenant_id"`
+	Email            *string `json:"email"`
+	Phone            *string `json:"phone"`
+	DisplayName      string  `json:"display_name"`
+	FirstName        *string `json:"first_name"`
+	LastName         *string `json:"last_name"`
+	BirthDate        *string `json:"birth_date"`
+	Gender           *string `json:"gender"`
+	AvatarURL        *string `json:"avatar_url"`
+	PhoneVerified    bool    `json:"phone_verified"`
+	ProfileCompleted bool    `json:"profile_completed"`
+	LastLoginAt      *string `json:"last_login_at"`
 }
 
 // Address matches user_addresses table
 type Address struct {
-	ID           string  `json:"id"`
-	UserID       string  `json:"user_id"`
-	TenantID     string  `json:"tenant_id"`
-	Label        string  `json:"label"`
-	RecipientName string `json:"recipient_name"`
-	Phone        string  `json:"phone"`
-	AddressLine1 string  `json:"address_line1"`
-	AddressLine2 *string `json:"address_line2"`
-	District     *string `json:"district"`
-	SubDistrict  *string `json:"sub_district"`
-	Province     *string `json:"province"`
-	PostalCode   *string `json:"postal_code"`
-	IsDefault    bool    `json:"is_default"`
-	CreatedAt   string  `json:"created_at"`
+	ID            string  `json:"id"`
+	UserID        string  `json:"user_id"`
+	TenantID      string  `json:"tenant_id"`
+	Label         string  `json:"label"`
+	RecipientName string  `json:"recipient_name"`
+	Phone         string  `json:"phone"`
+	AddressLine1  string  `json:"address_line1"`
+	AddressLine2  *string `json:"address_line2"`
+	District      *string `json:"district"`
+	SubDistrict   *string `json:"sub_district"`
+	Province      *string `json:"province"`
+	PostalCode    *string `json:"postal_code"`
+	IsDefault     bool    `json:"is_default"`
+	CreatedAt     string  `json:"created_at"`
 }
 
 type UpdateProfileInput struct {
@@ -92,12 +93,12 @@ func (s *Service) GetProfile(ctx context.Context, tenantID, userID string) (*Pro
 	var p Profile
 	err := s.db.QueryRow(ctx,
 		`SELECT id, tenant_id, email, phone, display_name, first_name, last_name,
-		        birth_date::text, gender, avatar_url, phone_verified, last_login_at::text
+		        birth_date::text, gender, avatar_url, phone_verified, profile_completed, last_login_at::text
 		 FROM users
 		 WHERE id = $1 AND tenant_id = $2`,
 		userID, tenantID,
 	).Scan(&p.ID, &p.TenantID, &p.Email, &p.Phone, &p.DisplayName, &p.FirstName, &p.LastName,
-		&p.BirthDate, &p.Gender, &p.AvatarURL, &p.PhoneVerified, &p.LastLoginAt)
+		&p.BirthDate, &p.Gender, &p.AvatarURL, &p.PhoneVerified, &p.ProfileCompleted, &p.LastLoginAt)
 	if err != nil {
 		return nil, fmt.Errorf("get profile: %w", err)
 	}

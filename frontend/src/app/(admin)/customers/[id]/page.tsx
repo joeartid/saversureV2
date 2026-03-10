@@ -60,6 +60,17 @@ interface CustomerDetail {
   }>;
 }
 
+interface UserSearchResult {
+  id: string;
+  display_name: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email: string;
+  line_user_id: string;
+  line_display_name: string;
+}
+
 const statusBadgeStyle: Record<string, { bg: string; text: string }> = {
   active: { bg: "bg-green-100", text: "text-green-700" },
   suspended: { bg: "bg-red-100", text: "text-red-700" },
@@ -101,6 +112,14 @@ export default function CustomerDetailPage() {
   const [refundReason, setRefundReason] = useState("");
   const [refundSubmitting, setRefundSubmitting] = useState(false);
 
+  const [transferModal, setTransferModal] = useState(false);
+  const [mergeModal, setMergeModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+
   useEffect(() => {
     const fetchDetail = async () => {
       try {
@@ -139,6 +158,59 @@ export default function CustomerDetailPage() {
       alert(msg);
     } finally {
       setRefundSubmitting(false);
+    }
+  };
+
+  const handleSearchUsers = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      const res = await api.get<{ data: UserSearchResult[] }>(
+        `/api/v1/customers/search?q=${encodeURIComponent(searchQuery)}`
+      );
+      setSearchResults((res.data || []).filter((u) => u.id !== id));
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleTransferLINE = async () => {
+    if (!selectedUser) return;
+    if (!confirm(`ย้าย LINE จาก "${selectedUser.line_display_name || selectedUser.display_name}" มายัง account นี้?`)) return;
+    setActionSubmitting(true);
+    try {
+      await api.post(`/api/v1/customers/${id}/transfer-line`, { from_user_id: selectedUser.id });
+      alert("ย้าย LINE สำเร็จ");
+      setTransferModal(false);
+      setSelectedUser(null);
+      setSearchQuery("");
+      const res = await api.get<CustomerDetail>(`/api/v1/customers/${id}/detail`);
+      setData(res);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Transfer failed");
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  const handleMerge = async () => {
+    if (!selectedUser) return;
+    if (!confirm(`รวม account "${selectedUser.display_name || selectedUser.phone}" เข้ากับ account นี้? (account ที่เลือกจะถูกปิด)`)) return;
+    setActionSubmitting(true);
+    try {
+      await api.post("/api/v1/customers/merge", { keep_user_id: id, remove_user_id: selectedUser.id });
+      alert("Merge สำเร็จ");
+      setMergeModal(false);
+      setSelectedUser(null);
+      setSearchQuery("");
+      const res = await api.get<CustomerDetail>(`/api/v1/customers/${id}/detail`);
+      setData(res);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Merge failed");
+    } finally {
+      setActionSubmitting(false);
     }
   };
 
@@ -260,10 +332,10 @@ export default function CustomerDetailPage() {
         </div>
       </div>
 
-      {/* Point Ledger */}
+      {/* Point Ledger (ประวัติการสะสม/ใช้แต้ม) */}
       <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
         <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
-          Point Ledger
+          Point Ledger <span className="font-normal text-[13px] text-[var(--md-on-surface-variant)]">(ประวัติการสะสม/ใช้แต้ม)</span>
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px]">
@@ -303,10 +375,10 @@ export default function CustomerDetailPage() {
         </div>
       </div>
 
-      {/* Scan History */}
+      {/* Scan History (ประวัติการสแกน) */}
       <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
         <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
-          Scan History
+          ประวัติการสแกน (Scan History)
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px]">
@@ -344,10 +416,10 @@ export default function CustomerDetailPage() {
         </div>
       </div>
 
-      {/* Redemptions */}
+      {/* Redemptions (ประวัติการแลกแต้ม) */}
       <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] overflow-x-auto">
         <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] px-6 py-4 border-b border-[var(--md-outline-variant)]">
-          Redemptions
+          ประวัติการแลกแต้ม (Redemptions)
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px]">
@@ -420,6 +492,168 @@ export default function CustomerDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Account Management */}
+      <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] border border-gray-200 dark:border-[var(--md-outline-variant)] p-6">
+        <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] mb-4">Account Management</h2>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => { setTransferModal(true); setSelectedUser(null); setSearchQuery(""); setSearchResults([]); }}
+            className="h-[40px] px-5 bg-blue-600 text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-blue-700 transition-all"
+          >
+            ย้าย LINE ID จาก account อื่น
+          </button>
+          <button
+            onClick={() => { setMergeModal(true); setSelectedUser(null); setSearchQuery(""); setSearchResults([]); }}
+            className="h-[40px] px-5 bg-orange-600 text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-orange-700 transition-all"
+          >
+            Merge Account
+          </button>
+        </div>
+      </div>
+
+      {/* Transfer LINE Modal */}
+      {transferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-6 w-full max-w-lg mx-4 shadow-xl">
+            <h3 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-4">ย้าย LINE ID จาก Account อื่น</h3>
+            <p className="text-[13px] text-[var(--md-on-surface-variant)] mb-4">
+              ค้นหา account ที่จะเอา LINE มา (ด้วยเบอร์, ชื่อ, email, หรือ ID)
+            </p>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearchUsers()}
+                placeholder="ค้นหาด้วยเบอร์, ชื่อ, email..."
+                className="flex-1 h-[44px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)]"
+              />
+              <button
+                onClick={handleSearchUsers}
+                disabled={searching}
+                className="h-[44px] px-4 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-sm)] text-[14px] font-medium disabled:opacity-50"
+              >
+                {searching ? "..." : "ค้นหา"}
+              </button>
+            </div>
+            {searchResults.length > 0 && (
+              <div className="max-h-[250px] overflow-y-auto border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] mb-4">
+                {searchResults.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => setSelectedUser(u)}
+                    className={`w-full text-left px-4 py-3 border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors ${
+                      selectedUser?.id === u.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                    }`}
+                  >
+                    <div className="text-[14px] font-medium text-[var(--md-on-surface)]">
+                      {u.display_name || [u.first_name, u.last_name].filter(Boolean).join(" ") || "—"}
+                    </div>
+                    <div className="text-[12px] text-[var(--md-on-surface-variant)]">
+                      {[u.phone, u.email, u.line_display_name ? `LINE: ${u.line_display_name}` : ""].filter(Boolean).join(" | ")}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedUser && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-[var(--md-radius-sm)] mb-4 text-[13px]">
+                <p className="font-medium">เลือก: {selectedUser.display_name || selectedUser.phone}</p>
+                {selectedUser.line_display_name && <p>LINE: {selectedUser.line_display_name}</p>}
+                {!selectedUser.line_user_id && <p className="text-red-600">⚠ account นี้ไม่มี LINE ผูกอยู่</p>}
+              </div>
+            )}
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setTransferModal(false)}
+                className="h-[40px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-xl)] text-[14px] font-medium text-[var(--md-on-surface)]"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleTransferLINE}
+                disabled={!selectedUser || !selectedUser.line_user_id || actionSubmitting}
+                className="h-[40px] px-5 bg-blue-600 text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium disabled:opacity-50"
+              >
+                {actionSubmitting ? "กำลังย้าย..." : "ย้าย LINE"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge Modal */}
+      {mergeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-6 w-full max-w-lg mx-4 shadow-xl">
+            <h3 className="text-[18px] font-medium text-[var(--md-on-surface)] mb-4">Merge Account</h3>
+            <p className="text-[13px] text-[var(--md-on-surface-variant)] mb-4">
+              ค้นหา account ที่จะรวมเข้ามา (แต้ม, ประวัติสแกน, การแลกแต้ม จะถูกย้ายมารวมที่ account นี้)
+            </p>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearchUsers()}
+                placeholder="ค้นหาด้วยเบอร์, ชื่อ, email..."
+                className="flex-1 h-[44px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-sm)] text-[14px] text-[var(--md-on-surface)] bg-transparent outline-none focus:border-[var(--md-primary)]"
+              />
+              <button
+                onClick={handleSearchUsers}
+                disabled={searching}
+                className="h-[44px] px-4 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-sm)] text-[14px] font-medium disabled:opacity-50"
+              >
+                {searching ? "..." : "ค้นหา"}
+              </button>
+            </div>
+            {searchResults.length > 0 && (
+              <div className="max-h-[250px] overflow-y-auto border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] mb-4">
+                {searchResults.map((u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => setSelectedUser(u)}
+                    className={`w-full text-left px-4 py-3 border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors ${
+                      selectedUser?.id === u.id ? "bg-orange-50 dark:bg-orange-900/20" : ""
+                    }`}
+                  >
+                    <div className="text-[14px] font-medium text-[var(--md-on-surface)]">
+                      {u.display_name || [u.first_name, u.last_name].filter(Boolean).join(" ") || "—"}
+                    </div>
+                    <div className="text-[12px] text-[var(--md-on-surface-variant)]">
+                      {[u.phone, u.email, u.line_display_name ? `LINE: ${u.line_display_name}` : ""].filter(Boolean).join(" | ")}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedUser && (
+              <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-[var(--md-radius-sm)] mb-4 text-[13px]">
+                <p className="font-medium">เลือก: {selectedUser.display_name || selectedUser.phone}</p>
+                <p className="text-orange-700 mt-1">⚠ Account ที่เลือกจะถูก merge เข้ามาและปิดการใช้งาน</p>
+              </div>
+            )}
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setMergeModal(false)}
+                className="h-[40px] px-4 border border-[var(--md-outline)] rounded-[var(--md-radius-xl)] text-[14px] font-medium text-[var(--md-on-surface)]"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleMerge}
+                disabled={!selectedUser || actionSubmitting}
+                className="h-[40px] px-5 bg-orange-600 text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium disabled:opacity-50"
+              >
+                {actionSubmitting ? "กำลัง merge..." : "Merge Account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Refund Modal */}
       {refundModal && (

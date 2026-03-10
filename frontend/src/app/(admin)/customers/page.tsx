@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
 interface Customer {
   id: string;
   email: string | null;
   phone: string | null;
+  display_name: string | null;
   first_name: string | null;
   last_name: string | null;
   status: string;
@@ -31,6 +33,7 @@ const flagEmoji: Record<string, string> = {
 };
 
 export default function CustomersPage() {
+  const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -92,33 +95,58 @@ export default function CustomersPage() {
       </div>
 
       <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 overflow-x-auto">
-        <table className="w-full min-w-[800px]">
+        <table className="w-full min-w-[900px]">
           <thead>
             <tr className="border-b border-[var(--md-outline-variant)]">
-              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Customer</th>
+              <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">
+                Customer <span className="font-normal normal-case text-[11px] opacity-80">(คลิกชื่อเพื่อดูประวัติการสแกน/แลกแต้ม)</span>
+              </th>
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Phone</th>
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">จังหวัด</th>
               <th className="text-center px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Flag</th>
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Status</th>
               <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Points</th>
               <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Scans</th>
+              <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Redeems</th>
               <th className="text-left px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Joined</th>
               <th className="text-right px-5 py-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] tracking-[0.4px] uppercase">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]"><svg className="animate-spin w-5 h-5 mx-auto" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></td></tr>
+              <tr><td colSpan={10} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]"><svg className="animate-spin w-5 h-5 mx-auto" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></td></tr>
             ) : customers.length === 0 ? (
-              <tr><td colSpan={9} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">No customers found</td></tr>
+              <tr><td colSpan={10} className="px-5 py-12 text-center text-[var(--md-on-surface-variant)]">No customers found</td></tr>
             ) : customers.map((c) => {
               const s = statusStyle[c.status] || statusStyle.active;
-              const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
+              const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || c.display_name;
               return (
-                <tr key={c.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors">
+                <tr
+                  key={c.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => router.push(`/customers/${c.id}`)}
+                  onKeyDown={(e) => e.key === "Enter" && router.push(`/customers/${c.id}`)}
+                  className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors cursor-pointer"
+                >
                   <td className="px-5 py-3">
-                    <div>
-                      <p className="text-[13px] font-medium text-[var(--md-on-surface)]">{name || "—"}</p>
+                    <div
+                      className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/customers/${c.id}`);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          router.push(`/customers/${c.id}`);
+                        }
+                      }}
+                      role="link"
+                      tabIndex={0}
+                    >
+                      <p className="text-[13px] font-medium text-[var(--md-primary)] hover:underline">{name || "—"}</p>
                       <p className="text-[11px] text-[var(--md-on-surface-variant)]">{c.email || "—"}</p>
                     </div>
                   </td>
@@ -128,8 +156,9 @@ export default function CustomersPage() {
                   <td className="px-5 py-3"><span className={`px-2.5 py-0.5 rounded-[6px] text-[11px] font-medium ${s.bg} ${s.text}`}>{c.status}</span></td>
                   <td className="px-5 py-3 text-right text-[14px] font-bold text-[var(--md-primary)]">{c.point_balance.toLocaleString()}</td>
                   <td className="px-5 py-3 text-right text-[13px] text-[var(--md-on-surface)]">{c.scan_count.toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right text-[13px] text-[var(--md-on-surface)]">{c.redeem_count.toLocaleString()}</td>
                   <td className="px-5 py-3 text-[12px] text-[var(--md-on-surface-variant)]">{new Date(c.created_at).toLocaleDateString()}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1 justify-end">
                       <Link
                         href={`/customers/${c.id}`}

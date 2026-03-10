@@ -34,7 +34,8 @@ type ConsumerRegisterInput struct {
 	PDPAConsent bool   `json:"pdpa_consent"`
 }
 
-type OTPVerifier interface {
+type OTPService interface {
+	RequestOTP(ctx context.Context, phone string) (otpID, refCode string, err error)
 	VerifyOTP(ctx context.Context, otpID, otpCode string) (bool, error)
 }
 
@@ -43,7 +44,7 @@ type Service struct {
 	jwtSecret   string
 	accessTTL   time.Duration
 	refreshTTL  time.Duration
-	otpVerifier OTPVerifier
+	otpVerifier OTPService
 }
 
 func NewService(db *pgxpool.Pool, jwtSecret string, accessTTL, refreshTTL time.Duration) *Service {
@@ -55,7 +56,7 @@ func NewService(db *pgxpool.Pool, jwtSecret string, accessTTL, refreshTTL time.D
 	}
 }
 
-func (s *Service) SetOTPVerifier(v OTPVerifier) {
+func (s *Service) SetOTPVerifier(v OTPService) {
 	s.otpVerifier = v
 }
 
@@ -69,14 +70,29 @@ type RegisterInput struct {
 }
 
 type LoginInput struct {
+	TenantID string `json:"tenant_id" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
 type TokenPair struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
+	AccessToken      string `json:"access_token"`
+	RefreshToken     string `json:"refresh_token"`
+	ExpiresIn        int64  `json:"expires_in"`
+	ProfileCompleted *bool  `json:"profile_completed,omitempty"`
+}
+
+type PasswordResetRequestInput struct {
+	TenantID string `json:"tenant_id" binding:"required"`
+	Phone    string `json:"phone" binding:"required"`
+}
+
+type PasswordResetInput struct {
+	TenantID    string `json:"tenant_id" binding:"required"`
+	Phone       string `json:"phone" binding:"required"`
+	OtpID       string `json:"otp_id" binding:"required"`
+	OtpCode     string `json:"otp_code" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
 }
 
 func (s *Service) Register(ctx context.Context, input RegisterInput, ipAddr string) (*TokenPair, error) {
@@ -182,10 +198,10 @@ func (s *Service) RegisterConsumer(ctx context.Context, input ConsumerRegisterIn
 
 	err = tx.QueryRow(ctx,
 		`INSERT INTO users (tenant_id, phone, password_hash, display_name, first_name, last_name,
-		        birth_date, gender, phone_verified, status)
+		        birth_date, gender, phone_verified, profile_completed, status)
 		 VALUES ($1, $2, $3, $4, $5, $6,
 		        CASE WHEN $7 = 'NULL' THEN NULL ELSE $7::date END,
-		        NULLIF($8, ''), TRUE, 'active')
+		        NULLIF($8, ''), TRUE, TRUE, 'active')
 		 RETURNING id`,
 		input.TenantID, input.Phone, string(hash), displayName,
 		input.FirstName, input.LastName, birthDate, input.Gender,
@@ -214,20 +230,27 @@ func (s *Service) RegisterConsumer(ctx context.Context, input ConsumerRegisterIn
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 
-	return s.generateTokenPair(userID, input.TenantID, "api_client", nil)
+	tokens, err := s.generateTokenPair(userID, input.TenantID, "api_client", nil)
+	if err != nil {
+		return nil, err
+	}
+	pc := true
+	tokens.ProfileCompleted = &pc
+	return tokens, nil
 }
 
-func (s *Service) LoginByPhone(ctx context.Context, phone, password string) (*TokenPair, error) {
-	var userID, passwordHash, tenantID, role string
+func (s *Service) LoginByPhone(ctx context.Context, tenantID, phone, password string) (*TokenPair, error) {
+	var userID, passwordHash, resolvedTenantID, role string
+	var profileCompleted bool
 	var factoryID *string
 	err := s.db.QueryRow(ctx,
-		`SELECT u.id, u.password_hash, u.tenant_id, ur.role, u.factory_id
+		`SELECT u.id, u.password_hash, u.tenant_id, ur.role, u.factory_id, u.profile_completed
 		 FROM users u
 		 JOIN user_roles ur ON ur.user_id = u.id
-		 WHERE u.phone = $1 AND u.status = 'active'
+		 WHERE u.tenant_id = $1 AND u.phone = $2 AND u.status = 'active'
 		 LIMIT 1`,
-		phone,
-	).Scan(&userID, &passwordHash, &tenantID, &role, &factoryID)
+		tenantID, phone,
+	).Scan(&userID, &passwordHash, &resolvedTenantID, &role, &factoryID, &profileCompleted)
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
@@ -238,21 +261,27 @@ func (s *Service) LoginByPhone(ctx context.Context, phone, password string) (*To
 
 	s.db.Exec(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, userID)
 
-	return s.generateTokenPair(userID, tenantID, role, factoryID)
+	tokens, err := s.generateTokenPair(userID, resolvedTenantID, role, factoryID)
+	if err != nil {
+		return nil, err
+	}
+	tokens.ProfileCompleted = &profileCompleted
+	return tokens, nil
 }
 
 func (s *Service) Login(ctx context.Context, input LoginInput) (*TokenPair, error) {
 	var userID, passwordHash, tenantID, role string
+	var profileCompleted bool
 	var factoryID *string
 
 	err := s.db.QueryRow(ctx,
-		`SELECT u.id, u.password_hash, u.tenant_id, ur.role, u.factory_id
+		`SELECT u.id, u.password_hash, u.tenant_id, ur.role, u.factory_id, u.profile_completed
 		 FROM users u
 		 JOIN user_roles ur ON ur.user_id = u.id
-		 WHERE u.email = $1 AND u.status = 'active'
+		 WHERE u.tenant_id = $1 AND LOWER(u.email) = LOWER($2) AND u.status = 'active'
 		 LIMIT 1`,
-		input.Email,
-	).Scan(&userID, &passwordHash, &tenantID, &role, &factoryID)
+		input.TenantID, input.Email,
+	).Scan(&userID, &passwordHash, &tenantID, &role, &factoryID, &profileCompleted)
 
 	if err != nil {
 		return nil, ErrInvalidCredentials
@@ -262,7 +291,14 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (*TokenPair, erro
 		return nil, ErrInvalidCredentials
 	}
 
-	return s.generateTokenPair(userID, tenantID, role, factoryID)
+	s.db.Exec(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, userID)
+
+	tokens, err := s.generateTokenPair(userID, tenantID, role, factoryID)
+	if err != nil {
+		return nil, err
+	}
+	tokens.ProfileCompleted = &profileCompleted
+	return tokens, nil
 }
 
 func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*TokenPair, error) {
@@ -280,10 +316,10 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 
 // PDPAConsent represents a consent record
 type PDPAConsent struct {
-	ID         string `json:"id"`
+	ID          string `json:"id"`
 	ConsentType string `json:"consent_type"`
-	AcceptedAt string `json:"accepted_at"`
-	IPAddress  string `json:"ip_address,omitempty"`
+	AcceptedAt  string `json:"accepted_at"`
+	IPAddress   string `json:"ip_address,omitempty"`
 }
 
 func (s *Service) GetPDPAConsents(ctx context.Context, userID string) ([]PDPAConsent, error) {
@@ -312,6 +348,124 @@ func (s *Service) GetPDPAConsents(ctx context.Context, userID string) ([]PDPACon
 		consents = append(consents, c)
 	}
 	return consents, rows.Err()
+}
+
+type CompleteProfileInput struct {
+	FirstName string `json:"first_name" binding:"required"`
+	LastName  string `json:"last_name" binding:"required"`
+	Phone     string `json:"phone" binding:"required"`
+	OtpID     string `json:"otp_id" binding:"required"`
+	OtpCode   string `json:"otp_code" binding:"required"`
+	Email     string `json:"email"`
+}
+
+func (s *Service) CompleteProfile(ctx context.Context, tenantID, userID string, input CompleteProfileInput) (*TokenPair, error) {
+	if s.otpVerifier == nil {
+		return nil, errors.New("OTP verification is not configured")
+	}
+
+	ok, err := s.otpVerifier.VerifyOTP(ctx, input.OtpID, input.OtpCode)
+	if err != nil {
+		return nil, fmt.Errorf("OTP verify: %w", err)
+	}
+	if !ok {
+		return nil, errors.New("invalid or expired OTP code")
+	}
+
+	var existing int
+	_ = s.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND phone = $2 AND id != $3 AND phone IS NOT NULL AND phone != ''`,
+		tenantID, input.Phone, userID,
+	).Scan(&existing)
+	if existing > 0 {
+		return nil, ErrPhoneExists
+	}
+
+	displayName := input.FirstName + " " + input.LastName
+
+	emailExpr := "email"
+	args := []any{input.FirstName, input.LastName, input.Phone, displayName, userID, tenantID}
+	if input.Email != "" {
+		emailExpr = "$7"
+		args = append(args, input.Email)
+	}
+
+	query := fmt.Sprintf(
+		`UPDATE users SET first_name = $1, last_name = $2, phone = $3, display_name = $4,
+		 phone_verified = true, profile_completed = true, updated_at = NOW(),
+		 email = %s
+		 WHERE id = $5 AND tenant_id = $6`, emailExpr)
+
+	_, err = s.db.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("update profile: %w", err)
+	}
+
+	pc := true
+	tokens, err := s.generateTokenPair(userID, tenantID, "api_client", nil)
+	if err != nil {
+		return nil, err
+	}
+	tokens.ProfileCompleted = &pc
+	return tokens, nil
+}
+
+func (s *Service) RequestPasswordReset(ctx context.Context, input PasswordResetRequestInput) (string, string, error) {
+	if s.otpVerifier == nil {
+		return "", "", errors.New("OTP verification is not configured")
+	}
+
+	var userID string
+	err := s.db.QueryRow(ctx,
+		`SELECT id
+		 FROM users
+		 WHERE tenant_id = $1 AND phone = $2 AND status = 'active'
+		 LIMIT 1`,
+		input.TenantID, input.Phone,
+	).Scan(&userID)
+	if err != nil {
+		return "", "", ErrUserNotFound
+	}
+
+	otpID, refCode, err := s.otpVerifier.RequestOTP(ctx, input.Phone)
+	if err != nil {
+		return "", "", fmt.Errorf("request OTP: %w", err)
+	}
+	return otpID, refCode, nil
+}
+
+func (s *Service) ResetPassword(ctx context.Context, input PasswordResetInput) error {
+	if s.otpVerifier == nil {
+		return errors.New("OTP verification is not configured")
+	}
+
+	ok, err := s.otpVerifier.VerifyOTP(ctx, input.OtpID, input.OtpCode)
+	if err != nil {
+		return fmt.Errorf("OTP verify: %w", err)
+	}
+	if !ok {
+		return errors.New("invalid or expired OTP code")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	cmd, err := s.db.Exec(ctx,
+		`UPDATE users
+		 SET password_hash = $1, updated_at = NOW()
+		 WHERE tenant_id = $2 AND phone = $3 AND status = 'active'`,
+		string(hash), input.TenantID, input.Phone,
+	)
+	if err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
 }
 
 func (s *Service) WithdrawPDPAConsent(ctx context.Context, userID, ipAddr string) error {

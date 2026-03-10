@@ -264,6 +264,7 @@ func (s *Service) GetGeoHeatmap(ctx context.Context, tenantID string) ([]GeoPoin
 
 // Activity holds a single scan or redemption activity for recent feed.
 type Activity struct {
+	ID        string `json:"id"` // unique key for list rendering
 	Type      string `json:"type"` // "scan" or "redeem"
 	UserName  string `json:"user_name"`
 	Detail    string `json:"detail"`
@@ -277,13 +278,13 @@ func (s *Service) GetRecentActivity(ctx context.Context, tenantID string, limit 
 	}
 
 	query := `
-		(SELECT 'scan' AS type, u.display_name, 'Scanned batch ' || b.prefix AS detail, c.scanned_at::text AS created_at
+		(SELECT 'scan' AS type, u.display_name, 'Scanned batch ' || b.prefix AS detail, c.scanned_at::text AS created_at, c.id::text AS row_id
 		 FROM codes c
 		 JOIN users u ON u.id = c.scanned_by
 		 JOIN batches b ON b.id = c.batch_id
 		 WHERE c.tenant_id = $1 AND c.scanned_by IS NOT NULL)
 		UNION ALL
-		(SELECT 'redeem' AS type, u.display_name, 'Redeemed ' || r.name AS detail, rr.created_at::text AS created_at
+		(SELECT 'redeem' AS type, u.display_name, 'Redeemed ' || r.name AS detail, rr.created_at::text AS created_at, rr.id::text AS row_id
 		 FROM reward_reservations rr
 		 JOIN users u ON u.id = rr.user_id
 		 JOIN rewards r ON r.id = rr.reward_id
@@ -298,11 +299,13 @@ func (s *Service) GetRecentActivity(ctx context.Context, tenantID string, limit 
 	defer rows.Close()
 
 	var activities []Activity
+	var rowID string
 	for rows.Next() {
 		var a Activity
-		if err := rows.Scan(&a.Type, &a.UserName, &a.Detail, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.Type, &a.UserName, &a.Detail, &a.CreatedAt, &rowID); err != nil {
 			return nil, fmt.Errorf("recent activity row: %w", err)
 		}
+		a.ID = a.Type + "-" + rowID
 		activities = append(activities, a)
 	}
 	return activities, nil

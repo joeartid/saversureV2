@@ -358,9 +358,9 @@ export default function DashboardPage() {
             Recent Activity
           </h2>
           <div className="space-y-0">
-            {activity.map((item) => (
+            {activity.map((item, index) => (
               <div
-                key={item.id}
+                key={item.id || `activity-${index}`}
                 className="flex items-start gap-4 py-3 border-b border-[var(--md-outline-variant)] last:border-b-0"
               >
                 <div
