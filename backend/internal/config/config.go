@@ -10,6 +10,7 @@ import (
 type Config struct {
 	App       AppConfig
 	DB        DBConfig
+	LegacyV1  DBConfig
 	Redis     RedisConfig
 	NATS      NATSConfig
 	JWT       JWTConfig
@@ -119,6 +120,16 @@ func Load() (*Config, error) {
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 			MaxConns: getEnvInt("DB_MAX_CONNS", 20),
 			MinConns: getEnvInt("DB_MIN_CONNS", 5),
+		},
+		LegacyV1: DBConfig{
+			Host:     getEnv("LEGACY_V1_DB_HOST", "localhost"),
+			Port:     getEnvInt("LEGACY_V1_DB_PORT", 5433),
+			Name:     getEnv("LEGACY_V1_DB_NAME", "saversure_v1_backup"),
+			User:     getEnv("LEGACY_V1_DB_USER", "saversure_app"),
+			Password: getEnv("LEGACY_V1_DB_PASSWORD", ""),
+			SSLMode:  getEnv("LEGACY_V1_DB_SSLMODE", "disable"),
+			MaxConns: getEnvInt("LEGACY_V1_DB_MAX_CONNS", 5),
+			MinConns: getEnvInt("LEGACY_V1_DB_MIN_CONNS", 1),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),

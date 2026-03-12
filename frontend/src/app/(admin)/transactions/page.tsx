@@ -116,7 +116,7 @@ export default function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [customerPanel, setCustomerPanel] = useState<Transaction | null>(null);
   const limit = 30;
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const buildParams = useCallback(() => {
     const p = new URLSearchParams({ limit: String(limit), offset: String(page * limit) });

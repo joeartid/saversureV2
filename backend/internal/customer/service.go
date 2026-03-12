@@ -71,7 +71,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Cu
 		`SELECT u.id, u.tenant_id, u.email, u.phone, u.display_name, u.first_name, u.last_name, u.status,
 		        u.province, u.occupation, COALESCE(u.customer_flag, 'green'),
 		        COALESCE((SELECT balance_after FROM point_ledger WHERE tenant_id = u.tenant_id AND user_id = u.id ORDER BY created_at DESC LIMIT 1), 0),
-		        COALESCE((SELECT COUNT(*) FROM codes WHERE tenant_id = u.tenant_id AND scanned_by = u.id), 0),
+		        COALESCE((SELECT COUNT(*) FROM scan_history WHERE tenant_id = u.tenant_id AND user_id = u.id AND COALESCE(scan_type, 'success') = 'success'), 0),
 		        COALESCE((SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = u.tenant_id AND user_id = u.id AND status = 'CONFIRMED'), 0),
 		        u.created_at::text
 		 FROM users u
@@ -107,7 +107,7 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*Customer, 
 		`SELECT u.id, u.tenant_id, u.email, u.phone, u.display_name, u.first_name, u.last_name, u.status,
 		        u.province, u.occupation, COALESCE(u.customer_flag, 'green'),
 		        COALESCE((SELECT balance_after FROM point_ledger WHERE tenant_id = u.tenant_id AND user_id = u.id ORDER BY created_at DESC LIMIT 1), 0),
-		        COALESCE((SELECT COUNT(*) FROM codes WHERE tenant_id = u.tenant_id AND scanned_by = u.id), 0),
+		        COALESCE((SELECT COUNT(*) FROM scan_history WHERE tenant_id = u.tenant_id AND user_id = u.id AND COALESCE(scan_type, 'success') = 'success'), 0),
 		        COALESCE((SELECT COUNT(*) FROM reward_reservations WHERE tenant_id = u.tenant_id AND user_id = u.id AND status = 'CONFIRMED'), 0),
 		        u.created_at::text
 		 FROM users u
@@ -264,17 +264,15 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 		tenantID, customerID,
 	).Scan(&balance)
 
-	// Scan history: use codes table (scanned_by = user)
+	// Scan history: use scan_history so migrated historical records appear immediately.
 	scanRows, err := s.db.Query(ctx,
-		`SELECT c.id, b.campaign_id,
-		        COALESCE(p.points_per_scan, (cam.settings->>'points_per_scan')::int, 1),
-		        c.scanned_at::text
-		 FROM codes c
-		 JOIN batches b ON b.id = c.batch_id
-		 JOIN campaigns cam ON cam.id = b.campaign_id
-		 LEFT JOIN products p ON p.id = b.product_id
-		 WHERE c.scanned_by = $1 AND c.tenant_id = $2
-		 ORDER BY c.scanned_at DESC LIMIT 10`,
+		`SELECT sh.id, COALESCE(sh.campaign_id::text, ''),
+		        COALESCE(sh.points_earned, 0),
+		        sh.scanned_at::text
+		 FROM scan_history sh
+		 WHERE sh.user_id = $1 AND sh.tenant_id = $2
+		   AND COALESCE(sh.scan_type, 'success') = 'success'
+		 ORDER BY sh.scanned_at DESC LIMIT 10`,
 		customerID, tenantID,
 	)
 	var scans []ScanHistoryEntry

@@ -38,6 +38,7 @@ import (
 	"saversure/internal/ledger"
 	"saversure/internal/linebot"
 	"saversure/internal/luckydraw"
+	"saversure/internal/migrationjob"
 	mw "saversure/internal/middleware"
 	"saversure/internal/navmenu"
 	"saversure/internal/news"
@@ -186,6 +187,11 @@ func main() {
 	platformLedgerSvc := platform.NewLedgerService(db)
 	platformExchangeSvc := platform.NewExchangeService(db, platformIdentitySvc, platformLedgerSvc)
 	platformHandler := platform.NewHandler(platformIdentitySvc, platformLedgerSvc, platformExchangeSvc)
+	migrationSvc := migrationjob.NewService(db, cfg)
+	migrationHandler := migrationjob.NewHandler(migrationSvc)
+	if err := migrationSvc.RecoverInterruptedJobs(context.Background()); err != nil {
+		slog.Warn("failed to recover interrupted migration jobs", "error", err)
+	}
 
 	var uploadHandler *upload.Handler
 	var exportHandler *export.Handler
@@ -724,6 +730,19 @@ func main() {
 		apiKeyRoutes.POST("", apiKeyHandler.Create)
 		apiKeyRoutes.PATCH("/:id/revoke", apiKeyHandler.Revoke)
 		apiKeyRoutes.DELETE("/:id", apiKeyHandler.Delete)
+	}
+
+	// Migration Center (Admin)
+	migrationRoutes := tenanted.Group("/migration-jobs")
+	migrationRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		migrationRoutes.GET("/config/source", migrationHandler.GetSourceConfig)
+		migrationRoutes.POST("", migrationHandler.Create)
+		migrationRoutes.GET("", migrationHandler.List)
+		migrationRoutes.GET("/:id", migrationHandler.Get)
+		migrationRoutes.GET("/:id/errors", migrationHandler.Errors)
+		migrationRoutes.POST("/:id/cancel", migrationHandler.Cancel)
+		migrationRoutes.POST("/:id/retry", migrationHandler.Retry)
 	}
 
 	// Webhooks (Admin)

@@ -343,6 +343,16 @@ const navGroups: NavGroup[] = [
     label: "ระบบ",
     items: [
       {
+        href: "/migration-center",
+        label: "Migration Center",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M16 1H4c-1.1 0-2 .9-2 2v12h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14zm-5.5-2l-4-4 1.41-1.41L12.5 15.67l3.59-3.59L17.5 13.5l-4 4zm-4-9h8V8h-8v2z" />
+          </svg>
+        ),
+      },
+      {
         href: "/tenants",
         label: "Tenants",
         roles: ["super_admin"],
