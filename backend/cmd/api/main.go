@@ -38,16 +38,16 @@ import (
 	"saversure/internal/ledger"
 	"saversure/internal/linebot"
 	"saversure/internal/luckydraw"
-	"saversure/internal/migrationjob"
 	mw "saversure/internal/middleware"
+	"saversure/internal/migrationjob"
 	"saversure/internal/navmenu"
 	"saversure/internal/news"
-	"saversure/internal/pageconfig"
-	"saversure/internal/popup"
 	"saversure/internal/notification"
 	"saversure/internal/opsdigest"
 	"saversure/internal/otp"
+	"saversure/internal/pageconfig"
 	"saversure/internal/platform"
+	"saversure/internal/popup"
 	"saversure/internal/product"
 	"saversure/internal/profile"
 	"saversure/internal/promotion"
@@ -720,6 +720,7 @@ func main() {
 		fulfillmentRoutes.GET("", fulfillmentHandler.List)
 		fulfillmentRoutes.PATCH("/:id", fulfillmentHandler.UpdateStatus)
 		fulfillmentRoutes.POST("/bulk-update", fulfillmentHandler.BulkUpdate)
+		fulfillmentRoutes.POST("/export-pdf", fulfillmentHandler.ExportPDF)
 	}
 
 	// API Keys (Admin)

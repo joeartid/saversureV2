@@ -66,3 +66,4 @@ frontend/dev_out.txt
 
 # Large SQL dumps (V1 backup data)
 backup/*.sql
+backup/*.dump

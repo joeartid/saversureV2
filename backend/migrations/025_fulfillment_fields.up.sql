@@ -7,4 +7,4 @@ ALTER TABLE reward_reservations
 
 CREATE INDEX IF NOT EXISTS idx_reservations_fulfillment
     ON reward_reservations(tenant_id, fulfillment_status)
-    WHERE status = 'confirmed';
+    WHERE status = 'CONFIRMED';

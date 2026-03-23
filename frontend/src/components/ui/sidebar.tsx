@@ -152,6 +152,16 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
+      {
+        href: "/fulfillment",
+        label: "Fulfillment",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2a3 3 0 006 0h6a3 3 0 006 0h2v-5l-3-4zM6 18.5A1.5 1.5 0 114.5 17 1.5 1.5 0 016 18.5zm8-3H3V6h11zm4 3a1.5 1.5 0 111.5-1.5A1.5 1.5 0 0118 18.5zM16 12V9.5h3.2l1.96 2.5z" />
+          </svg>
+        ),
+      },
     ],
   },
   {

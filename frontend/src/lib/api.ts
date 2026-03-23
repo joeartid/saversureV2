@@ -7,6 +7,12 @@ interface RequestOptions {
   idempotencyKey?: string;
 }
 
+interface DownloadOptions {
+  method?: string;
+  body?: unknown;
+  headers?: Record<string, string>;
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -77,6 +83,38 @@ async function downloadFile(endpoint: string, filename: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+async function downloadFileWithOptions(endpoint: string, filename: string, options: DownloadOptions = {}): Promise<void> {
+  const headers: Record<string, string> = {
+    ...getAuthHeader(),
+    ...options.headers,
+  };
+
+  if (options.body) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    method: options.method || "GET",
+    headers,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  handle401(res);
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function uploadFile(endpoint: string, file: File, fieldName = "file"): Promise<{ url: string }> {
   const form = new FormData();
   form.append(fieldName, file);
@@ -118,7 +156,8 @@ export const api = {
     request<T>(endpoint, { method: "PATCH", body }),
   delete: <T>(endpoint: string) =>
     request<T>(endpoint, { method: "DELETE" }),
-  download: downloadFile,
+  download: (endpoint: string, filename: string, options?: DownloadOptions) =>
+    options ? downloadFileWithOptions(endpoint, filename, options) : downloadFile(endpoint, filename),
   upload: uploadFile,
   uploadForm: uploadFormData,
 };
