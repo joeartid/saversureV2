@@ -85,6 +85,11 @@ func (h *Handler) Delete(c *gin.Context) {
 
 func (h *Handler) ListActive(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
+	if tenantID == "" {
+		// Graceful fallback: popups are cosmetic — return empty instead of 400
+		c.JSON(http.StatusOK, gin.H{"data": []Popup{}})
+		return
+	}
 	page := c.DefaultQuery("page", "")
 	items, err := h.svc.ListActive(c.Request.Context(), tenantID, page)
 	if err != nil {
