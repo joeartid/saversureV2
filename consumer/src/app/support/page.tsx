@@ -346,7 +346,7 @@ export default function SupportPage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       <Navbar />
 
-      <div className="pt-16">
+      <div className="pt-24">
         {/* Header */}
         <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] bg-[length:200%_200%] animate-gradient px-5 pt-6 pb-14 text-white relative overflow-hidden">
           <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-white/10 animate-float" />

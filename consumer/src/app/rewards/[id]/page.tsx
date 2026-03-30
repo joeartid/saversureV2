@@ -246,7 +246,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
     return (
       <div className="pb-36 min-h-screen bg-background">
         <Navbar />
-        <div className="pt-16">
+        <div className="pt-24">
           <div className="aspect-square bg-muted animate-pulse" />
           <div className="p-5 space-y-3">
             <div className="h-6 bg-muted rounded w-3/4 animate-pulse" />
@@ -263,7 +263,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
     return (
       <div className="pb-36 min-h-screen bg-background">
         <Navbar />
-        <div className="pt-16 flex flex-col items-center justify-center px-6" style={{ minHeight: "60vh" }}>
+        <div className="pt-24 flex flex-col items-center justify-center px-6" style={{ minHeight: "60vh" }}>
           <p className="text-lg font-bold mb-2">ไม่พบรางวัล</p>
           <p className="text-sm text-muted-foreground mb-6">รางวัลนี้อาจถูกลบหรือไม่มีอยู่แล้ว</p>
           <Link href="/rewards" className="rounded-full bg-[var(--jh-green)] px-8 py-2.5 text-sm font-bold text-white">
@@ -289,7 +289,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
     <div className="pb-36 min-h-screen bg-background">
       <Navbar />
 
-      <div className="pt-16">
+      <div className="pt-24">
         {/* Back button */}
         <button
           onClick={() => router.back()}

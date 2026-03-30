@@ -90,7 +90,7 @@ export default function ProfilePage() {
     <div className="min-h-screen pb-24 bg-background">
       <Navbar />
 
-      <div className="pt-16">
+      <div className="pt-24">
         <PageHeader title="โปรไฟล์" subtitle="จัดการข้อมูลสมาชิกของคุณ" />
 
         {loggedIn ? (

@@ -126,7 +126,7 @@ export default function WalletPage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       <Navbar />
 
-      <div className="pt-16">
+      <div className="pt-24">
         {/* Hero balance card */}
         <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-6 pb-16 text-white relative overflow-hidden">
           <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/8" />

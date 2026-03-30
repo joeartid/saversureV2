@@ -107,7 +107,7 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="pb-24 min-h-screen bg-background">
         <Navbar />
-        <div className="pt-16">
+        <div className="pt-24">
           <div className="aspect-video bg-muted animate-pulse" />
           <div className="p-5 space-y-3">
             <div className="h-6 bg-muted rounded w-3/4 animate-pulse" />
@@ -124,7 +124,7 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="pb-24 min-h-screen bg-background">
         <Navbar />
-        <div className="pt-16 flex flex-col items-center justify-center px-6" style={{ minHeight: "60vh" }}>
+        <div className="pt-24 flex flex-col items-center justify-center px-6" style={{ minHeight: "60vh" }}>
           <p className="text-lg font-bold mb-2">ไม่พบภารกิจ</p>
           <p className="text-sm text-muted-foreground mb-6">ภารกิจนี้อาจไม่มีอยู่แล้ว</p>
           <Link href="/missions" className="rounded-full bg-[var(--jh-green)] px-8 py-2.5 text-sm font-bold text-white">
@@ -156,7 +156,7 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
     <div className="pb-24 min-h-screen bg-background">
       <Navbar />
 
-      <div className="pt-16">
+      <div className="pt-24">
         {/* Back button */}
         <button
           onClick={() => router.back()}

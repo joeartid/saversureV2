@@ -8,6 +8,8 @@ import { useTenant } from "./TenantProvider";
 import { api } from "@/lib/api";
 import { getNavIcon } from "@/lib/nav-icons";
 
+import PointsBar from "./PointsBar";
+
 interface HeaderMenuItem {
   icon: string;
   label: string;
@@ -106,6 +108,9 @@ export default function Navbar() {
         {/* Green accent strip at bottom */}
         <div className="h-[2px] bg-[linear-gradient(90deg,var(--jh-green)_0%,var(--jh-lime)_50%,var(--jh-teal)_100%)]" />
       </header>
+      
+      {/* Global Points Bar for all pages */}
+      <PointsBar />
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </>

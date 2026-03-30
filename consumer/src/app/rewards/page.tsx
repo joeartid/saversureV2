@@ -115,7 +115,7 @@ export default function RewardsPage() {
     <div className="pb-24 min-h-screen bg-background">
       <Navbar />
 
-      <div className="pt-16">
+      <div className="pt-24">
         {/* Header with animated gradient */}
         <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] bg-[length:200%_200%] animate-gradient px-5 pt-8 pb-14 text-white relative overflow-hidden">
           {/* Floating decorative shapes */}

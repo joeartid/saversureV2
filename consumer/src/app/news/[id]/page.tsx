@@ -42,7 +42,7 @@ export default function NewsDetailPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <Navbar />
-      <div className="pt-14">
+      <div className="pt-24">
         {loading ? (
           <div className="p-4 space-y-4">
             <div className="h-48 bg-muted rounded-2xl animate-pulse" />

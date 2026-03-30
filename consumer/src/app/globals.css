@@ -126,8 +126,10 @@ body {
 }
 
 .app-fixed-bar {
-  left: max(0px, calc(50vw - 240px));
-  right: max(0px, calc(50vw - 240px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
 }
 
 @theme inline {

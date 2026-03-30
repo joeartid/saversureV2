@@ -186,19 +186,7 @@ function JulaHerbHome() {
 
   return (
     <>
-      {/* ══════ Points Bar ══════ */}
-      <div className="jh-points-bar">
-        <span className="jh-points-name">
-          {loggedIn ? `${displayName} Points` : `${brandName} Points`}
-        </span>
-        <div className="jh-points-values">
-          <span>แต้ม {(primaryBal?.balance ?? 0).toLocaleString()}</span>
-          <span className="jh-coin">🪙</span>
-          <span className="jh-divider">|</span>
-          <span>เพชร {secondaryBals.length > 0 ? secondaryBals[0].balance.toLocaleString() : "0"}</span>
-          <span className="jh-diamond">💎</span>
-        </div>
-      </div>
+
 
       {/* ══════ Banner ══════ */}
       <div className="jh-banner-section">
@@ -269,9 +257,9 @@ export default function HomePage() {
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-white">
       <Navbar />
-      <div className="pt-14 relative z-0">
+      <div className="pt-24 relative z-0">
         <JulaHerbHome />
       </div>
       <BottomNav />

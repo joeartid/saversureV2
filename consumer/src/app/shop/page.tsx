@@ -7,7 +7,7 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <Navbar />
-      <div className="pt-14">
+      <div className="pt-24">
         <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] px-5 pt-8 pb-12 text-white relative overflow-hidden">
           <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
           <h1 className="text-xl font-bold relative">🛒 ช้อปออนไลน์</h1>

@@ -33,7 +33,7 @@ export default function CustomPage({
   return (
     <div className="min-h-screen pb-24 bg-background">
       <Navbar />
-      <div className="pt-16">
+      <div className="pt-24">
         <PageRenderer pageSlug={slug} fallback={<NotFoundFallback />} />
       </div>
       <BottomNav />

@@ -408,7 +408,7 @@ export default function ActivityPage() {
     <div className="pb-24 min-h-screen bg-background">
       <Navbar />
 
-      <div className="pt-16">
+      <div className="pt-24">
         <PageHeader
           title="กิจกรรมของฉัน"
           subtitle="ติดตามความคืบหน้าและประวัติกิจกรรม"

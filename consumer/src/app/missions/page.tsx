@@ -73,7 +73,7 @@ export default function MissionsPage() {
     <div className="pb-20 min-h-screen bg-background">
       <Navbar />
 
-      <div className="pt-16">
+      <div className="pt-24">
         <PageHeader
           title="ภารกิจ"
           subtitle="ทำภารกิจรับคะแนนและ Badge"
