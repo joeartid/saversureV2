@@ -255,6 +255,16 @@ func main() {
 		})
 	})
 
+	r.GET("/temp-add-points", func(c *gin.Context) {
+		svc := ledger.NewService(db)
+		err := svc.AwardPoints(context.Background(), "00000000-0000-0000-0000-000000000001", "6337553b-69cc-44ce-a42e-f263ddd47b46", "point", 100, "test_points_100", "เพิ่มแต้มสำหรับทดสอบ", nil)
+		if err != nil {
+			c.String(500, "Error: " + err.Error())
+		} else {
+			c.String(200, "OK 100 POINTS ADDED")
+		}
+	})
+
 	// Public download (no auth required)
 	if exportHandler != nil {
 		r.GET("/api/v1/exports/download/:token", exportHandler.Download)

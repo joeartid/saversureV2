@@ -471,9 +471,9 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
-/* Image side — 44% */
+/* Image side — 42% */
 .jh-card-img {
-  width: 44%;
+  width: 42%;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -521,35 +521,44 @@ body {
   animation: pulse 1.5s infinite;
 }
 
-/* Detail side — 56% */
+/* Detail side — 58% */
 .jh-card-detail {
-  width: 56%;
+  width: 58%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
+  padding: 4px 6px;
 }
 .jh-card-detail-top {
-  padding: 12px 10px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 .jh-card-detail-bottom {
-  padding: 0 10px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* "แลกรับฟรี !" */
 .jh-card-free-label {
   color: rgba(148, 201, 69, 1);
   font-weight: 900;
-  font-size: 20px;
-  line-height: 1.1;
+  font-size: 26px;
+  line-height: 1;
+  text-align: center;
+  margin-bottom: -2px;
 }
 
 /* Product name */
 .jh-card-name {
-  color: #333;
+  color: var(--jh-green-dark);
   font-weight: 700;
-  font-size: 15px;
-  line-height: 1.3;
-  margin-top: 2px;
+  font-size: 18px;
+  line-height: 1;
+  text-align: center;
+  margin-bottom: 0px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -558,41 +567,51 @@ body {
 
 /* Price */
 .jh-card-price {
-  color: #888;
-  font-weight: 600;
-  font-size: 15px;
-  line-height: 1.2;
-  margin-top: 2px;
+  color: rgba(148, 201, 69, 1);
+  font-weight: 900;
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+  margin-bottom: 2px;
+  margin-top: 4px;
 }
 .jh-card-price span {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 800;
 }
 
 /* Discount info */
 .jh-card-discount {
-  background: #f8f8f8;
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 13px;
-  color: #666;
-  line-height: 1.5;
-  margin-top: 6px;
+  background: transparent;
+  padding: 0;
+  font-size: 16px; /* Increased from 15px */
+  color: #444;
+  line-height: 1.15;
+  margin-top: 0px;
+  text-align: center;
+  width: 100%;
 }
 .jh-card-discount strong {
-  color: #c71e1e; /* making "พิเศษ!" stand out a bit more */
-  font-weight: 700;
-  font-size: 12px;
+  color: #000;
+  font-weight: 900;
+  font-size: 17px;
+  display: block;
+  margin-bottom: 0px;
+  text-indent: -2px;
 }
 .jh-pts {
-  color: rgba(148, 201, 69, 1);
+  color: var(--jh-green);
   font-weight: 900;
-  font-size: 26px;
+  font-size: 22px; /* Increased from 18px */
 }
 .jh-pts-old {
-  color: #aaa;
-  font-size: 15px;
+  color: #666;
+  font-size: 15px; /* Increased from 14px */
   margin-left: 2px;
+}
+.jh-pts-old s {
+  color: rgba(239, 68, 68, 1);
+  text-decoration-thickness: 1px;
 }
 
 /* Shipping */
@@ -600,7 +619,9 @@ body {
   text-align: center;
   color: rgba(148, 201, 69, 1);
   font-size: 12px;
-  margin-top: 4px;
+  margin-top: 2px;
+  margin-bottom: 4px;
+  font-weight: 700;
 }
 
 /* Point button */
@@ -608,14 +629,25 @@ body {
   background: rgba(148, 201, 69, 1);
   color: #fff;
   text-align: center;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 16px;
-  padding: 8px;
-  border-radius: 8px 8px 0 0;
-  margin-top: 6px;
+  padding: 4px 0;
+  width: 100%;
+  border-radius: 6px;
+  margin-top: 0px;
+  margin-bottom: 0px;
+  box-shadow: 0 2px 6px rgba(148, 201, 69, 0.25);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+}
+.jh-card-point-btn:active {
+  transform: scale(0.96);
 }
 .jh-card-point-btn span {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 /* Card image background colors */

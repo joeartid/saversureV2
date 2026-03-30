@@ -98,13 +98,21 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
             </div>
 
             <div className="jh-card-detail-bottom">
-              <div className="jh-card-discount">
-                <strong>พิเศษ! ลดแลกแต้มสินค้า</strong><br />
-                เพียง <span className="jh-pts">{reward.point_cost.toLocaleString()}</span> แต้ม{" "}
-                {reward.normal_point_cost > reward.point_cost && (
-                  <span className="jh-pts-old">
-                    (ปกติ <s>{reward.normal_point_cost.toLocaleString()}</s> แต้ม)
-                  </span>
+              <div className="jh-card-discount" style={{ minHeight: '44px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                {(typeof reward.normal_point_cost === "number" && reward.normal_point_cost > reward.point_cost) ? (
+                  <>
+                    <strong>พิเศษ! ลดแลกแต้มสินค้า</strong>
+                    <div>
+                      เพียง <span className="jh-pts">{reward.point_cost.toLocaleString()}</span> แต้ม{" "}
+                      <span className="jh-pts-old">
+                        (ปกติ <s>{reward.normal_point_cost.toLocaleString()}</s> แต้ม)
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <span className="jh-pts" style={{ fontSize: '24px' }}>{reward.point_cost.toLocaleString()}</span> แต้ม
+                  </div>
                 )}
               </div>
 
