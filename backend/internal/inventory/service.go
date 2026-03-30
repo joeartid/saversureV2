@@ -179,7 +179,7 @@ func (s *Service) UpdateReward(ctx context.Context, tenantID, rewardID string, i
 			normal_point_cost = COALESCE($7, normal_point_cost),
 			price = COALESCE($8, price),
 			cost_currency = COALESCE($9, cost_currency),
-			image_url = COALESCE($10, image_url),
+			image_url = CASE WHEN $10::text = '__clear__' THEN NULL WHEN $10::text IS NOT NULL THEN $10::text ELSE image_url END,
 			delivery_type = COALESCE($11, delivery_type),
 			status = COALESCE($12, status),
 			valid_from = CASE WHEN $13::text = '__clear__' THEN NULL WHEN $13::text IS NOT NULL THEN $13::timestamptz ELSE valid_from END,

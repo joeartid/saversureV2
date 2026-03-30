@@ -151,8 +151,8 @@ export default function RewardsPage() {
       cost_currency: r.cost_currency,
       delivery_type: r.delivery_type,
       status: r.status,
-      valid_from: r.valid_from ? r.valid_from.slice(0, 16) : "",
-      expires_at: r.expires_at ? r.expires_at.slice(0, 16) : "",
+      valid_from: r.valid_from ? r.valid_from.replace(' ', 'T').slice(0, 16) : "",
+      expires_at: r.expires_at ? r.expires_at.replace(' ', 'T').slice(0, 16) : "",
       total_qty: r.total_qty,
       image_url: r.image_url || "",
     });
@@ -176,7 +176,7 @@ export default function RewardsPage() {
           status: form.status || undefined,
           valid_from: form.valid_from || "__clear__",
           expires_at: form.expires_at || "__clear__",
-          image_url: form.image_url || undefined,
+          image_url: form.image_url === "" ? "__clear__" : (form.image_url || undefined),
         });
       } else {
         await api.post("/api/v1/rewards", {
@@ -218,7 +218,10 @@ export default function RewardsPage() {
     try {
       const result = await api.upload("/api/v1/upload/image", file);
       setForm({ ...form, image_url: result.url });
-    } catch { toast.error("Upload failed"); } finally { setUploading(false); }
+    } catch { toast.error("Upload failed"); } finally { 
+      setUploading(false);
+      e.target.value = ""; // Reset input so same file can be uploaded again if needed
+    }
   };
 
   const filtered = rewards.filter((r) => {
@@ -338,15 +341,15 @@ export default function RewardsPage() {
                 </div>
                 <div>
                   <label className={labelClass}>ราคาเต็ม (บาท)</label>
-                  <input type="number" value={form.price || ""} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} required className={fieldClass} />
+                  <input type="number" value={form.price === 0 ? 0 : (form.price || "")} onChange={(e) => setForm({ ...form, price: e.target.value === "" ? 0 : parseFloat(e.target.value) })} required className={fieldClass} />
                 </div>
                 <div>
                   <label className={labelClass}>แต้มปกติ (ก่อนลด)</label>
-                  <input type="number" value={form.normal_point_cost || ""} onChange={(e) => setForm({ ...form, normal_point_cost: parseInt(e.target.value) || 0 })} required className={fieldClass} />
+                  <input type="number" value={form.normal_point_cost === 0 ? 0 : (form.normal_point_cost || "")} onChange={(e) => setForm({ ...form, normal_point_cost: e.target.value === "" ? 0 : parseInt(e.target.value) })} required className={fieldClass} />
                 </div>
                 <div>
                   <label className={labelClass}>แต้มลดราคา (แต้มที่ใช้จริง)</label>
-                  <input type="number" value={form.point_cost || ""} onChange={(e) => setForm({ ...form, point_cost: parseInt(e.target.value) || 1 })} min={1} required className={fieldClass} />
+                  <input type="number" value={form.point_cost === 0 ? 0 : (form.point_cost || "")} onChange={(e) => setForm({ ...form, point_cost: e.target.value === "" ? 0 : parseInt(e.target.value) })} min={1} required className={fieldClass} />
                 </div>
                 <div>
                   <label className={labelClass}>สกุลเงิน</label>

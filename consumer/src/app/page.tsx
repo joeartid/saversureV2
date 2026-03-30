@@ -98,7 +98,14 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
             </div>
 
             <div className="jh-card-detail-bottom">
-              <div className="jh-card-discount" style={{ minHeight: '44px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div
+                className={`jh-card-discount ${
+                  typeof reward.normal_point_cost === "number" && reward.normal_point_cost > reward.point_cost
+                    ? "bg-[#eff5f0] rounded-lg px-2.5 py-1 mt-1 mb-1"
+                    : "my-1"
+                }`}
+                style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
+              >
                 {(typeof reward.normal_point_cost === "number" && reward.normal_point_cost > reward.point_cost) ? (
                   <>
                     <strong>พิเศษ! ลดแลกแต้มสินค้า</strong>
@@ -115,11 +122,6 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
                   </div>
                 )}
               </div>
-
-              {/* จัดส่ง */}
-              {reward.delivery_type === "shipping" && (
-                <div className="jh-card-shipping">จัดส่งฟรีทั่วประเทศ</div>
-              )}
 
               {/* Point button */}
               <div className="jh-card-point-btn">
