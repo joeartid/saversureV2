@@ -21,14 +21,15 @@ interface RewardItem {
   description: string;
   type: string;
   point_cost: number;
+  normal_point_cost: number;
+  price: number;
   cost_currency: string;
   image_url?: string;
   delivery_type: string;
   available_qty: number;
   is_flash: boolean;
-  price?: number;
-  diamond_point?: number;
   tier_name?: string;
+  valid_from?: string;
 }
 
 interface NewsItem {
@@ -60,7 +61,7 @@ const mediaUrl = (url?: string) => {
    ═══════════════════════════════════ */
 function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
   const imgSrc = mediaUrl(reward.image_url);
-  const price = reward.price || Math.round(reward.point_cost * 0.65);
+  const price = reward.price || 0;
 
   // สีพื้นหลังรูป (สลับ pastel)
   const bgClasses = ["jh-bg-green", "jh-bg-pink", "jh-bg-blue", "jh-bg-yellow", "jh-bg-purple", "jh-bg-teal"];
@@ -86,14 +87,6 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
             ) : (
               <div className="jh-card-emoji">🎁</div>
             )}
-            {/* ป้ายใต้รูป */}
-            <div className="jh-card-img-label">
-              {reward.description
-                ? reward.description.length > 40
-                  ? reward.description.slice(0, 40) + "..."
-                  : reward.description
-                : reward.name}
-            </div>
           </div>
 
           {/* ═══ ข้อมูล ═══ */}
@@ -108,9 +101,11 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
               <div className="jh-card-discount">
                 <strong>พิเศษ! ลดแลกแต้มสินค้า</strong><br />
                 เพียง <span className="jh-pts">{reward.point_cost.toLocaleString()}</span> แต้ม{" "}
-                <span className="jh-pts-old">
-                  (ปกติ <s>{Math.round(reward.point_cost * 1.4).toLocaleString()}</s> แต้ม)
-                </span>
+                {reward.normal_point_cost > reward.point_cost && (
+                  <span className="jh-pts-old">
+                    (ปกติ <s>{reward.normal_point_cost.toLocaleString()}</s> แต้ม)
+                  </span>
+                )}
               </div>
 
               {/* จัดส่ง */}
@@ -120,7 +115,7 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
 
               {/* Point button */}
               <div className="jh-card-point-btn">
-                ใช้ {reward.point_cost.toLocaleString()} <span>🪙</span>
+                แลกรับสิทธิ์
               </div>
             </div>
           </div>
@@ -172,11 +167,11 @@ function JulaHerbHome() {
 
   const filteredRewards =
     activeTab === "julaherb"
-      ? rewards.filter((r) => r.delivery_type === "shipping" || r.delivery_type === "pickup")
+      ? rewards.filter((r) => r.type === "physical" || r.type === "product")
       : activeTab === "premium"
-      ? rewards.filter((r) => r.tier_name || r.point_cost >= 200)
+      ? rewards.filter((r) => r.type === "premium")
       : activeTab === "lifestyle"
-      ? rewards.filter((r) => r.delivery_type === "coupon" || r.delivery_type === "digital")
+      ? rewards.filter((r) => r.type === "coupon" || r.type === "digital" || r.type === "ticket")
       : activeTab === "donate"
       ? rewards.filter((r) => r.delivery_type === "none" || r.type === "donation")
       : rewards;

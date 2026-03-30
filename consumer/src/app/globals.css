@@ -477,16 +477,17 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 12px 8px 6px;
   position: relative;
   min-height: 180px;
+  overflow: hidden;
 }
 .jh-card-product-img {
-  object-fit: contain;
-  max-height: 120px;
-  width: auto;
-  max-width: 100%;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.1));
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 .jh-card-emoji {
   font-size: 56px;
@@ -555,38 +556,41 @@ body {
 
 /* Price */
 .jh-card-price {
-  color: rgba(148, 201, 69, 1);
-  font-weight: 900;
-  font-size: 28px;
-  line-height: 1.1;
+  color: #888;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
   margin-top: 2px;
 }
 .jh-card-price span {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 /* Discount info */
 .jh-card-discount {
   background: #f8f8f8;
-  border-radius: 6px;
-  padding: 6px 8px;
-  font-size: 10px;
-  color: #888;
-  line-height: 1.6;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
   margin-top: 6px;
 }
 .jh-card-discount strong {
-  color: #555;
+  color: #c71e1e; /* making "พิเศษ!" stand out a bit more */
   font-weight: 700;
+  font-size: 12px;
 }
 .jh-pts {
   color: rgba(148, 201, 69, 1);
-  font-weight: 700;
+  font-weight: 900;
+  font-size: 26px;
 }
 .jh-pts-old {
-  color: #bbb;
-  font-size: 9px;
+  color: #aaa;
+  font-size: 15px;
+  margin-left: 2px;
 }
 
 /* Shipping */

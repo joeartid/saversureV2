@@ -11,10 +11,13 @@ interface Reward {
   description: string;
   type: string;
   point_cost: number;
+  normal_point_cost: number;
+  price: number;
   cost_currency: string;
   image_url: string | null;
   delivery_type: string;
   status: string;
+  valid_from: string | null;
   expires_at: string | null;
   total_qty: number;
   reserved_qty: number;
@@ -34,6 +37,7 @@ interface CurrencyMaster {
 
 const typeOptions = [
   { value: "physical", label: "สินค้าจริง" },
+  { value: "premium", label: "สินค้าพรีเมียม" },
   { value: "coupon", label: "คูปอง" },
   { value: "digital", label: "ดิจิทัล" },
   { value: "ticket", label: "ตั๋ว" },
@@ -72,9 +76,12 @@ type FormData = {
   description: string;
   type: string;
   point_cost: number;
+  normal_point_cost: number;
+  price: number;
   cost_currency: string;
   delivery_type: string;
   status: string;
+  valid_from: string;
   expires_at: string;
   total_qty: number;
   image_url: string;
@@ -82,8 +89,8 @@ type FormData = {
 
 const emptyForm: FormData = {
   campaign_id: "", name: "", description: "", type: "physical",
-  point_cost: 100, cost_currency: "point", delivery_type: "none",
-  status: "active", expires_at: "", total_qty: 100, image_url: "",
+  point_cost: 100, normal_point_cost: 0, price: 0, cost_currency: "point", delivery_type: "none",
+  status: "active", valid_from: "", expires_at: "", total_qty: 100, image_url: "",
 };
 
 export default function RewardsPage() {
@@ -138,9 +145,12 @@ export default function RewardsPage() {
       description: r.description,
       type: r.type,
       point_cost: r.point_cost,
+      normal_point_cost: r.normal_point_cost,
+      price: r.price,
       cost_currency: r.cost_currency,
       delivery_type: r.delivery_type,
       status: r.status,
+      valid_from: r.valid_from ? r.valid_from.slice(0, 16) : "",
       expires_at: r.expires_at ? r.expires_at.slice(0, 16) : "",
       total_qty: r.total_qty,
       image_url: r.image_url || "",
@@ -157,16 +167,20 @@ export default function RewardsPage() {
           name: form.name || undefined,
           description: form.description || undefined,
           type: form.type || undefined,
-          point_cost: form.point_cost || undefined,
+          point_cost: form.point_cost,
+          normal_point_cost: form.normal_point_cost,
+          price: form.price,
           cost_currency: form.cost_currency || undefined,
           delivery_type: form.delivery_type || undefined,
           status: form.status || undefined,
+          valid_from: form.valid_from || "__clear__",
           expires_at: form.expires_at || "__clear__",
           image_url: form.image_url || undefined,
         });
       } else {
         await api.post("/api/v1/rewards", {
           ...form,
+          valid_from: form.valid_from || null,
           expires_at: form.expires_at || null,
           image_url: form.image_url || null,
         });
@@ -309,8 +323,16 @@ export default function RewardsPage() {
                   <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} className={`${fieldClass} h-auto py-2`} />
                 </div>
                 <div>
-                  <label className={labelClass}>ราคา (จำนวนแต้ม)</label>
-                  <input type="number" value={form.point_cost} onChange={(e) => setForm({ ...form, point_cost: parseInt(e.target.value) || 1 })} min={1} required className={fieldClass} />
+                  <label className={labelClass}>ราคาเต็ม (บาท)</label>
+                  <input type="number" value={form.price || ""} onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })} required className={fieldClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>แต้มปกติ (ก่อนลด)</label>
+                  <input type="number" value={form.normal_point_cost || ""} onChange={(e) => setForm({ ...form, normal_point_cost: parseInt(e.target.value) || 0 })} required className={fieldClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>แต้มลดราคา (แต้มที่ใช้จริง)</label>
+                  <input type="number" value={form.point_cost || ""} onChange={(e) => setForm({ ...form, point_cost: parseInt(e.target.value) || 1 })} min={1} required className={fieldClass} />
                 </div>
                 <div>
                   <label className={labelClass}>สกุลเงิน</label>
@@ -329,7 +351,7 @@ export default function RewardsPage() {
                   <label className={labelClass}>ประเภทสินค้า</label>
                   <select value={form.type} onChange={(e) => {
                     const t = e.target.value;
-                    const autoDelivery: Record<string, string> = { physical: "shipping", coupon: "coupon", digital: "digital", ticket: "ticket" };
+                    const autoDelivery: Record<string, string> = { physical: "shipping", premium: "shipping", coupon: "coupon", digital: "digital", ticket: "ticket" };
                     setForm({ ...form, type: t, delivery_type: autoDelivery[t] || form.delivery_type });
                   }} className={fieldClass}>
                     {typeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -348,6 +370,10 @@ export default function RewardsPage() {
                     <option value="inactive">⏸️ Inactive</option>
                     <option value="draft">📝 Draft</option>
                   </select>
+                </div>
+                <div>
+                  <label className={labelClass}>วันเริ่มต้น</label>
+                  <input type="datetime-local" value={form.valid_from} onChange={(e) => setForm({ ...form, valid_from: e.target.value })} className={fieldClass} />
                 </div>
                 <div>
                   <label className={labelClass}>วันหมดอายุ</label>

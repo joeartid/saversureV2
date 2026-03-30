@@ -16,6 +16,8 @@ interface RewardDetail {
   name: string;
   description: string;
   point_cost: number;
+  normal_point_cost: number;
+  price: number;
   cost_currency: string;
   image_url?: string;
   delivery_type: string;
@@ -327,7 +329,10 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
           {/* Name & Price */}
           <div>
             <h1 className="text-xl font-bold leading-tight">{reward.name}</h1>
-            <div className="flex items-center gap-3 mt-2">
+            {reward.price > 0 && (
+              <p className="text-sm text-muted-foreground mt-1">ราคาปกติ {reward.price.toLocaleString()} บาท</p>
+            )}
+            <div className="flex items-center gap-2 mt-2">
               <span className="text-2xl font-bold text-[var(--jh-green)] relative group cursor-default">
                 <span>{emoji}</span> {reward.point_cost.toLocaleString()}
                 <span className="absolute -top-7 left-0 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
@@ -337,6 +342,11 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
               <span className="text-sm text-muted-foreground">
                 {currName}
               </span>
+              {reward.normal_point_cost > reward.point_cost && (
+                <span className="text-sm text-muted-foreground line-through ml-2">
+                  ปกติ {reward.normal_point_cost.toLocaleString()}
+                </span>
+              )}
             </div>
           </div>
 

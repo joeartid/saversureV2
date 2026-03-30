@@ -20,49 +20,58 @@ func NewService(db *pgxpool.Pool) *Service {
 }
 
 type Reward struct {
-	ID           string  `json:"id"`
-	TenantID     string  `json:"tenant_id"`
-	CampaignID   string  `json:"campaign_id"`
-	Name         string  `json:"name"`
-	Description  string  `json:"description"`
-	Type         string  `json:"type"`
-	PointCost    int     `json:"point_cost"`
-	CostCurrency string  `json:"cost_currency"`
-	ImageURL     *string `json:"image_url"`
-	DeliveryType string  `json:"delivery_type"`
-	Status       string  `json:"status"`
-	ExpiresAt    *string `json:"expires_at"`
-	TotalQty     int     `json:"total_qty"`
-	ReservedQty  int     `json:"reserved_qty"`
-	SoldQty      int     `json:"sold_qty"`
-	AvailableQty int     `json:"available_qty"`
-	CreatedAt    string  `json:"created_at"`
+	ID              string  `json:"id"`
+	TenantID        string  `json:"tenant_id"`
+	CampaignID      string  `json:"campaign_id"`
+	Name            string  `json:"name"`
+	Description     string  `json:"description"`
+	Type            string  `json:"type"`
+	PointCost       int     `json:"point_cost"`
+	NormalPointCost int     `json:"normal_point_cost"`
+	Price           float64 `json:"price"`
+	CostCurrency    string  `json:"cost_currency"`
+	ImageURL        *string `json:"image_url"`
+	DeliveryType    string  `json:"delivery_type"`
+	Status          string  `json:"status"`
+	ValidFrom       *string `json:"valid_from"`
+	ExpiresAt       *string `json:"expires_at"`
+	TotalQty        int     `json:"total_qty"`
+	ReservedQty     int     `json:"reserved_qty"`
+	SoldQty         int     `json:"sold_qty"`
+	AvailableQty    int     `json:"available_qty"`
+	CreatedAt       string  `json:"created_at"`
 }
 
 type CreateRewardInput struct {
-	CampaignID   string  `json:"campaign_id" binding:"required"`
-	Name         string  `json:"name" binding:"required"`
-	Description  string  `json:"description"`
-	Type         string  `json:"type" binding:"required"`
-	PointCost    int     `json:"point_cost" binding:"required,min=1"`
-	CostCurrency string  `json:"cost_currency"`
-	ImageURL     *string `json:"image_url"`
-	DeliveryType string  `json:"delivery_type"`
-	Status       string  `json:"status"`
-	ExpiresAt    *string `json:"expires_at"`
-	TotalQty     int     `json:"total_qty" binding:"required,min=1"`
+	CampaignID      string  `json:"campaign_id" binding:"required"`
+	Name            string  `json:"name" binding:"required"`
+	Description     string  `json:"description"`
+	Type            string  `json:"type" binding:"required"`
+	PointCost       int     `json:"point_cost" binding:"required,min=1"`
+	NormalPointCost int     `json:"normal_point_cost"`
+	Price           float64 `json:"price"`
+	CostCurrency    string  `json:"cost_currency"`
+	ImageURL        *string `json:"image_url"`
+	DeliveryType    string  `json:"delivery_type"`
+	Status          string  `json:"status"`
+	ValidFrom       *string `json:"valid_from"`
+	ExpiresAt       *string `json:"expires_at"`
+	TotalQty        int     `json:"total_qty" binding:"required,min=1"`
 }
 
 type UpdateRewardInput struct {
-	Name         *string `json:"name"`
-	Description  *string `json:"description"`
-	Type         *string `json:"type"`
-	PointCost    *int    `json:"point_cost"`
-	CostCurrency *string `json:"cost_currency"`
-	ImageURL     *string `json:"image_url"`
-	DeliveryType *string `json:"delivery_type"`
-	Status       *string `json:"status"`
-	ExpiresAt    *string `json:"expires_at"`
+	Name            *string  `json:"name"`
+	Description     *string  `json:"description"`
+	Type            *string  `json:"type"`
+	PointCost       *int     `json:"point_cost"`
+	NormalPointCost *int     `json:"normal_point_cost"`
+	Price           *float64 `json:"price"`
+	CostCurrency    *string  `json:"cost_currency"`
+	ImageURL        *string  `json:"image_url"`
+	DeliveryType    *string  `json:"delivery_type"`
+	Status          *string  `json:"status"`
+	ValidFrom       *string  `json:"valid_from"`
+	ExpiresAt       *string  `json:"expires_at"`
 }
 
 type UpdateInventoryInput struct {
@@ -70,16 +79,16 @@ type UpdateInventoryInput struct {
 }
 
 const rewardSelectCols = `r.id, r.tenant_id, r.campaign_id, r.name, COALESCE(r.description, ''), r.type, r.point_cost,
-	COALESCE(r.cost_currency, 'point'), r.image_url, COALESCE(r.delivery_type, 'none'),
-	COALESCE(r.status, 'active'), r.expires_at::text,
+	COALESCE(r.normal_point_cost, 0), COALESCE(r.price, 0::numeric), COALESCE(r.cost_currency, 'point'), r.image_url, COALESCE(r.delivery_type, 'none'),
+	COALESCE(r.status, 'active'), r.valid_from::text, r.expires_at::text,
 	ri.total_qty, ri.reserved_qty, ri.sold_qty, (ri.total_qty - ri.reserved_qty - ri.sold_qty) as available_qty,
 	r.created_at::text`
 
 func scanReward(scanner interface{ Scan(dest ...any) error }) (*Reward, error) {
 	var r Reward
 	err := scanner.Scan(&r.ID, &r.TenantID, &r.CampaignID, &r.Name, &r.Description, &r.Type, &r.PointCost,
-		&r.CostCurrency, &r.ImageURL, &r.DeliveryType,
-		&r.Status, &r.ExpiresAt,
+		&r.NormalPointCost, &r.Price, &r.CostCurrency, &r.ImageURL, &r.DeliveryType,
+		&r.Status, &r.ValidFrom, &r.ExpiresAt,
 		&r.TotalQty, &r.ReservedQty, &r.SoldQty, &r.AvailableQty,
 		&r.CreatedAt)
 	if err != nil {
@@ -101,18 +110,18 @@ func (s *Service) CreateReward(ctx context.Context, tenantID string, input Creat
 
 	row := s.db.QueryRow(ctx,
 		`WITH ins AS (
-			INSERT INTO rewards (tenant_id, campaign_id, name, description, type, point_cost, cost_currency, image_url, delivery_type, status, expires_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::timestamptz)
+			INSERT INTO rewards (tenant_id, campaign_id, name, description, type, point_cost, normal_point_cost, price, cost_currency, image_url, delivery_type, status, valid_from, expires_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::timestamptz, $14::timestamptz)
 			RETURNING *
 		), inv AS (
 			INSERT INTO reward_inventory (reward_id, total_qty, reserved_qty, sold_qty)
-			SELECT id, $12, 0, 0 FROM ins
+			SELECT id, $15, 0, 0 FROM ins
 			RETURNING reward_id, total_qty, reserved_qty, sold_qty
 		)
 		SELECT `+rewardSelectCols+`
 		FROM ins r JOIN inv ri ON ri.reward_id = r.id`,
 		tenantID, input.CampaignID, input.Name, input.Description, input.Type, input.PointCost,
-		input.CostCurrency, input.ImageURL, input.DeliveryType, input.Status, input.ExpiresAt,
+		input.NormalPointCost, input.Price, input.CostCurrency, input.ImageURL, input.DeliveryType, input.Status, input.ValidFrom, input.ExpiresAt,
 		input.TotalQty,
 	)
 	return scanReward(row)
@@ -167,17 +176,20 @@ func (s *Service) UpdateReward(ctx context.Context, tenantID, rewardID string, i
 			description = COALESCE($4, description),
 			type = COALESCE($5, type),
 			point_cost = COALESCE($6, point_cost),
-			cost_currency = COALESCE($7, cost_currency),
-			image_url = COALESCE($8, image_url),
-			delivery_type = COALESCE($9, delivery_type),
-			status = COALESCE($10, status),
-			expires_at = CASE WHEN $11::text = '__clear__' THEN NULL WHEN $11::text IS NOT NULL THEN $11::timestamptz ELSE expires_at END,
+			normal_point_cost = COALESCE($7, normal_point_cost),
+			price = COALESCE($8, price),
+			cost_currency = COALESCE($9, cost_currency),
+			image_url = COALESCE($10, image_url),
+			delivery_type = COALESCE($11, delivery_type),
+			status = COALESCE($12, status),
+			valid_from = CASE WHEN $13::text = '__clear__' THEN NULL WHEN $13::text IS NOT NULL THEN $13::timestamptz ELSE valid_from END,
+			expires_at = CASE WHEN $14::text = '__clear__' THEN NULL WHEN $14::text IS NOT NULL THEN $14::timestamptz ELSE expires_at END,
 			updated_at = NOW()
 		 WHERE id = $2 AND tenant_id = $1
 		 RETURNING id`,
 		tenantID, rewardID,
 		input.Name, input.Description, input.Type, input.PointCost,
-		input.CostCurrency, input.ImageURL, input.DeliveryType, input.Status, input.ExpiresAt,
+		input.NormalPointCost, input.Price, input.CostCurrency, input.ImageURL, input.DeliveryType, input.Status, input.ValidFrom, input.ExpiresAt,
 	)
 
 	var id string
