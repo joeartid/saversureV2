@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { getTenantId } from "@/lib/tenant";
+import { useTenant } from "@/components/TenantProvider";
 
 function formatPhone(phone: string) {
   const digits = phone.replace(/\D/g, "");
@@ -15,7 +15,7 @@ function formatPhone(phone: string) {
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const tenantId = getTenantId() || process.env.NEXT_PUBLIC_TENANT_ID || "";
+  const { tenantId, ready } = useTenant();
 
   const [step, setStep] = useState<1 | 2>(1);
   const [phone, setPhone] = useState("");
@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
 
   const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId) {
+    if (!ready || !tenantId) {
       setError("ยังไม่พบ tenant ของแบรนด์นี้");
       return;
     }
@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId) {
+    if (!ready || !tenantId) {
       setError("ยังไม่พบ tenant ของแบรนด์นี้");
       return;
     }
@@ -114,6 +114,16 @@ export default function ForgotPasswordPage() {
         </div>
 
         <div className="mt-5 rounded-[24px] border border-white/60 bg-white/90 p-5 shadow-[0_20px_50px_rgba(18,52,29,0.12)]">
+          {!ready && (
+            <p className="mb-4 text-center text-sm text-[var(--on-surface-variant)]">
+              กำลังโหลดข้อมูลแบรนด์...
+            </p>
+          )}
+          {ready && !tenantId && (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              ยังไม่พบ tenant — เปิดผ่านโดเมนแบรนด์ หรือตั้งค่า NEXT_PUBLIC_TENANT_ID สำหรับ dev
+            </div>
+          )}
           {error && (
             <div className="mb-4 rounded-2xl border border-[var(--error)]/20 bg-[var(--error-light)] px-4 py-3 text-sm text-[var(--error)]">
               {error}
@@ -144,7 +154,7 @@ export default function ForgotPasswordPage() {
               </div>
               <button
                 type="submit"
-                disabled={loading || phone.replace(/\D/g, "").length < 10}
+                disabled={loading || !ready || !tenantId || phone.replace(/\D/g, "").length < 10}
                 className="h-12 w-full rounded-2xl bg-[var(--primary)] text-sm font-semibold text-white disabled:opacity-60"
               >
                 {loading ? "กำลังส่ง OTP..." : "ส่ง OTP"}
@@ -201,7 +211,7 @@ export default function ForgotPasswordPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || otpCode.length !== 6}
+                  disabled={loading || !ready || !tenantId || otpCode.length !== 6}
                   className="h-12 flex-1 rounded-2xl bg-[var(--primary)] text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {loading ? "กำลังบันทึก..." : "เปลี่ยนรหัสผ่าน"}

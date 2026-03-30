@@ -13,8 +13,8 @@ node_modules/
 # testing
 /coverage
 
-# next.js
-/.next/
+# next.js (any app under monorepo)
+**/.next/
 /out/
 
 # production
@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!**/.env.example
 
 # vercel
 .vercel

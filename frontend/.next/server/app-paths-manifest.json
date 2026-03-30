@@ -1,8 +1,0 @@
-{
-  "/(admin)/dashboard/page": "app/(admin)/dashboard/page.js",
-  "/(admin)/gamification/page": "app/(admin)/gamification/page.js",
-  "/(admin)/lucky-draw/page": "app/(admin)/lucky-draw/page.js",
-  "/(admin)/campaigns/page": "app/(admin)/campaigns/page.js",
-  "/(admin)/rewards/page": "app/(admin)/rewards/page.js",
-  "/(admin)/news/page": "app/(admin)/news/page.js"
-}

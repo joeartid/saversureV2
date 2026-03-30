@@ -33,7 +33,7 @@ interface AuthResponse {
 }
 
 function LoginPageInner() {
-  const { tenantId, brandName, branding } = useTenant();
+  const { tenantId, brandName, branding, ready } = useTenant();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [phone, setPhone] = useState("");
@@ -59,11 +59,11 @@ function LoginPageInner() {
   }, [router]);
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!ready || !tenantId) return;
     api.get<{ client_id?: string; enabled?: boolean }>(`/api/v1/auth/google/config?tenant_id=${encodeURIComponent(tenantId)}`)
       .then((data) => setGoogleClientId(data.client_id || ""))
       .catch(() => {});
-  }, [tenantId]);
+  }, [tenantId, ready]);
 
   const finishAuth = (tokens: AuthResponse) => {
     setToken(tokens.access_token);
@@ -77,7 +77,7 @@ function LoginPageInner() {
   };
 
   const handleLineLogin = async () => {
-    if (!tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
+    if (!ready || !tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
     setLineLoading(true);
     setError("");
     try {
@@ -93,7 +93,7 @@ function LoginPageInner() {
 
   const handlePhoneLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
+    if (!ready || !tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
     setLoading(true);
     setError("");
     try {
@@ -108,7 +108,7 @@ function LoginPageInner() {
   };
 
   const handleGoogleLogin = async () => {
-    if (!tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
+    if (!ready || !tenantId) { setError("ยังไม่พบ tenant ของแบรนด์นี้"); return; }
     if (!googleClientId) { setError("Google Login ยังไม่ถูกตั้งค่าสำหรับแบรนด์นี้"); return; }
     setGoogleLoading(true);
     setError("");
@@ -187,6 +187,16 @@ function LoginPageInner() {
 
         {/* Content */}
         <div className="flex flex-col gap-3 px-4 py-5">
+          {!ready && (
+            <p className="text-center text-sm text-muted-foreground">กำลังโหลดข้อมูลแบรนด์...</p>
+          )}
+          {ready && !tenantId && (
+            <Card className="border-amber-200 bg-amber-50 shadow-sm">
+              <CardContent className="p-3 text-sm text-amber-900">
+                ยังไม่พบ tenant — เปิดผ่านโดเมนแบรนด์ หรือตั้งค่า NEXT_PUBLIC_TENANT_ID สำหรับ dev
+              </CardContent>
+            </Card>
+          )}
           {error && (
             <Card className="border-red-200 bg-red-50 shadow-sm">
               <CardContent className="p-3 flex items-start gap-2.5">
@@ -205,7 +215,7 @@ function LoginPageInner() {
                 <button
                   type="button"
                   onClick={handleLineLogin}
-                  disabled={lineLoading}
+                  disabled={lineLoading || !ready || !tenantId}
                   className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-[#06C755] text-sm font-semibold text-white transition-all duration-200 hover:shadow-md active:scale-[0.96] disabled:opacity-60"
                 >
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
@@ -217,7 +227,7 @@ function LoginPageInner() {
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
-                  disabled={googleLoading}
+                  disabled={googleLoading || !ready || !tenantId}
                   className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl border border-border bg-white text-sm font-semibold text-foreground transition-all duration-200 hover:shadow-md active:scale-[0.96] disabled:opacity-60"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24">
@@ -232,7 +242,8 @@ function LoginPageInner() {
                 <button
                   type="button"
                   onClick={() => setShowPhoneForm((p) => !p)}
-                  className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-muted text-sm font-semibold text-foreground transition-all duration-200 hover:shadow-md active:scale-[0.96]"
+                  disabled={!ready || !tenantId}
+                  className="flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-muted text-sm font-semibold text-foreground transition-all duration-200 hover:shadow-md active:scale-[0.96] disabled:opacity-60"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
@@ -253,7 +264,7 @@ function LoginPageInner() {
                     <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="รหัสผ่านของคุณ" required
                       className="h-11 w-full rounded-lg border border-input bg-muted px-3.5 text-sm outline-none transition focus:border-[var(--jh-green)] focus:bg-white focus:ring-2 focus:ring-[var(--jh-green)]/20" />
                   </div>
-                  <button type="submit" disabled={loading}
+                  <button type="submit" disabled={loading || !ready || !tenantId}
                     className="h-11 w-full rounded-xl bg-[var(--jh-green)] text-sm font-semibold text-white transition active:scale-[0.98] disabled:opacity-50">
                     {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
                   </button>

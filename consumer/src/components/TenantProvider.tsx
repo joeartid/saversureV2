@@ -53,9 +53,12 @@ function applyBrandingCSS(branding: BrandingData) {
   }
 }
 
+const ENV_TENANT_FALLBACK = process.env.NEXT_PUBLIC_TENANT_ID || "";
+
 export default function TenantProvider({ children }: { children: ReactNode }) {
   const [branding, setBranding] = useState<BrandingData | null>(null);
   const [ready, setReady] = useState(false);
+  const [tenantId, setTenantId] = useState(ENV_TENANT_FALLBACK);
 
   useEffect(() => {
     resolveTenant().then((b) => {
@@ -63,6 +66,7 @@ export default function TenantProvider({ children }: { children: ReactNode }) {
         setBranding(b);
         applyBrandingCSS(b);
       }
+      setTenantId(getTenantId());
       setReady(true);
     });
   }, []);
@@ -70,7 +74,7 @@ export default function TenantProvider({ children }: { children: ReactNode }) {
   return (
     <TenantContext.Provider
       value={{
-        tenantId: getTenantId(),
+        tenantId,
         branding,
         brandName: branding?.brand_name || "Saversure",
         ready,

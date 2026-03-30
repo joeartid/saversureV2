@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import DOMPurify from "dompurify";
 import { api } from "@/lib/api";
+import { useTenant } from "@/components/TenantProvider";
 
 interface PopupData {
   id: string;
@@ -51,8 +52,11 @@ const mediaUrl = (url: string) => {
 export default function PopupRenderer() {
   const [popup, setPopup] = useState<PopupData | null>(null);
   const pathname = usePathname();
+  const { tenantId, ready } = useTenant();
 
   useEffect(() => {
+    if (!ready || !tenantId) return;
+
     const pageSlug = pathname === "/" ? "home" : pathname.replace("/", "");
 
     api
@@ -68,7 +72,7 @@ export default function PopupRenderer() {
         }
       })
       .catch(() => {});
-  }, [pathname]);
+  }, [pathname, ready, tenantId]);
 
   if (!popup) return null;
 

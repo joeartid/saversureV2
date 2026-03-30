@@ -72,5 +72,23 @@ export async function resolveTenant(): Promise<BrandingData | null> {
     }
   }
 
+  const host = window.location.hostname.toLowerCase();
+  if (!slug && !ENV_TENANT_ID && (host === "localhost" || host === "127.0.0.1")) {
+    const demoId = "00000000-0000-0000-0000-000000000001";
+    resolvedTenantId = demoId;
+    try {
+      const brandRes = await fetch(`${API_BASE}/api/v1/public/branding`, {
+        headers: { "X-Tenant-ID": demoId },
+      });
+      if (brandRes.ok) {
+        const data = await brandRes.json();
+        resolvedBranding = { ...data, tenant_id: demoId };
+        return resolvedBranding;
+      }
+    } catch {
+      // keep demo tenant id for API headers even if branding fails
+    }
+  }
+
   return null;
 }
