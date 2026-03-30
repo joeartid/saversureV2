@@ -244,7 +244,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
 
   if (loading) {
     return (
-      <div className="pb-24 min-h-screen bg-background">
+      <div className="pb-36 min-h-screen bg-background">
         <Navbar />
         <div className="pt-16">
           <div className="aspect-square bg-muted animate-pulse" />
@@ -261,7 +261,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
 
   if (!reward) {
     return (
-      <div className="pb-24 min-h-screen bg-background">
+      <div className="pb-36 min-h-screen bg-background">
         <Navbar />
         <div className="pt-16 flex flex-col items-center justify-center px-6" style={{ minHeight: "60vh" }}>
           <p className="text-lg font-bold mb-2">ไม่พบรางวัล</p>
@@ -286,7 +286,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
   const selectedAddress = savedAddresses.find((item) => item.id === selectedAddressId);
 
   return (
-    <div className="pb-24 min-h-screen bg-background">
+    <div className="pb-36 min-h-screen bg-background">
       <Navbar />
 
       <div className="pt-16">
@@ -402,9 +402,10 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
           {reward.description && (
             <div>
               <h3 className="text-sm font-semibold mb-2">รายละเอียด</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                {reward.description}
-              </p>
+              <div 
+                className="text-sm text-muted-foreground leading-relaxed [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&_a]:text-[var(--jh-green)] [&_a]:underline break-words"
+                dangerouslySetInnerHTML={{ __html: reward.description }}
+              />
             </div>
           )}
 
