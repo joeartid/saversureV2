@@ -4,72 +4,21 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn, logout } from "@/lib/auth";
 import { api } from "@/lib/api";
-import {
-  type MultiBalance,
-  getCurrencyIcon,
-  getPrimaryBalance,
-  getSecondaryBalances,
-} from "@/lib/currency";
+import { type MultiBalance, getPrimaryBalance } from "@/lib/currency";
 import { useTenant } from "./TenantProvider";
-import { Separator } from "@/components/ui/separator";
-import { getNavIcon } from "@/lib/nav-icons";
 
 interface DrawerMenuItem {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   link: string;
-  visible?: boolean;
 }
-
-interface RawNavItem {
-  icon: string;
-  label: string;
-  link?: string;
-  path?: string;
-  visible?: boolean;
-}
-
-function normalizeNavItems(raw: RawNavItem[]): DrawerMenuItem[] {
-  return raw.map((item) => ({
-    icon: item.icon,
-    label: item.label,
-    link: item.link || item.path || "/",
-    visible: item.visible !== false,
-  }));
-}
-
-const FALLBACK_ITEMS: DrawerMenuItem[] = [
-  { icon: "home", label: "หน้าหลัก", link: "/", visible: true },
-  { icon: "scan", label: "สแกน QR Code", link: "/scan", visible: true },
-  { icon: "gift", label: "แลกของรางวัล", link: "/rewards", visible: true },
-  { icon: "star", label: "กระเป๋าเงิน", link: "/wallet", visible: true },
-  { icon: "history", label: "ประวัติสแกน", link: "/history", visible: true },
-  { icon: "trophy", label: "ประวัติแลกรางวัล", link: "/history/redeems", visible: true },
-  { icon: "target", label: "ภารกิจ", link: "/missions", visible: true },
-  { icon: "user", label: "โปรไฟล์ของฉัน", link: "/profile", visible: true },
-];
 
 export default function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
   const [balances, setBalances] = useState<MultiBalance[]>([]);
-  const [menuItems, setMenuItems] = useState<DrawerMenuItem[]>(FALLBACK_ITEMS);
   const { brandName, branding } = useTenant();
   const primaryBalance = getPrimaryBalance(balances);
-  const secondaryBalances = getSecondaryBalances(balances);
-
-  useEffect(() => {
-    api
-      .get<{ items: RawNavItem[] }>("/api/v1/public/nav-menu/drawer")
-      .then((d) => {
-        if (d.items && d.items.length > 0) {
-          const normalized = normalizeNavItems(d.items);
-          const visible = normalized.filter((i) => i.visible !== false);
-          if (visible.length > 0) setMenuItems(visible);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     const li = isLoggedIn();
@@ -92,137 +41,227 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
     onClose();
   };
 
+  const personalItems: DrawerMenuItem[] = [
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      ),
+      label: "หน้าแรก",
+      link: "/",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      label: "บัญชีของฉัน",
+      link: "/profile",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+      ),
+      label: "ประวัติกิจกรรมทั้งหมด",
+      link: "/history",
+    },
+  ];
+
+  const settingsItems: DrawerMenuItem[] = [
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      label: "ศูนย์ช่วยเหลือและคำถาม (FAQ)",
+      link: "/support",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      label: "ตั้งค่าระบบ",
+      link: "/settings",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      ),
+      label: "ติดต่อแอดมิน",
+      link: "/support/ticket",
+    },
+  ];
+
   return (
     <>
-      {open && (
-        <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      )}
-
+      {/* Backdrop */}
       <div
-        className="fixed top-0 h-full bg-white z-[9999] shadow-2xl transition-transform duration-300 ease-out"
-        style={{
-          width: "80%",
-          maxWidth: "320px",
-          transform: open ? "translateX(0)" : "translateX(-100%)",
-        }}
-      >
-        {/* Header with animated gradient */}
-        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] bg-[length:200%_200%] animate-gradient px-5 pb-5 pt-10 text-white relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10 animate-float" />
-          <div className="absolute right-12 top-8 h-6 w-6 rounded-full bg-[var(--jh-yellow)]/20 animate-float-delay-1" />
-          <div className="absolute left-4 -bottom-2 h-10 w-10 rounded-full bg-white/5 animate-float-delay-2" />
-          <div className="flex items-center gap-3 relative">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 shadow-lg animate-bounce-in">
-              {branding?.logo_url ? (
-                <img src={branding.logo_url} alt={brandName} className="h-7 w-7 object-contain" />
-              ) : (
-                <span className="text-base font-bold">{brandName.slice(0, 1)}</span>
-              )}
-            </div>
-            <div className="animate-slide-up">
-              <p className="text-base font-bold">{brandName}</p>
-              <p className="text-[11px] text-white/60">Consumer Portal</p>
-            </div>
-          </div>
-        </div>
+        className={`fixed inset-y-0 w-full max-w-[480px] left-1/2 -translate-x-1/2 z-[9990] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
+          open ? "opacity-100 cursor-pointer" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={onClose}
+      />
 
-        {/* User card */}
-        <div className="p-4 animate-slide-up">
-          <div
-            className="flex cursor-pointer items-center rounded-xl bg-secondary p-3.5 transition-all hover:shadow-md active:scale-[0.98]"
-            onClick={() => navigate("/profile")}
-          >
-            <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[var(--jh-green)] to-[var(--jh-lime)] shadow-md">
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 text-white">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate">
-                {loggedIn ? "สมาชิก" : "ผู้เยี่ยมชม"}
-              </p>
-              {loggedIn ? (
-                <>
-                  <div className="flex items-baseline gap-1 mt-0.5">
-                    <span className="text-xl font-bold text-[var(--jh-green)] animate-shimmer">
-                      {(primaryBalance?.balance ?? 0).toLocaleString()}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {primaryBalance?.name || "แต้ม"}
-                    </span>
+      {/* Drawer Container */}
+      <div className="fixed inset-y-0 w-full max-w-[480px] left-1/2 -translate-x-1/2 pointer-events-none z-[9999] p-4 sm:p-5">
+        <div
+          className="relative w-full max-w-[340px] h-full flex flex-col pointer-events-auto transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+          style={{ transform: open ? "translateX(0)" : "translateX(-120%)" }}
+        >
+          {/* Main Floating Card */}
+          <div className="flex-1 bg-[#F6F8F9] rounded-[32px] overflow-hidden shadow-2xl flex flex-col relative w-full h-full max-h-full">
+            
+            {/* White Header Area */}
+            <div className="bg-white px-6 pt-6 pb-20 relative rounded-b-[32px] shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)] z-10">
+              {/* Close Button */}
+              <button
+                onClick={onClose}
+                className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              {/* Avatar Area */}
+              <div className="flex flex-col gap-3 mt-4">
+                <div className="w-16 h-16 rounded-full border-2 border-[var(--jh-green)] p-0.5 relative">
+                  <img
+                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jula"
+                    alt="avatar"
+                    className="w-full h-full rounded-full object-cover bg-gray-100"
+                  />
+                </div>
+                
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="text-[22px] font-bold text-gray-900 leading-none">
+                      {loggedIn ? "ฉัตรธิดา สุขสบาย" : "ผู้เยี่ยมชม"}
+                    </h2>
+                    {loggedIn && (
+                      <div className="w-5 h-5 rounded-full bg-[#10C836] flex items-center justify-center text-white shrink-0">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
-                  {secondaryBalances.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {secondaryBalances.map((item) => (
-                        <span
-                          key={item.currency}
-                          className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-[var(--jh-green)]"
-                        >
-                          <span>{getCurrencyIcon(item.currency, item.icon)}</span>
-                          <span>{item.balance.toLocaleString()}</span>
-                        </span>
-                      ))}
+                  
+                  {loggedIn && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="bg-[#FFC600] text-black text-xs font-black px-2.5 py-1 rounded shadow-sm">
+                        JULA VIP
+                      </span>
+                      <span className="bg-gray-100 text-gray-600 font-bold text-xs px-2.5 py-1 rounded">
+                        {(primaryBalance?.balance ?? 0).toLocaleString()} Point
+                      </span>
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="flex items-baseline gap-1 mt-0.5">
-                  <span className="text-xl font-bold text-[var(--jh-green)]">0</span>
-                  <span className="text-xs text-muted-foreground">แต้ม</span>
                 </div>
-              )}
+              </div>
             </div>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-muted-foreground">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
+
+            {/* Scan Action Button (Overlaying the gap) */}
+            <div className="px-5 -mt-14 relative z-20">
+              <button
+                onClick={() => navigate("/scan")}
+                className="w-full bg-[linear-gradient(270deg,#4DA735_0%,#31893D_100%)] rounded-[20px] p-4 flex items-center justify-between text-white shadow-[0_8px_16px_-6px_rgba(77,167,53,0.4)] transition-transform active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full border border-white/30 flex items-center justify-center bg-white/10 shrink-0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+                      <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <div className="text-base font-bold leading-none mb-1">สแกนคิวอาร์โค้ด</div>
+                    <div className="text-[11px] text-white/90">สแกนง่าย แลกฟรี ทันใจ</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-5 pt-6 pb-6 space-y-5 no-scrollbar">
+              
+              {/* Menu Section 1 */}
+              <div className="bg-white rounded-[24px] p-2 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
+                <div className="px-4 pt-3 pb-1 text-[11px] font-bold text-gray-400 mb-1">
+                  บริการส่วนตัว
+                </div>
+                <div className="space-y-0.5">
+                  {personalItems.map((item, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => navigate(item.link)}
+                      className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center shrink-0">
+                          {item.icon}
+                        </div>
+                        <span className="text-[15px] font-bold text-gray-800">{item.label}</span>
+                      </div>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-gray-300">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Menu Section 2 */}
+              <div className="bg-white rounded-[24px] p-2 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
+                <div className="px-4 pt-3 pb-1 text-[11px] font-bold text-gray-400 mb-1">
+                  ช่วยเหลือและการตั้งค่า
+                </div>
+                <div className="space-y-0.5">
+                  {settingsItems.map((item, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => navigate(item.link)}
+                      className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center shrink-0">
+                          {item.icon}
+                        </div>
+                        <span className="text-[15px] font-bold text-gray-800">{item.label}</span>
+                      </div>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-gray-300">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Logout Button */}
+              {loggedIn && (
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-white rounded-[24px] p-4 flex items-center justify-center gap-2 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] transition-colors hover:bg-red-50 text-[#FF3B30] mt-6"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H9m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h6a3 3 0 013 3v1" />
+                  </svg>
+                  <span className="text-[15px] font-bold">ออกจากระบบ</span>
+                </button>
+              )}
+              
+            </div>
           </div>
         </div>
-
-        <Separator />
-
-        {/* Menu — dynamically fetched */}
-        <div className="p-2 stagger-children">
-          {menuItems.map((item, idx) => {
-            const renderIcon = getNavIcon(item.icon);
-            const iconColors = [
-              "text-[var(--jh-green)]",
-              "text-[var(--jh-teal)]",
-              "text-[var(--jh-orange)]",
-              "text-[var(--jh-purple)]",
-              "text-[var(--jh-pink)]",
-              "text-[var(--jh-green)]",
-              "text-[var(--jh-teal)]",
-              "text-[var(--jh-orange)]",
-            ];
-            return (
-              <button
-                key={item.link}
-                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left transition-all hover:bg-secondary hover:translate-x-1 active:scale-[0.98]"
-                onClick={() => navigate(item.link)}
-              >
-                <span className={iconColors[idx % iconColors.length]}>{renderIcon(false)}</span>
-                <span className="text-sm font-medium text-foreground">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {loggedIn && (
-          <>
-            <Separator className="mx-4" />
-            <div className="p-2">
-              <button
-                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-red-400 transition-all hover:bg-red-50 hover:text-red-500"
-                onClick={handleLogout}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">
-                  <path d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                </svg>
-                <span className="text-sm font-medium">ออกจากระบบ</span>
-              </button>
-            </div>
-          </>
-        )}
       </div>
     </>
   );
