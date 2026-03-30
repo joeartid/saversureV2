@@ -162,8 +162,8 @@ export default function GamificationPage() {
       reward_type: m.reward_type,
       reward_points: m.reward_points,
       reward_currency: m.reward_currency,
-      start_date: m.start_date ? m.start_date.split("T")[0] : "",
-      end_date: m.end_date ? m.end_date.split("T")[0] : "",
+      start_date: m.start_date ? m.start_date.split(/T|\s/)[0] : "",
+      end_date: m.end_date ? m.end_date.split(/T|\s/)[0] : "",
     });
     setEditId(m.id);
     setShowMissionForm(true);

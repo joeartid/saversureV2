@@ -9,6 +9,14 @@ import EmptyState from "@/components/EmptyState";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 
+const badgeColors = [
+  { border: "border-[#f44336]", text: "text-[#f44336]", label: "ส่วนลด" },
+  { border: "border-[#4caf50]", text: "text-[#4caf50]", label: "แต้มพิเศษ" },
+  { border: "border-[#2196f3]", text: "text-[#2196f3]", label: "ลุ้นโชค" },
+  { border: "border-[#e91e63]", text: "text-[#e91e63]", label: "BONUS" },
+  { border: "border-[#ff9800]", text: "text-[#ff9800]", label: "WATERMELON" }
+];
+
 interface Mission {
   id: string;
   title: string;
@@ -19,6 +27,7 @@ interface Mission {
   reward_points?: number;
   reward_badge_id?: string;
   reward_badge_name?: string;
+  end_date?: string;
 }
 
 interface MissionProgress {
@@ -36,6 +45,7 @@ const mediaUrl = (url?: string | null) => {
 
 export default function MissionsPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [activeTab, setActiveTab] = useState<'current' | 'completed'>('current');
   const [progressMap, setProgressMap] = useState<Record<string, MissionProgress>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -94,7 +104,32 @@ export default function MissionsPage() {
           </div>
         )}
 
-        <div className="px-5 mt-6">
+        <div className="px-5 mt-4 mb-4">
+          <div className="bg-gray-100 p-1.5 rounded-xl flex gap-1">
+            <button
+              onClick={() => setActiveTab('current')}
+              className={`flex-1 py-2 text-[14px] font-bold rounded-lg transition-all ${
+                activeTab === 'current'
+                  ? 'bg-white text-[var(--jh-green)] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+              }`}
+            >
+              ภารกิจปัจจุบัน
+            </button>
+            <button
+              onClick={() => setActiveTab('completed')}
+              className={`flex-1 py-2 text-[14px] font-bold rounded-lg transition-all ${
+                activeTab === 'completed'
+                  ? 'bg-white text-[var(--jh-green)] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+              }`}
+            >
+              สำเร็จแล้ว
+            </button>
+          </div>
+        </div>
+
+        <div className="px-5 mt-2">
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((n) => (
@@ -114,89 +149,131 @@ export default function MissionsPage() {
             <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
               <p className="text-[14px] font-medium text-red-600">{error}</p>
             </div>
-          ) : missions.length === 0 ? (
-            <EmptyState
-              icon={
-                <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="1.5" className="w-10 h-10">
-                  <path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z" />
-                </svg>
-              }
-              title="ยังไม่มีภารกิจ"
-              subtitle="ภารกิจใหม่กำลังจะมาเร็วๆ นี้"
-            />
-          ) : (
-            <div className="space-y-3 stagger-children">
-              {missions.map((m) => {
-                const prog = progressMap[m.id];
+          ) : (() => {
+            const displayMissions = missions.filter(m => 
+              activeTab === 'current' 
+                ? !progressMap[m.id]?.completed_at 
+                : !!progressMap[m.id]?.completed_at
+            );
+
+            if (displayMissions.length === 0) {
+              return (
+                <EmptyState
+                  icon={
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="1.5" className="w-10 h-10">
+                      {activeTab === 'current' ? (
+                        <path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      )}
+                    </svg>
+                  }
+                  title={activeTab === 'current' ? "ยังไม่มีภารกิจปัจจุบัน" : "ยังไม่มีภารกิจที่สำเร็จแล้ว"}
+                  subtitle={activeTab === 'current' ? "ภารกิจใหม่กำลังจะมาเร็วๆ นี้" : "มาเริ่มทำขุมทรัพย์แรกกันเถอะ"}
+                />
+              );
+            }
+
+            return (
+              <div className="space-y-3 stagger-children">
+                {displayMissions.map((m, index) => {
+                  const prog = progressMap[m.id];
                 const progress = prog?.progress ?? 0;
                 const completed = !!prog?.completed_at;
                 const pct = m.target > 0 ? Math.min(100, Math.round((progress / m.target) * 100)) : 0;
                 const imgSrc = mediaUrl(m.image_url);
+                const badgeTheme = badgeColors[index % badgeColors.length];
+                
+                const daysLeft = m.end_date ? Math.ceil((new Date(m.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+                const timeText = daysLeft !== null ? (daysLeft > 0 ? `เหลืออีก ${daysLeft} วัน` : "หมดเวลา") : "ตลอดปี";
 
                 return (
                   <Link
                     key={m.id}
                     href={`/missions/${m.id}`}
-                    className="block bg-white rounded-2xl shadow-sm overflow-hidden card-playful"
+                    className="block bg-white rounded-[20px] shadow-sm border border-gray-100 overflow-hidden mb-4 hover:shadow-md transition-shadow"
                   >
-                    <div className="flex gap-4 p-4">
-                      <div className="w-20 h-20 shrink-0 rounded-xl bg-secondary overflow-hidden">
+                    <div className="flex p-4 gap-3 items-center">
+                      <div className="w-[60px] h-[60px] shrink-0 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 p-0.5">
                         {imgSrc ? (
-                          <img src={imgSrc} alt={m.title} className="w-full h-full object-cover" />
+                          <img src={imgSrc} alt={m.title} className="w-full h-full object-cover rounded-lg" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <svg viewBox="0 0 24 24" fill="var(--jh-green)" className="w-8 h-8 opacity-40">
+                          <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
+                            <svg viewBox="0 0 24 24" fill="var(--jh-green)" className="w-6 h-6 opacity-30">
                               <path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z" />
                             </svg>
                           </div>
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="text-[17px] font-bold truncate text-[var(--md-on-surface)]">{m.title}</h3>
-                          <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-                            {completed && (
-                              <span className="w-5 h-5 rounded-full bg-[var(--jh-green)] flex items-center justify-center">
-                                <svg viewBox="0 0 24 24" fill="white" className="w-3 h-3">
-                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                </svg>
-                              </span>
-                            )}
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-muted-foreground">
-                              <path d="M9 18l6-6-6-6" />
-                            </svg>
-                          </div>
-                        </div>
+                      
+                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <h3 className="text-[15px] font-extrabold text-gray-800 truncate tracking-tight">{m.title}</h3>
                         {m.description && (
-                          <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-1">{m.description}</p>
+                          <p className="text-[12px] font-medium text-gray-400 mt-0.5 truncate">{m.description}</p>
                         )}
-                        {/* Progress bar */}
-                        <div className="mt-3">
-                          <div className="flex justify-between text-[13px] font-medium text-muted-foreground mb-1">
-                            <span>{progress} / {m.target}</span>
-                            {!completed && <span className="text-[var(--jh-green)]">{pct}%</span>}
+                        
+                        {completed ? (
+                          <div className="mt-4 flex items-center text-[#4caf50] font-bold text-[13px] bg-green-50 rounded-lg py-1.5 px-3 w-fit border border-[#4caf50]/20">
+                            <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            สำเร็จแล้ว
                           </div>
-                          <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${completed ? "bg-[var(--jh-green)]" : "bg-[linear-gradient(90deg,var(--jh-green)_0%,var(--jh-lime)_100%)]"}`}
-                              style={{ width: `${pct}%` }}
-                            />
+                        ) : (
+                          <div className="mt-3.5">
+                            <div className="relative h-2.5 bg-gray-100 rounded-full flex items-center mx-1">
+                              <div className="absolute left-0 top-0 bottom-0 bg-[#4caf50] rounded-full transition-all duration-700" style={{ width: `${pct}%` }}></div>
+                              <div className="absolute left-0 right-0 flex justify-between px-[0px] -mx-1.5">
+                                {Array.from({ length: m.target <= 12 ? m.target + 1 : 5 }).map((_, i, arr) => {
+                                  const segments = arr.length - 1;
+                                  const dotPct = (i / segments) * 100;
+                                  const isColored = pct >= dotPct;
+                                  const isFarthestColor = isColored && (i === arr.length - 1 || pct < ((i + 1) / segments) * 100);
+
+                                  return (
+                                    <div key={i} className={`w-3.5 h-3.5 rounded-full border-[2.5px] flex items-center justify-center z-10 transition-colors duration-500 ${
+                                      isFarthestColor && progress > 0 ? 'bg-[#4caf50] border-[#4caf50]' : 
+                                      isColored ? 'bg-white border-[#4caf50]' : 
+                                      'bg-white border-gray-200'
+                                    }`}>
+                                      {isFarthestColor && progress > 0 && (
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" className="w-2 h-2"><path d="M5 12l4 4L19 7" /></svg>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                            
+                            <div className="flex justify-between items-center text-[12px] font-bold mt-2.5 px-0.5">
+                              <span className="text-gray-800">{progress}/{m.target}</span>
+                              <span className="text-[#f44336] text-[11px] font-bold">{timeText}</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="mt-2 text-[13px] font-semibold">
-                          <span className="text-muted-foreground">
-                            {m.reward_type === "badge"
-                              ? "🏅 ได้รับ Badge"
-                              : `🎯 ${m.reward_points ?? 0} คะแนน`}
-                          </span>
-                        </div>
+                        )}
+                      </div>
+
+                      <div className={`w-[72px] h-[72px] shrink-0 rounded-full border-[3px] ${badgeTheme.border} bg-white flex flex-col items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.04)] ml-1`}>
+                        {m.reward_type === "badge" ? (
+                          <>
+                            <span className={`font-extrabold text-[13px] leading-tight text-center px-1 ${badgeTheme.text}`}>Badge<br/>ไอเทม</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className={`font-black text-[15px] leading-none ${badgeTheme.text}`}>
+                              {m.reward_points ?? 0}<span className="text-[10px] ml-0.5">แต้ม</span>
+                            </span>
+                            <span className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-widest">{badgeTheme.label}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </Link>
                 );
-              })}
-            </div>
-          )}
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

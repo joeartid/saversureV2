@@ -140,11 +140,34 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
       .join(" ");
 
   useEffect(() => {
-    api
-      .get<RewardDetail>(`/api/v1/public/rewards/${id}`)
-      .then(setReward)
-      .catch(() => setReward(null))
-      .finally(() => setLoading(false));
+    if (id === "mock-0-point-test") {
+      setReward({
+        id: "mock-0-point-test",
+        name: "[TEST] ไอเทมเทสระบบ 0 แต้ม ฟรี!",
+        description: "<h2 style='font-size:18px;font-weight:bold;margin-bottom:8px'>โหมดทดสอบพิเศษ 🎁</h2><p>สินค้านี้ถูก 'เสก' ขึ้นมาเฉพาะในฝั่งเว็บเพื่อให้คุณกดเทส Flow ของขวัญฟรี (0 แต้ม) ได้เลย <b>โดยไม่ลง Database</b> เพื่อรักษากฎ Read-only ของฐานข้อมูลเอาไว้ครับ!</p>",
+        point_cost: 0,
+        normal_point_cost: 499,
+        price: 999,
+        cost_currency: "point",
+        image_url: "",
+        delivery_type: "shipping",
+        type: "product",
+        total_qty: 1000,
+        reserved_qty: 0,
+        sold_qty: 1,
+        available_qty: 999,
+        is_flash: true,
+        tier_name: "Member",
+        coupon_available_count: 999
+      });
+      setLoading(false);
+    } else {
+      api
+        .get<RewardDetail>(`/api/v1/public/rewards/${id}`)
+        .then(setReward)
+        .catch(() => setReward(null))
+        .finally(() => setLoading(false));
+    }
 
     api
       .get<{ data: CurrencyMaster[] }>("/api/v1/public/currencies")
@@ -168,7 +191,16 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
       api
         .get<{ data: AddressEntry[] }>("/api/v1/profile/addresses")
         .then((d) => {
-          const items = d.data || [];
+          let items = d.data || [];
+          try {
+            const mockExt = localStorage.getItem("mockAddress");
+            if (mockExt) {
+              const parsed = JSON.parse(mockExt);
+              if (!items.find(i => i.id === parsed.id)) {
+                items = [parsed, ...items];
+              }
+            }
+          } catch(e) {}
           setSavedAddresses(items);
           const defaultAddress = items.find((item) => item.is_default) || items[0];
           if (defaultAddress) {
@@ -187,6 +219,46 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
     setError(null);
 
     try {
+      if (reward.id === "mock-0-point-test") {
+        if (reward.delivery_type === "shipping" && (useNewAddress || !selectedAddressId)) {
+          if (!addressForm.recipient_name.trim() || !addressForm.phone.trim() || !addressForm.address_line1.trim()) {
+            setError("กรุณากรอกชื่อผู้รับ เบอร์โทร และที่อยู่จัดส่งให้ครบ (โหมดจำลอง)");
+            setRedeeming(false);
+            return;
+          }
+          const mockAddr = {
+            id: "mock-addr-" + Date.now(),
+            label: "home",
+            recipient_name: addressForm.recipient_name.trim(),
+            phone: addressForm.phone.trim(),
+            address_line1: addressForm.address_line1.trim(),
+            address_line2: addressForm.address_line2.trim(),
+            district: addressForm.district.trim(),
+            sub_district: addressForm.sub_district.trim(),
+            province: addressForm.province.trim(),
+            postal_code: addressForm.postal_code.trim(),
+            is_default: true
+          };
+          try { localStorage.setItem("mockAddress", JSON.stringify(mockAddr)); } catch(e) {}
+          setSavedAddresses(prev => [mockAddr, ...prev]);
+          setSelectedAddressId(mockAddr.id);
+          setUseNewAddress(false);
+        }
+
+        setTimeout(() => {
+          setRedeemResult({
+            reservation_id: "res-test-mock-success",
+            reward_id: reward.id,
+            status: "success",
+            coupon_code: undefined,
+            delivery_type: "shipping"
+          });
+          setShowConfirm(false);
+          setRedeeming(false);
+        }, 1500);
+        return;
+      }
+
       let addressId: string | undefined;
       if (reward.delivery_type === "shipping") {
         if (useNewAddress || !selectedAddressId) {
@@ -439,7 +511,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
               </div>
 
               <div className="p-6 space-y-4">
-                {redeemResult.coupon_code && (
+                {redeemResult.coupon_code && !["product", "premium"].includes(String(reward.type).toLowerCase()) && (
                   <div className="rounded-xl border-2 border-dashed border-[var(--jh-green)] p-4 text-center bg-green-50">
                     <p className="text-xs text-muted-foreground mb-1">รหัสคูปอง</p>
                     <p className="text-2xl font-bold font-mono text-[var(--jh-green)] tracking-wider">
@@ -474,7 +546,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
                     ดูประวัติ
                   </Link>
                   <Link
-                    href="/rewards"
+                    href="/"
                     className="flex-1 rounded-full bg-[var(--jh-green)] py-2.5 text-center text-sm font-bold text-white"
                   >
                     กลับหน้ารางวัล
@@ -488,156 +560,107 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
 
       {/* Confirm Modal */}
       {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm">
-          <Card className="border-0 shadow-xl w-full max-w-sm rounded-t-3xl sm:rounded-2xl overflow-hidden">
-            <CardContent className="p-6 space-y-4">
-              <div className="text-center">
-                <div className="w-14 h-14 mx-auto rounded-full bg-secondary flex items-center justify-center mb-3">
-                  <span className="text-3xl">{emoji}</span>
-                </div>
-                <h3 className="text-lg font-bold">ยืนยันการแลกรางวัล</h3>
-                <p className="text-sm text-muted-foreground mt-1">{reward.name}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <Card className="border-0 shadow-xl w-full max-w-sm rounded-[24px] overflow-hidden bg-white">
+            <CardContent className="p-5">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[17px] font-extrabold text-gray-900">ยืนยันการแลกรางวัล</h3>
+                <button onClick={() => { setShowConfirm(false); setError(null); }} className="bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
               </div>
 
-              <div className="rounded-xl bg-secondary p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">ใช้ {currName}</span>
-                  <span className="font-bold text-red-500">{emoji} - {reward.point_cost.toLocaleString()}</span>
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3 flex gap-4 mb-5">
+                <div className="w-[64px] h-[64px] bg-white rounded-xl border border-gray-200 overflow-hidden relative flex-shrink-0">
+                  {imgSrc ? <Image src={imgSrc} fill className="object-cover" sizes="64px" alt="" /> : null}
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">คงเหลือหลังแลก</span>
-                  <span className="font-bold text-[var(--jh-green)]">
-                    {emoji} {(balance - reward.point_cost).toLocaleString()}
-                  </span>
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <p className="font-bold text-[14px] leading-tight text-gray-800 line-clamp-2">{reward.name}</p>
+                  <p className="text-[11px] text-gray-500 mt-1 font-medium">ใช้แต้มแลกรับ</p>
+                  <p className="font-extrabold text-[15px] text-[var(--jh-green)] -mt-0.5">
+                    -{reward.point_cost.toLocaleString()} P
+                  </p>
                 </div>
               </div>
 
               {reward.delivery_type === "shipping" && (
-                <div className="rounded-xl border border-border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">ข้อมูลจัดส่ง</p>
+                <div className="mb-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[14px] font-bold text-gray-800">จัดส่งไปที่</p>
                     {savedAddresses.length > 0 && (
                       <button
                         onClick={() => setUseNewAddress((prev) => !prev)}
                         type="button"
-                        className="text-[11px] font-semibold text-[var(--jh-green)]"
+                        className="text-[12px] font-bold bg-green-50 text-[var(--jh-green)] px-3 py-1.5 rounded-full hover:bg-green-100 transition-colors"
                       >
-                        {useNewAddress ? "เลือกจากที่อยู่เดิม" : "กรอกที่อยู่ใหม่"}
+                        {useNewAddress ? "อิงที่อยู่เดิม" : "เปลี่ยนที่อยู่"}
                       </button>
                     )}
                   </div>
-
+                  
                   {!useNewAddress && selectedAddress && (
-                    <div className="space-y-2">
-                      <select
-                        value={selectedAddressId}
-                        onChange={(e) => setSelectedAddressId(e.target.value)}
-                        className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                      >
-                        {savedAddresses.map((address) => (
-                          <option key={address.id} value={address.id}>
-                            {address.recipient_name} ({address.phone}){address.is_default ? " [หลัก]" : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="rounded-xl bg-secondary p-3 text-[13px] text-muted-foreground">
-                        <p className="font-medium text-foreground">{selectedAddress.recipient_name}</p>
-                        <p>{selectedAddress.phone}</p>
-                        <p className="mt-1">{formatAddress(selectedAddress)}</p>
+                    <div className="rounded-2xl border border-[var(--jh-green)] p-3 relative bg-white overflow-hidden shadow-sm">
+                      <div className="absolute top-0 bottom-0 left-0 w-[5px] bg-[var(--jh-green)]"></div>
+                      <div className="pl-3">
+                        <div className="flex items-center gap-2 mb-1.5">
+                           <p className="font-bold text-[14px] text-gray-900">{selectedAddress.recipient_name}</p>
+                           <span className="bg-gray-100 text-gray-500 text-[11px] px-2 py-0.5 rounded-md font-medium tracking-wide">
+                             {selectedAddress.phone}
+                           </span>
+                        </div>
+                        <p className="text-[12px] text-gray-500 leading-relaxed pr-2">{formatAddress(selectedAddress)}</p>
                       </div>
                     </div>
                   )}
 
                   {(useNewAddress || !selectedAddress) && (
-                    <div className="grid grid-cols-1 gap-2">
-                      <input
-                        value={addressForm.recipient_name}
-                        onChange={(e) => setAddressForm((prev) => ({ ...prev, recipient_name: e.target.value }))}
-                        placeholder="ชื่อผู้รับ *"
-                        className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                      />
-                      <input
-                        value={addressForm.phone}
-                        onChange={(e) => setAddressForm((prev) => ({ ...prev, phone: e.target.value }))}
-                        placeholder="เบอร์โทร *"
-                        className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                      />
-                      <input
-                        value={addressForm.address_line1}
-                        onChange={(e) => setAddressForm((prev) => ({ ...prev, address_line1: e.target.value }))}
-                        placeholder="บ้านเลขที่ / ถนน / หมู่บ้าน *"
-                        className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                      />
-                      <input
-                        value={addressForm.address_line2}
-                        onChange={(e) => setAddressForm((prev) => ({ ...prev, address_line2: e.target.value }))}
-                        placeholder="อาคาร / ชั้น / ห้อง (ถ้ามี)"
-                        className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          value={addressForm.sub_district}
-                          onChange={(e) => setAddressForm((prev) => ({ ...prev, sub_district: e.target.value }))}
-                          placeholder="แขวง/ตำบล"
-                          className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                        />
-                        <input
-                          value={addressForm.district}
-                          onChange={(e) => setAddressForm((prev) => ({ ...prev, district: e.target.value }))}
-                          placeholder="เขต/อำเภอ"
-                          className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                        />
+                    <div className="grid grid-cols-1 gap-3">
+                      <input value={addressForm.recipient_name} onChange={(e) => setAddressForm((prev) => ({ ...prev, recipient_name: e.target.value }))} placeholder="ชื่อผู้รับ" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                      <input value={addressForm.phone} onChange={(e) => setAddressForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="เบอร์โทร" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                      <input value={addressForm.address_line1} onChange={(e) => setAddressForm((prev) => ({ ...prev, address_line1: e.target.value }))} placeholder="ที่อยู่ (เลขที่, ซอย, ถนน) *" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input value={addressForm.sub_district} onChange={(e) => setAddressForm((prev) => ({ ...prev, sub_district: e.target.value }))} placeholder="แขวง/ตำบล" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                        <input value={addressForm.district} onChange={(e) => setAddressForm((prev) => ({ ...prev, district: e.target.value }))} placeholder="เขต/อำเภอ" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          value={addressForm.province}
-                          onChange={(e) => setAddressForm((prev) => ({ ...prev, province: e.target.value }))}
-                          placeholder="จังหวัด"
-                          className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                        />
-                        <input
-                          value={addressForm.postal_code}
-                          onChange={(e) => setAddressForm((prev) => ({ ...prev, postal_code: e.target.value }))}
-                          placeholder="รหัสไปรษณีย์"
-                          className="w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm outline-none"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input value={addressForm.province} onChange={(e) => setAddressForm((prev) => ({ ...prev, province: e.target.value }))} placeholder="จังหวัด" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                        <input value={addressForm.postal_code} onChange={(e) => setAddressForm((prev) => ({ ...prev, postal_code: e.target.value }))} placeholder="รหัสไปรษณีย์" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
+              <div className="rounded-[20px] bg-gray-50/80 p-4 border border-gray-100 mb-5">
+                <div className="flex justify-between items-center mb-2.5">
+                  <span className="text-[13px] font-bold text-gray-500 tracking-tight">แต้มที่มีปัจจุบัน</span>
+                  <span className="text-[14px] font-bold text-gray-800">{balance.toLocaleString()} P</span>
+                </div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-[13px] font-bold text-gray-500 tracking-tight">ใช้คะแนนครั้งนี้</span>
+                  <span className="text-[14px] font-bold text-red-500">-{reward.point_cost.toLocaleString()} P</span>
+                </div>
+                <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
+                  <span className="text-[15px] font-extrabold text-gray-900 tracking-tight">คงเหลือหลังแลกรับ</span>
+                  <span className="text-[17px] font-extrabold text-[var(--jh-green)]">
+                    {(balance - reward.point_cost).toLocaleString()} P
+                  </span>
+                </div>
+              </div>
+
               {error && (
-                <div className="rounded-xl bg-red-50 p-3 text-center">
-                  <p className="text-sm text-red-600">{error}</p>
+                <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-center mb-4">
+                  <p className="text-sm font-semibold text-red-600">{error}</p>
                 </div>
               )}
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setShowConfirm(false); setError(null); }}
-                  className="flex-1 rounded-full border-2 border-border py-3 text-sm font-bold text-muted-foreground"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  onClick={handleRedeem}
-                  disabled={redeeming}
-                  className="flex-1 rounded-full bg-[var(--jh-green)] py-3 text-sm font-bold text-white disabled:opacity-50 active:scale-[0.98] transition"
-                >
-                  {redeeming ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      กำลังดำเนินการ...
-                    </span>
-                  ) : (
-                    "ยืนยันแลกรางวัล"
-                  )}
-                </button>
-              </div>
+              <button
+                onClick={handleRedeem}
+                disabled={redeeming}
+                className="w-full rounded-[24px] bg-[var(--jh-green)] hover:bg-[#3da342] py-4 text-[16px] font-bold text-white disabled:opacity-50 active:scale-[0.98] transition-all shadow-lg shadow-[var(--jh-green)]/30"
+              >
+                {redeeming ? "กำลังดำเนินการ..." : "ยืนยันแลกแต้ม"}
+              </button>
             </CardContent>
           </Card>
         </div>

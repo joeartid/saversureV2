@@ -153,27 +153,33 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
   };
 
   return (
-    <div className="pb-24 min-h-screen bg-background">
+    <div className="pb-36 min-h-screen bg-background">
       <Navbar />
 
-      <div className="pt-24">
-        {/* Back button */}
-        <button
-          onClick={() => router.back()}
-          className="absolute top-[72px] left-4 z-20 w-9 h-9 rounded-full bg-white/90 backdrop-blur shadow-md flex items-center justify-center"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-            <path d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-
+      <div className="pt-20">
         {/* Banner / Header */}
         {imgSrc ? (
           <div className="aspect-square bg-secondary relative overflow-hidden">
+            <button
+              onClick={() => router.back()}
+              className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-white/90 backdrop-blur shadow-md flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" className="w-5 h-5">
+                <path d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
             <Image src={imgSrc} alt={mission.title} fill className="object-cover" sizes="100vw" priority />
           </div>
         ) : (
           <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] px-5 pt-12 pb-10 text-white relative overflow-hidden">
+            <button
+              onClick={() => router.back()}
+              className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-white/20 backdrop-blur flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" className="w-5 h-5">
+                <path d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
             <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 animate-float" />
             <div className="absolute left-12 bottom-2 h-16 w-16 rounded-full bg-white/5 animate-float-delay-1" />
             <div className="flex items-center justify-center py-6">
@@ -262,11 +268,12 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Description */}
           {mission.description && (
-            <div>
+            <div className="mb-6">
               <h3 className="text-sm font-bold mb-2">คำอธิบาย</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {mission.description}
-              </p>
+              <div 
+                className="prose prose-sm max-w-none text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap [&>p]:mb-2 [&>ul]:mb-2 [&>ul]:list-disc [&>ul]:pl-4 [&>br]:content-['']"
+                dangerouslySetInnerHTML={{ __html: mission.description }}
+              />
             </div>
           )}
 
