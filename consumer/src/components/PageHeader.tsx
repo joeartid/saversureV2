@@ -12,7 +12,7 @@ interface PageHeaderProps {
 }
 
 const defaultGradient =
-  "linear-gradient(135deg, var(--jh-green) 0%, var(--jh-purple) 50%, var(--jh-green-dark) 100%)";
+  "linear-gradient(277.42deg, #3C9B4D -13.4%, #7DBD48 80.19%)";
 
 export default function PageHeader({
   title,

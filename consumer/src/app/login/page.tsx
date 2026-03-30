@@ -151,7 +151,7 @@ function LoginPageInner() {
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen w-full flex-col">
         {/* Header */}
-        <div className="relative overflow-hidden bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] px-5 pb-10 pt-10 text-white">
+        <div className="relative overflow-hidden bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pb-10 pt-10 text-white">
           <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/10 animate-float" />
           <div className="absolute -bottom-6 -left-4 h-20 w-20 rounded-full bg-white/5 animate-float-delay-1" />
           <div className="absolute right-12 bottom-4 h-10 w-10 rounded-full animate-float-delay-2" style={{ background: 'rgba(255,193,7,0.15)' }} />

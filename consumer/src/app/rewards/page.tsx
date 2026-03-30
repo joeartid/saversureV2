@@ -117,7 +117,7 @@ export default function RewardsPage() {
 
       <div className="pt-24">
         {/* Header with animated gradient */}
-        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] bg-[length:200%_200%] animate-gradient px-5 pt-8 pb-14 text-white relative overflow-hidden">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-14 text-white relative overflow-hidden">
           {/* Floating decorative shapes */}
           <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 animate-float" />
           <div className="absolute right-16 top-12 h-8 w-8 rounded-full bg-white/10 animate-float-delay-1" />

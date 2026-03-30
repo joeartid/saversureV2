@@ -271,7 +271,7 @@ function ScanPageInner() {
     <div className="pb-24 min-h-screen bg-background">
       <Navbar />
       {/* Header */}
-      <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-10 pb-14 text-white relative overflow-hidden">
+      <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-10 pb-14 text-white relative overflow-hidden">
         <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
         <div className="relative">
           <h1 className="text-xl font-bold">สะสมแต้ม</h1>

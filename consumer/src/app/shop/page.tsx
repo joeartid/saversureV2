@@ -8,7 +8,7 @@ export default function ShopPage() {
     <div className="min-h-screen bg-background pb-24">
       <Navbar />
       <div className="pt-24">
-        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] px-5 pt-8 pb-12 text-white relative overflow-hidden">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-12 text-white relative overflow-hidden">
           <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
           <h1 className="text-xl font-bold relative">🛒 ช้อปออนไลน์</h1>
           <p className="text-[13px] text-white/70 mt-1 relative">สินค้าจุฬาเฮิร์บ ส่งตรงถึงบ้าน</p>

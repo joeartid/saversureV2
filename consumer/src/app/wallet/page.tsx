@@ -128,7 +128,7 @@ export default function WalletPage() {
 
       <div className="pt-24">
         {/* Hero balance card */}
-        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-green-dark)_100%)] px-5 pt-6 pb-16 text-white relative overflow-hidden">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-6 pb-16 text-white relative overflow-hidden">
           <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/8" />
           <div className="absolute right-12 bottom-0 h-20 w-20 rounded-full bg-white/5" />
           <h1 className="text-[17px] font-bold relative">กระเป๋าเงิน</h1>

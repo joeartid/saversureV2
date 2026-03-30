@@ -87,7 +87,6 @@ export default function MissionsPage() {
         <PageHeader
           title="ภารกิจ"
           subtitle="ทำภารกิจรับคะแนนและ Badge"
-          gradient="linear-gradient(135deg, var(--jh-green) 0%, var(--jh-teal) 100%)"
         />
 
         {!loggedIn && (

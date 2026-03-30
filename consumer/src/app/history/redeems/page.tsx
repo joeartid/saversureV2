@@ -36,7 +36,6 @@ export default function RedeemHistoryPage() {
         <PageHeader
           title="ประวัติการแลกแต้ม"
           subtitle={entries.length > 0 ? `${entries.length} รายการ` : undefined}
-          gradient="linear-gradient(135deg, var(--jh-green) 0%, var(--jh-green-dark) 100%)"
         />
 
         {/* Tab links */}

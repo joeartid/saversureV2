@@ -77,7 +77,7 @@ export default function BadgesPage() {
   return (
     <div className="pb-20">
       <Navbar />
-      <div className="bg-gradient-to-br from-[var(--primary)] to-[#1557b0] text-white px-5 pt-12 pb-6 rounded-b-[24px]">
+      <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] text-white px-5 pt-12 pb-6 rounded-b-[24px]">
         <h1 className="text-[22px] font-semibold">Badge</h1>
         <p className="text-[13px] opacity-80 mt-1">สะสม Badge จากภารกิจและกิจกรรม</p>
       </div>

@@ -348,7 +348,7 @@ export default function SupportPage() {
 
       <div className="pt-24">
         {/* Header */}
-        <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_50%,var(--jh-green-dark)_100%)] bg-[length:200%_200%] animate-gradient px-5 pt-6 pb-14 text-white relative overflow-hidden">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-6 pb-14 text-white relative overflow-hidden">
           <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-white/10 animate-float" />
           <div className="absolute right-10 bottom-2 h-14 w-14 rounded-full bg-white/5 animate-float-delay-1" />
           <div className="absolute left-8 bottom-0 h-10 w-10 rounded-full bg-white/8 animate-float-delay-2" />

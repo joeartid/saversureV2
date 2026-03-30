@@ -171,7 +171,7 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
             <Image src={imgSrc} alt={mission.title} fill className="object-cover" sizes="100vw" priority />
           </div>
         ) : (
-          <div className="bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] px-5 pt-12 pb-10 text-white relative overflow-hidden">
+          <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-12 pb-10 text-white relative overflow-hidden">
             <button
               onClick={() => router.back()}
               className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-white/20 backdrop-blur flex items-center justify-center active:scale-95 transition-transform"
