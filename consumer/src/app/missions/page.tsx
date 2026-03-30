@@ -85,7 +85,7 @@ export default function MissionsPage() {
 
       <div className="pt-24">
         {/* Custom Header with very large font and green background matching the theme */}
-        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-16 text-white relative overflow-hidden">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
           {/* Abstract Leaf Graphics Background */}
           <div className="absolute inset-0 pointer-events-none z-0">
             <svg viewBox="0 0 200 200" fill="none" className="absolute top-0 right-0 w-64 h-64 opacity-20">
@@ -96,8 +96,8 @@ export default function MissionsPage() {
           </div>
 
           <div className="relative z-10 flex flex-col items-start">
-            <h1 className="text-[52px] font-black tracking-tight leading-[1] mb-1 drop-shadow-md">ภารกิจ</h1>
-            <p className="text-[17px] font-medium text-white/95">ทำภารกิจรับคะแนนและ Badge</p>
+            <h1 className="text-[40px] font-black tracking-tight leading-[1] mb-0 drop-shadow-md">ภารกิจ</h1>
+            <p className="text-[17px] font-medium text-white/95 -mt-1.5">ทำภารกิจรับคะแนนและ Badge</p>
           </div>
         </div>
 
@@ -115,11 +115,11 @@ export default function MissionsPage() {
           </div>
         )}
 
-        <div className="px-5 mt-4 mb-4">
-          <div className="bg-gray-100 p-1.5 rounded-xl flex gap-1">
+        <div className={`px-5 ${!loggedIn ? "mt-4" : "-mt-6 relative z-10"} mb-4`}>
+          <div className="bg-white/90 backdrop-blur-sm p-1.5 rounded-2xl flex gap-1 shadow-sm border border-gray-100">
             <button
               onClick={() => setActiveTab('current')}
-              className={`flex-1 py-2 text-[14px] font-bold rounded-lg transition-all ${
+              className={`flex-1 py-2 text-[14px] font-bold rounded-xl transition-all ${
                 activeTab === 'current'
                   ? 'bg-white text-[var(--jh-green)] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
@@ -129,7 +129,7 @@ export default function MissionsPage() {
             </button>
             <button
               onClick={() => setActiveTab('completed')}
-              className={`flex-1 py-2 text-[14px] font-bold rounded-lg transition-all ${
+              className={`flex-1 py-2 text-[14px] font-bold rounded-xl transition-all ${
                 activeTab === 'completed'
                   ? 'bg-white text-[var(--jh-green)] shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'

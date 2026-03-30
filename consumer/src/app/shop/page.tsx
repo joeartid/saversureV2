@@ -80,7 +80,7 @@ export default function ShopPage() {
       
       <div className="pt-24">
         {/* Custom Header with very large font and green background matching the theme */}
-        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-16 text-white relative overflow-hidden">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
           {/* Abstract Leaf Graphics Background */}
           <div className="absolute inset-0 pointer-events-none z-0">
             <svg viewBox="0 0 200 200" fill="none" className="absolute top-0 right-0 w-64 h-64 opacity-20">
@@ -91,8 +91,8 @@ export default function ShopPage() {
           </div>
 
           <div className="relative z-10 flex flex-col items-start">
-            <h1 className="text-[52px] font-black tracking-tight leading-[1] mb-1 drop-shadow-md">ช้อปออนไลน์</h1>
-            <p className="text-[17px] font-medium text-white/95">เลือกซื้อสินค้าออนไลน์กับเราได้ที่นี่เลย</p>
+            <h1 className="text-[40px] font-black tracking-tight leading-[1] mb-0 drop-shadow-md">ช้อปออนไลน์</h1>
+            <p className="text-[17px] font-medium text-white/95 -mt-1.5">เลือกซื้อสินค้าออนไลน์กับเราได้ที่นี่เลย</p>
           </div>
         </div>
 

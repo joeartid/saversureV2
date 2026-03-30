@@ -128,14 +128,14 @@ export default function WalletPage() {
 
       <div className="pt-24">
         {/* Hero balance card */}
-        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-6 pb-16 text-white relative overflow-hidden">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
           <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/8" />
           <div className="absolute right-12 bottom-0 h-20 w-20 rounded-full bg-white/5" />
-          <h1 className="text-[17px] font-bold relative">กระเป๋าเงิน</h1>
-          <p className="text-[11px] text-white/60 mt-0.5 relative">ยอดคงเหลือทั้งหมดของคุณ</p>
+          <h1 className="text-[40px] font-black tracking-tight leading-[1] mb-0 drop-shadow-md relative">กระเป๋าเงิน</h1>
+          <p className="text-[17px] font-medium text-white/95 -mt-1.5 relative">ยอดคงเหลือทั้งหมดของคุณ</p>
         </div>
 
-        <div className="px-4 -mt-10 relative z-10 space-y-3">
+        <div className="px-4 -mt-6 relative z-10 space-y-3">
           {/* Loading skeleton */}
           {loading && (
             <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4 animate-pulse">

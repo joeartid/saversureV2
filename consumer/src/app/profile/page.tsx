@@ -27,6 +27,18 @@ interface ProfileData {
   phone_verified?: boolean;
 }
 
+interface Tier {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  min_points: number;
+}
+
+interface TierResponse {
+  tier: Tier | null;
+}
+
 const ICONS = {
   user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
   history: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
@@ -68,6 +80,8 @@ export default function ProfilePage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [points, setPoints] = useState<PointBalance>({ current: 0, total_earned: 0, total_spent: 0 });
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [tier, setTier] = useState<Tier | null>(null);
+  const [allTiers, setAllTiers] = useState<Tier[]>([]);
 
   useEffect(() => {
     const li = isLoggedIn();
@@ -79,6 +93,12 @@ export default function ProfilePage() {
       api.get<ProfileData>("/api/v1/profile")
         .then((d) => setProfile(d))
         .catch(() => {});
+      api.get<TierResponse>("/api/v1/my/tier")
+        .then((d) => setTier(d.tier))
+        .catch(() => {});
+      api.get<{data: Tier[]}>("/api/v1/public/tiers")
+        .then((d) => setAllTiers(d.data || []))
+        .catch(() => {});
     }
   }, []);
 
@@ -86,6 +106,30 @@ export default function ProfilePage() {
     profile?.display_name ||
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
     "สมาชิก";
+
+  let currentTier = tier;
+  let nextTier: Tier | null = null;
+  let progressPercent = 100;
+
+  if (allTiers.length > 0) {
+    const sortedTiers = [...allTiers].sort((a, b) => a.min_points - b.min_points);
+    if (currentTier) {
+      const idx = sortedTiers.findIndex(t => t.id === currentTier!.id);
+      if (idx >= 0 && idx < sortedTiers.length - 1) {
+        nextTier = sortedTiers[idx + 1];
+      }
+    } else {
+      nextTier = sortedTiers[0];
+    }
+
+    if (nextTier) {
+      const currentMin = currentTier ? currentTier.min_points : 0;
+      const nextMin = nextTier.min_points;
+      const earned = points.total_earned;
+      const rawPercent = ((earned - currentMin) / (nextMin - currentMin)) * 100;
+      progressPercent = Math.min(Math.max(rawPercent, 0), 100);
+    }
+  }
 
   return (
     <div className="min-h-screen pb-24 bg-background">
@@ -97,67 +141,131 @@ export default function ProfilePage() {
         {loggedIn ? (
           <>
             {/* Profile Header Block */}
-            <div className="px-4 -mt-8 relative z-10 animate-slide-up">
-              <Card className="border-0 shadow-md">
+            <div className="px-4 -mt-6 relative z-10 animate-slide-up">
+              <Card className="border-0 shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-2xl overflow-hidden">
                 <CardContent className="p-5">
-                  <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-4 w-full">
                     {/* Avatar */}
-                    <div className="relative">
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-secondary ring-[3px] ring-[var(--jh-green)] ring-offset-2"
+                    <div className="relative shrink-0">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-secondary ring-[4px] ring-white shadow-[0_4px_15px_rgba(60,155,77,0.2)]"
                         style={{ background: "linear-gradient(135deg, var(--jh-green-light) 0%, var(--jh-lime) 100%)" }}>
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-white">
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-white">
                           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                         </svg>
-                      </div>
-                      <div className="absolute -bottom-1 -right-1 bg-[var(--jh-gold)] text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm animate-bounce-in">
-                        LV1
                       </div>
                     </div>
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-lg font-bold truncate">{displayName}</p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-[19px] font-black text-gray-800 truncate tracking-tight">{displayName}</p>
+                      <p className="text-[13px] text-muted-foreground truncate font-medium">
                         {profile?.email || profile?.phone || ""}
                       </p>
-                      <div className="mt-1 flex gap-1.5">
-                        <Badge variant={profile?.profile_completed ? "default" : "secondary"} className={`text-[10px] px-2 py-0 ${profile?.profile_completed ? "bg-green-50 text-[var(--jh-green)]" : "bg-amber-50 text-amber-700"}`}>
+                      <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                        <Badge variant={profile?.profile_completed ? "default" : "secondary"} className={`text-[10px] px-2.5 py-0.5 rounded-full border-0 ${profile?.profile_completed ? "bg-green-50 text-[var(--jh-green)] font-bold" : "bg-amber-50 text-amber-700 font-bold"}`}>
                           {profile?.profile_completed ? "ข้อมูลครบถ้วน" : "รอยืนยัน"}
                         </Badge>
                         {profile?.phone_verified && (
-                          <Badge variant="default" className="text-[10px] px-2 py-0 bg-blue-50 text-blue-700">
+                          <Badge variant="default" className="text-[10px] px-2.5 py-0.5 rounded-full border-0 bg-blue-50 text-blue-700 font-bold">
                             เบอร์ยืนยันแล้ว
                           </Badge>
                         )}
                       </div>
                     </div>
+                    {/* Tier badge on the right */}
+                    <div className="shrink-0 flex flex-col items-end justify-center">
+                      {tier ? (
+                        <div 
+                          className="text-white text-[13px] px-4 py-2 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] animate-bounce-in flex items-center gap-1.5 whitespace-nowrap border border-white/40 backdrop-blur-md"
+                          style={{ 
+                            background: tier.color 
+                              ? `linear-gradient(135deg, ${tier.color}f2 0%, ${tier.color} 100%)` 
+                              : "linear-gradient(135deg, var(--jh-gold) 0%, #B8860B 100%)" 
+                          }}
+                        >
+                          <span className="text-[17px] leading-none drop-shadow-sm">{tier.icon}</span>
+                          <span className="leading-none font-black tracking-tight drop-shadow-sm">{tier.name}</span>
+                        </div>
+                      ) : (
+                        <div className="bg-[linear-gradient(135deg,var(--jh-gold)_0%,#B8860B_100%)] text-white text-[12px] font-black px-4 py-2 rounded-xl shadow-sm animate-bounce-in border border-white/40">
+                          MEMBER
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Tier Progress Bar */}
+                  {allTiers.length > 0 && nextTier && (
+                    <div className="mt-5 pt-4 border-t border-gray-100">
+                      <div className="flex justify-between items-end mb-1.5">
+                        <p className="text-[11px] font-bold text-gray-500">
+                          ระดับปัจจุบัน: <span className="text-gray-800">{currentTier?.name || "MEMBER"}</span>
+                        </p>
+                        <p className="text-[11px] font-bold text-gray-500">
+                          {points.total_earned.toLocaleString()} / {nextTier.min_points.toLocaleString()} 
+                          <span className="text-gray-400 ml-1">&rarr; {nextTier.name}</span>
+                        </p>
+                      </div>
+                      <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-1000 ease-out"
+                          style={{ 
+                            width: `${progressPercent}%`,
+                            background: currentTier?.color 
+                              ? `linear-gradient(90deg, ${currentTier.color}88 0%, ${currentTier.color} 100%)` 
+                              : "linear-gradient(90deg, #e5e7eb 0%, var(--jh-gold) 100%)" 
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-1.5 text-right">
+                        อีก {(nextTier.min_points - points.total_earned).toLocaleString()} แต้ม เพื่อเลื่อนระดับ
+                      </p>
+                    </div>
+                  )}
+                  {allTiers.length > 0 && !nextTier && currentTier && (
+                    <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
+                      <p className="text-[12px] font-bold text-[var(--jh-gold)] flex items-center gap-1">
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        คุณอยู่ระดับสูงสุดแล้ว!
+                      </p>
+                      <p className="text-[11px] font-bold text-gray-500">
+                         สะสมทั้งหมด: {points.total_earned.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* Circular Points Summary */}
-            <div className="px-4 mt-3">
-              <Card className="border-0 shadow-sm">
-                <CardContent className="p-5">
-                  {/* Sub-stats compact layout */}
-                  <div className="flex items-center justify-between pb-4 border-b border-border/60">
+            {/* White Sleek Wallet Points Summary */}
+            <div className="px-4 mt-4">
+              <Card className="border border-gray-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] overflow-hidden rounded-2xl bg-white relative">
+                {/* Subtle top accent line */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-[linear-gradient(90deg,var(--jh-green)_0%,var(--jh-lime)_100%)]" />
+                
+                <CardContent className="p-5 relative z-10 pt-6">
+                  <div className="flex items-end justify-between pb-5 border-b border-gray-100/80">
                      <div className="flex flex-col">
-                        <h3 className="text-[12px] font-medium text-muted-foreground">แต้มสะสมใช้งานได้</h3>
-                        <p className="text-[24px] font-black text-[var(--jh-green)] -mt-1">{points.current.toLocaleString()}</p>
+                        <div className="flex items-center gap-1.5 mb-1 text-gray-400">
+                           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-[var(--jh-gold)] drop-shadow-sm"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.64-2.25 1.64-1.74 0-2.24-.97-2.31-1.8h-1.7c.07 1.69 1.11 2.76 2.81 3.14V19h2.38v-1.67c1.6-.32 2.78-1.25 2.78-2.91.01-1.89-1.48-2.7-3.66-3.21z" /></svg>
+                           <h3 className="text-[12px] font-bold tracking-wide">แต้มสะสมใช้งานได้</h3>
+                        </div>
+                        <p className="text-[36px] leading-[1] font-black text-[var(--jh-green)] tracking-tighter drop-shadow-sm">
+                          {points.current.toLocaleString()}
+                        </p>
                      </div>
-                     <Link href="/history" className="bg-[var(--jh-green)] text-white text-[12px] font-bold px-4 py-1.5 rounded-full shadow-sm active:scale-95 transition-transform">
+                     <Link href="/history" className="bg-gray-900 hover:bg-black text-white text-[13px] font-bold px-4 py-2 rounded-full shadow-sm active:scale-95 transition-all flex items-center gap-1.5 mb-1 group">
                         ใช้แต้ม
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                      </Link>
                   </div>
-                  <div className="flex justify-between pt-4 px-2">
-                    <div className="text-center">
-                      <p className="text-[11px] font-medium text-muted-foreground">ใช้ไปแล้ว</p>
-                      <p className="text-[14px] font-bold text-gray-700">{points.total_spent.toLocaleString()}</p>
+                  <div className="flex justify-between pt-4 px-1 border-t-0">
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-[11px] font-bold text-gray-400 tracking-wider">ใช้ไปแล้ว</p>
+                      <p className="text-[15px] font-bold text-gray-700">{points.total_spent.toLocaleString()}</p>
                     </div>
-                    <div className="w-px h-10 bg-border/60" />
-                    <div className="text-center">
-                      <p className="text-[11px] font-medium text-muted-foreground">สะสมทั้งหมดทีี่ผ่านมา</p>
-                      <p className="text-[14px] font-bold text-[var(--jh-purple)]">{points.total_earned.toLocaleString()}</p>
+                    <div className="flex flex-col gap-0.5 items-end">
+                      <p className="text-[11px] font-bold text-gray-400 tracking-wider">สะสมทั้งหมด</p>
+                      <p className="text-[15px] font-black text-gray-700">{points.total_earned.toLocaleString()}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -230,7 +338,7 @@ export default function ProfilePage() {
             </div>
           </>
         ) : (
-          <div className="px-4 -mt-8 relative z-10 animate-slide-up">
+          <div className="px-4 -mt-6 relative z-10 animate-slide-up">
             <Card className="border-0 shadow-md rounded-2xl">
               <CardContent className="flex flex-col items-center py-16 px-6">
                 <div className="w-20 h-20 mb-4 rounded-full bg-secondary flex items-center justify-center animate-float">

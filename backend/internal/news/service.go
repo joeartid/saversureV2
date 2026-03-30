@@ -182,27 +182,43 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*News, error) 
 }
 
 func (s *Service) Update(ctx context.Context, tenantID, id string, input UpdateInput) (*News, error) {
+	query := "UPDATE news SET updated_at = NOW()"
+	args := []any{id, tenantID}
+	argID := 3
+
 	if input.Title != nil {
-		s.db.Exec(ctx, `UPDATE news SET title = $3, updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID, *input.Title)
+		query += fmt.Sprintf(", title = $%d", argID)
+		args = append(args, *input.Title)
+		argID++
 	}
 	if input.Content != nil {
-		s.db.Exec(ctx, `UPDATE news SET content = NULLIF($3,''), updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID, *input.Content)
+		query += fmt.Sprintf(", content = NULLIF($%d, '')", argID)
+		args = append(args, *input.Content)
+		argID++
 	}
 	if input.ImageURL != nil {
-		s.db.Exec(ctx, `UPDATE news SET image_url = NULLIF($3,''), updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID, *input.ImageURL)
+		query += fmt.Sprintf(", image_url = NULLIF($%d, '')", argID)
+		args = append(args, *input.ImageURL)
+		argID++
 	}
 	if input.LinkURL != nil {
-		s.db.Exec(ctx, `UPDATE news SET link_url = NULLIF($3,''), updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID, *input.LinkURL)
+		query += fmt.Sprintf(", link_url = NULLIF($%d, '')", argID)
+		args = append(args, *input.LinkURL)
+		argID++
 	}
 	if input.Position != nil {
-		s.db.Exec(ctx, `UPDATE news SET position = $3, updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID, *input.Position)
+		query += fmt.Sprintf(", position = $%d", argID)
+		args = append(args, *input.Position)
+		argID++
 	}
 	if input.Type != nil {
 		valid := map[string]bool{"news": true, "banner": true}
 		if !valid[*input.Type] {
 			return nil, fmt.Errorf("invalid type: %s", *input.Type)
 		}
-		s.db.Exec(ctx, `UPDATE news SET type = $3, updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID, *input.Type)
+		query += fmt.Sprintf(", type = $%d", argID)
+		args = append(args, *input.Type)
+		argID++
 	}
 	if input.Status != nil {
 		valid := map[string]bool{"draft": true, "published": true, "archived": true}
@@ -210,9 +226,23 @@ func (s *Service) Update(ctx context.Context, tenantID, id string, input UpdateI
 			return nil, fmt.Errorf("invalid status: %s", *input.Status)
 		}
 		if *input.Status == "published" {
-			s.db.Exec(ctx, `UPDATE news SET status = $3, published_at = NOW(), updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID, *input.Status)
+			query += fmt.Sprintf(", status = $%d, published_at = NOW()", argID)
 		} else {
-			s.db.Exec(ctx, `UPDATE news SET status = $3, updated_at = NOW() WHERE id = $1 AND tenant_id = $2`, id, tenantID, *input.Status)
+			query += fmt.Sprintf(", status = $%d", argID)
+		}
+		args = append(args, *input.Status)
+		argID++
+	}
+
+	query += " WHERE id = $1 AND tenant_id = $2"
+
+	if len(args) > 2 {
+		result, err := s.db.Exec(ctx, query, args...)
+		if err != nil {
+			return nil, fmt.Errorf("update news db.Exec error: %w", err)
+		}
+		if result.RowsAffected() == 0 {
+			return nil, fmt.Errorf("news not found or no rows affected")
 		}
 	}
 

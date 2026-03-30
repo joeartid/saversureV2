@@ -117,14 +117,14 @@ export default function RewardsPage() {
 
       <div className="pt-24">
         {/* Header with animated gradient */}
-        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-14 text-white relative overflow-hidden">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
           {/* Floating decorative shapes */}
           <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10 animate-float" />
           <div className="absolute right-16 top-12 h-8 w-8 rounded-full bg-white/10 animate-float-delay-1" />
           <div className="absolute left-8 -bottom-4 h-16 w-16 rounded-full bg-white/5 animate-float-delay-2" />
 
-          <h1 className="text-xl font-bold relative animate-slide-up">🎁 แลกรางวัล</h1>
-          <p className="text-[13px] text-white/70 mt-1 relative animate-slide-up" style={{ animationDelay: "60ms" }}>แลกของรางวัลและสิทธิพิเศษ</p>
+          <h1 className="text-[40px] font-black tracking-tight leading-[1] mb-0 drop-shadow-md relative animate-slide-up">🎁 แลกรางวัล</h1>
+          <p className="text-[17px] font-medium text-white/95 -mt-1.5 relative animate-slide-up" style={{ animationDelay: "60ms" }}>แลกของรางวัลและสิทธิพิเศษ</p>
 
           {isLoggedIn() && Object.keys(userBalance).length > 0 && (
             <div className="flex items-center gap-3 mt-4 relative flex-wrap stagger-children">
@@ -145,7 +145,7 @@ export default function RewardsPage() {
         </div>
 
         {/* Categories Tabs */}
-        <div className="px-4 mt-4 relative z-20">
+        <div className="px-4 -mt-6 relative z-20">
           <div className="flex bg-white/60 backdrop-blur-md rounded-full p-1 shadow-sm overflow-x-auto hide-scrollbar border border-white justify-between">
             {[
               { id: "julaherb", label: "สินค้าจุฬาเฮิร์บ", icon: "🌱" },

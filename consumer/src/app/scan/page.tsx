@@ -271,13 +271,14 @@ function ScanPageInner() {
     <div className="pb-24 min-h-screen bg-background">
       <Navbar />
       {/* Header */}
-      <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-10 pb-14 text-white relative overflow-hidden">
-        <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
-        <div className="relative">
-          <h1 className="text-xl font-bold">สะสมแต้ม</h1>
-          <p className="text-[13px] text-white/70 mt-1">สแกน QR Code หรือกรอกรหัสใต้ฝาเพื่อรับแต้ม</p>
+      <div className="pt-24">
+        <div className="bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] px-5 pt-8 pb-10 text-white relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/10" />
+          <div className="relative z-10 flex flex-col items-start">
+            <h1 className="text-[40px] font-black tracking-tight leading-[1] mb-0 drop-shadow-md">สะสมแต้ม</h1>
+            <p className="text-[17px] font-medium text-white/95 -mt-1.5 mb-4">สแกนคิวอาร์โค้ด หรือกรอกรหัสเพื่อสะสมแต้ม</p>
 
-          <div className="mt-4 flex items-center justify-between rounded-xl bg-white/15 px-4 py-3 ring-1 ring-white/20">
+            <div className="w-full flex items-center justify-between rounded-xl bg-white/15 px-4 py-3 ring-1 ring-white/20">
             <div>
               <p className="text-[11px] text-white/60">{primaryBalance?.name || "แต้มปัจจุบัน"}</p>
               <p className="text-2xl font-bold leading-tight">{(primaryBalance?.balance ?? 0).toLocaleString()}</p>
@@ -299,8 +300,9 @@ function ScanPageInner() {
           </div>
         </div>
       </div>
+    </div>
 
-      {/* Scan Form */}
+    {/* Scan Form */}
       <div className="px-4 -mt-6 relative z-10">
         <Card className="border-0 shadow-md">
           <CardContent className="p-5">

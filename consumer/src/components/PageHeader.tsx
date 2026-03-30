@@ -23,7 +23,7 @@ export default function PageHeader({
 }: PageHeaderProps) {
   return (
     <div
-      className="bg-[length:200%_200%] animate-gradient px-5 pt-8 pb-14 text-white relative overflow-hidden"
+      className="bg-[length:200%_200%] animate-gradient px-5 pt-8 pb-10 text-white relative overflow-hidden"
       style={{ backgroundImage: gradient || defaultGradient }}
     >
       {/* Floating decorative circles */}
@@ -43,9 +43,9 @@ export default function PageHeader({
           </Link>
         )}
         <div className="flex-1">
-          <h1 className="text-[36px] sm:text-[42px] font-black tracking-tight leading-[1.1] mb-1 drop-shadow-md">{title}</h1>
+          <h1 className="text-[40px] font-black tracking-tight leading-[1] mb-0 drop-shadow-md">{title}</h1>
           {subtitle && (
-            <p className="text-[15px] font-medium text-white/95 mt-0.5">{subtitle}</p>
+            <p className="text-[17px] font-medium text-white/95 -mt-1.5">{subtitle}</p>
           )}
           {children}
         </div>
