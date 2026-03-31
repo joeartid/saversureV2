@@ -43,16 +43,16 @@ export default function PointsBar() {
 
   return (
     <div className="app-fixed-bar fixed top-14 z-[990] bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] text-white shadow-sm">
-      <div className="flex items-center justify-between px-4 py-[6px] text-[15px] font-bold">
+      <div className="flex items-center justify-between px-4 py-2 text-[17px] font-bold">
         <span>
           {loggedIn ? `${displayName} Points` : `${brandName} Points`}
         </span>
         <div className="flex items-center gap-1.5">
           <span>แต้ม {(primaryBal?.balance ?? 0).toLocaleString()}</span>
-          <span className="text-[12px]">🪙</span>
+          <span className="text-[15px]">🪙</span>
           <span className="opacity-40 mx-0.5">|</span>
           <span>เพชร {secondaryBals.length > 0 ? secondaryBals[0].balance.toLocaleString() : "0"}</span>
-          <span className="text-[12px]">💎</span>
+          <span className="text-[15px]">💎</span>
         </div>
       </div>
     </div>

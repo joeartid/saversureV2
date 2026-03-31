@@ -123,8 +123,8 @@ export default function RewardsPage() {
           <div className="absolute right-16 top-12 h-8 w-8 rounded-full bg-white/10 animate-float-delay-1" />
           <div className="absolute left-8 -bottom-4 h-16 w-16 rounded-full bg-white/5 animate-float-delay-2" />
 
-          <h1 className="text-[40px] font-black tracking-tight leading-[1] mb-0 drop-shadow-md relative animate-slide-up">🎁 แลกรางวัล</h1>
-          <p className="text-[17px] font-medium text-white/95 -mt-1.5 relative animate-slide-up" style={{ animationDelay: "60ms" }}>แลกของรางวัลและสิทธิพิเศษ</p>
+          <h1 className="text-3xl font-black tracking-tight leading-[1] mb-0 drop-shadow-md relative animate-slide-up">🎁 แลกรางวัล</h1>
+          <p className="text-sm font-medium text-white/95 -mt-1.5 relative animate-slide-up" style={{ animationDelay: "60ms" }}>แลกของรางวัลและสิทธิพิเศษ</p>
 
           {isLoggedIn() && Object.keys(userBalance).length > 0 && (
             <div className="flex items-center gap-3 mt-4 relative flex-wrap stagger-children">
@@ -190,7 +190,7 @@ export default function RewardsPage() {
                     <path d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-bold text-[var(--jh-green)]">ยังไม่มีของรางวัลในหมวดนี้</h3>
+                <h3 className="text-base font-bold text-[var(--jh-green)]">ยังไม่มีของรางวัลในหมวดนี้</h3>
                 <p className="text-sm text-muted-foreground mt-1 text-center">สะสมแต้มรอไว้ก่อนนะ เร็วๆ นี้จะมีของรางวัลมากมาย</p>
               </CardContent>
             </Card>
@@ -241,7 +241,7 @@ export default function RewardsPage() {
                       </div>
 
                       <CardContent className="p-3">
-                        <h3 className="text-[13px] font-semibold line-clamp-2 leading-tight min-h-[2.5em]">
+                        <h3 className="text-[12px] font-semibold line-clamp-2 leading-tight min-h-[2.5em]">
                           {r.name}
                         </h3>
 
@@ -253,7 +253,7 @@ export default function RewardsPage() {
                         )}
 
                         <div className="mt-2 flex items-center justify-between">
-                          <span className={`text-[14px] font-bold relative group ${affordable ? "text-[var(--jh-green)]" : "text-foreground"}`}>
+                          <span className={`text-[13px] font-bold relative group ${affordable ? "text-[var(--jh-green)]" : "text-foreground"}`}>
                             <span className="cursor-default">{icon}</span>{" "}
                             {r.point_cost.toLocaleString()}
                             <span className="absolute -top-6 left-0 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">

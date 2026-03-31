@@ -365,7 +365,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
         {/* Back button */}
         <button
           onClick={() => router.back()}
-          className="absolute top-[72px] left-4 z-20 w-9 h-9 rounded-full bg-white/90 backdrop-blur shadow-md flex items-center justify-center"
+          className="absolute top-[110px] left-4 z-20 w-9 h-9 rounded-full bg-white/90 backdrop-blur shadow-md flex items-center justify-center"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
             <path d="M15 19l-7-7 7-7" />
@@ -391,7 +391,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
           )}
           {outOfStock && (
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="text-white text-2xl font-bold">หมดแล้ว</span>
+              <span className="text-white text-base font-bold">หมดแล้ว</span>
             </div>
           )}
         </div>
@@ -400,22 +400,22 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
         <div className="px-5 py-5 space-y-4">
           {/* Name & Price */}
           <div>
-            <h1 className="text-xl font-bold leading-tight">{reward.name}</h1>
+            <h1 className="text-base font-extrabold leading-tight text-gray-900">{reward.name}</h1>
             {reward.price > 0 && (
-              <p className="text-sm text-muted-foreground mt-1">ราคาปกติ {reward.price.toLocaleString()} บาท</p>
+              <p className="text-xs text-muted-foreground mt-1">ราคาปกติ {reward.price.toLocaleString()} บาท</p>
             )}
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-2xl font-bold text-[var(--jh-green)] relative group cursor-default">
-                <span>{emoji}</span> {reward.point_cost.toLocaleString()}
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-lg font-bold text-[var(--jh-green)] relative group cursor-default flex items-center gap-1">
+                <span className="text-xl">{emoji}</span> {reward.point_cost.toLocaleString()}
                 <span className="absolute -top-7 left-0 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
                   {currName}
                 </span>
               </span>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-xs text-muted-foreground ml-1">
                 {currName}
               </span>
               {reward.normal_point_cost > reward.point_cost && (
-                <span className="text-sm text-muted-foreground line-through ml-2">
+                <span className="text-xs text-muted-foreground line-through ml-2">
                   ปกติ {reward.normal_point_cost.toLocaleString()}
                 </span>
               )}
@@ -427,9 +427,9 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
             <Card className={`border-0 shadow-sm ${canAfford ? "bg-green-50" : "bg-amber-50"}`}>
               <CardContent className="p-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">คงเหลือของคุณ ({currName})</p>
-                  <p className={`text-lg font-bold ${canAfford ? "text-[var(--jh-green)]" : "text-amber-600"}`}>
-                    {emoji} {balance.toLocaleString()}
+                  <p className="text-[11px] text-muted-foreground">คงเหลือของคุณ ({currName})</p>
+                  <p className={`text-base font-bold flex items-center gap-1.5 mt-0.5 ${canAfford ? "text-[var(--jh-green)]" : "text-amber-600"}`}>
+                    <span className="text-lg">{emoji}</span> {balance.toLocaleString()}
                   </p>
                 </div>
                 {canAfford ? (
@@ -446,16 +446,16 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
           {/* Delivery type */}
           <Card className="border-0 shadow-sm">
             <CardContent className="p-3 flex items-center gap-3">
-              <span className="text-2xl">{delivery.icon}</span>
+              <span className="text-xl leading-none">{delivery.icon}</span>
               <div>
-                <p className="text-sm font-semibold">{delivery.label}</p>
-                <p className="text-xs text-muted-foreground">{delivery.desc}</p>
+                <p className="text-[13px] font-bold text-gray-800">{delivery.label}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{delivery.desc}</p>
               </div>
             </CardContent>
           </Card>
 
           {/* Stock */}
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-xs px-1">
             <span className="text-muted-foreground">คงเหลือ</span>
             <div className="flex items-center gap-2">
               <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -472,10 +472,10 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
 
           {/* Description */}
           {reward.description && (
-            <div>
-              <h3 className="text-sm font-semibold mb-2">รายละเอียด</h3>
+            <div className="pt-2">
+              <h3 className="text-[13px] font-bold mb-2 text-gray-900">รายละเอียด</h3>
               <div 
-                className="text-sm text-muted-foreground leading-relaxed [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&_a]:text-[var(--jh-green)] [&_a]:underline break-words"
+                className="text-xs text-muted-foreground leading-relaxed [&>p]:mb-2 [&>ul]:list-disc [&>ul]:pl-5 [&>ol]:list-decimal [&>ol]:pl-5 [&>strong]:font-bold [&_a]:text-[var(--jh-green)] [&_a]:underline break-words"
                 dangerouslySetInnerHTML={{ __html: reward.description }}
               />
             </div>
@@ -485,7 +485,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
           {reward.tier_name && (
             <Card className="border-0 shadow-sm bg-amber-50">
               <CardContent className="p-3 flex items-center gap-2">
-                <span className="text-lg">👑</span>
+                <span className="text-base">👑</span>
                 <p className="text-sm">
                   สำหรับสมาชิกระดับ <span className="font-bold text-amber-700">{reward.tier_name}</span> ขึ้นไป
                 </p>
@@ -506,7 +506,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                   </svg>
                 </div>
-                <h2 className="text-xl font-bold">แลกรางวัลสำเร็จ!</h2>
+                <h2 className="text-lg font-bold">แลกรางวัลสำเร็จ!</h2>
                 <p className="text-sm text-white/80 mt-1">{reward.name}</p>
               </div>
 
@@ -514,7 +514,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
                 {redeemResult.coupon_code && !["product", "premium"].includes(String(reward.type).toLowerCase()) && (
                   <div className="rounded-xl border-2 border-dashed border-[var(--jh-green)] p-4 text-center bg-green-50">
                     <p className="text-xs text-muted-foreground mb-1">รหัสคูปอง</p>
-                    <p className="text-2xl font-bold font-mono text-[var(--jh-green)] tracking-wider">
+                    <p className="text-xl font-bold font-mono text-[var(--jh-green)] tracking-wider">
                       {redeemResult.coupon_code}
                     </p>
                   </div>
@@ -564,7 +564,7 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
           <Card className="border-0 shadow-xl w-full max-w-sm rounded-[24px] overflow-hidden bg-white">
             <CardContent className="p-5">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[17px] font-extrabold text-gray-900">ยืนยันการแลกรางวัล</h3>
+                <h3 className="text-[15px] font-extrabold text-gray-900">ยืนยันการแลกรางวัล</h3>
                 <button onClick={() => { setShowConfirm(false); setError(null); }} className="bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -641,8 +641,8 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
                   <span className="text-[14px] font-bold text-red-500">-{reward.point_cost.toLocaleString()} P</span>
                 </div>
                 <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
-                  <span className="text-[15px] font-extrabold text-gray-900 tracking-tight">คงเหลือหลังแลกรับ</span>
-                  <span className="text-[17px] font-extrabold text-[var(--jh-green)]">
+                  <span className="text-[14px] font-extrabold text-gray-900 tracking-tight">คงเหลือหลังแลกรับ</span>
+                  <span className="text-[15px] font-extrabold text-[var(--jh-green)]">
                     {(balance - reward.point_cost).toLocaleString()} P
                   </span>
                 </div>

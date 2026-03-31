@@ -49,7 +49,24 @@ export default function MissionsPage() {
   const [progressMap, setProgressMap] = useState<Record<string, MissionProgress>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [claimedMission, setClaimedMission] = useState<Mission | null>(null);
   const loggedIn = isLoggedIn();
+
+  const handleClaim = async (e: React.MouseEvent, mission: Mission) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // ตั้งค่าภารกิจที่ claim ให้ state เพื่อแสดง Modal
+    setClaimedMission(mission);
+    
+    setProgressMap(prev => ({
+      ...prev,
+      [mission.id]: {
+        ...prev[mission.id],
+        completed_at: new Date().toISOString()
+      }
+    }));
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -60,14 +77,28 @@ export default function MissionsPage() {
         ]);
 
         const missionsList = Array.isArray(missionsRes) ? missionsRes : missionsRes.data ?? [];
+        
+        // --- MOCK TEST DATA ---
+        if (!missionsList.find((m: any) => m.id === "mock-1")) {
+          missionsList.unshift(
+            { id: "mock-1", title: "[ทดสอบ] ภารกิจสำเร็จแล้ว", description: "นี่คือตัวอย่างภารกิจที่ทำสำเร็จเรียบร้อยและรับรางวัลแล้ว", target: 5, reward_points: 100, reward_type: "points" },
+            { id: "mock-2", title: "[ทดสอบ] ภารกิจรอรับรางวัล", description: "นี่คือตัวอย่างภารกิจที่ทำครบแล้ว กรุณากดปุ่มเพื่อรับรางวัล", target: 3, reward_points: 50, reward_type: "points" }
+          );
+        }
+
         setMissions(missionsList);
 
-        if (progressRes) {
-          const list = Array.isArray(progressRes) ? progressRes : progressRes.data ?? [];
+        if (progressRes || true) { // Force progress block for mock
+          const list = progressRes ? (Array.isArray(progressRes) ? progressRes : progressRes.data ?? []) : [];
           const map: Record<string, MissionProgress> = {};
-          list.forEach((p) => {
+          list.forEach((p: any) => {
             map[p.mission_id] = p;
           });
+          
+          // --- MOCK TEST PROGRESS ---
+          map["mock-1"] = { mission_id: "mock-1", progress: 5, completed_at: new Date().toISOString() };
+          map["mock-2"] = { mission_id: "mock-2", progress: 3, completed_at: null }; // reach target but not completed
+
           setProgressMap(map);
         }
       } catch (err: unknown) {
@@ -230,6 +261,14 @@ export default function MissionsPage() {
                             </svg>
                             สำเร็จแล้ว
                           </div>
+                        ) : progress >= m.target ? (
+                          <button 
+                            onClick={(e) => handleClaim(e, m)}
+                            className="mt-3.5 bg-[var(--jh-orange)] text-white font-bold text-[13px] rounded-full py-1.5 px-5 w-fit shadow-md hover:scale-105 transition-transform flex items-center gap-1.5"
+                          >
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                            กดรับรางวัล
+                          </button>
                         ) : (
                           <div className="mt-3.5">
                             <div className="relative h-2.5 bg-gray-100 rounded-full flex items-center mx-1">
@@ -289,6 +328,45 @@ export default function MissionsPage() {
       </div>
 
       <BottomNav />
+
+      {/* Claim Success Popup Modal */}
+      {claimedMission && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-5 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl w-full max-w-[320px] p-6 text-center shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] animate-bounce-in relative overflow-hidden">
+            {/* Background decoration */}
+            <div className="absolute top-0 left-0 w-full h-32 bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] opacity-10" />
+            
+            {/* Icon */}
+            <div className="relative mx-auto w-24 h-24 mb-4">
+              <div className="absolute inset-0 bg-yellow-100 rounded-full animate-pulse-glow" />
+              <div className="absolute inset-0 flex items-center justify-center text-6xl animate-wiggle" style={{ animationDuration: '2s', animationIterationCount: 'infinite' }}>
+                🎉
+              </div>
+            </div>
+            
+            <h2 className="text-[24px] font-black text-gray-800 mb-2 relative z-10">ยินดีด้วย!</h2>
+            <p className="text-[15px] text-gray-600 mb-5 relative z-10 leading-snug">
+              คุณทำภารกิจ <br/>
+              <span className="font-extrabold text-[var(--jh-green)]">{claimedMission.title}</span> <br/>
+              สำเร็จแล้ว
+            </p>
+
+            <div className="bg-orange-50 rounded-2xl p-4 mb-6 border border-orange-100 relative z-10">
+              <div className="text-[13px] text-orange-600 font-bold mb-1">ได้รับรางวัล</div>
+              <div className="text-[28px] font-black text-orange-500 leading-none drop-shadow-sm">
+                {claimedMission.reward_type === 'points' ? `+${claimedMission.reward_points} แต้ม` : 'Badge ใหม่!'}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setClaimedMission(null)}
+              className="w-full bg-[linear-gradient(277.42deg,#3C9B4D_-13.4%,#7DBD48_80.19%)] text-white font-bold text-[18px] rounded-xl py-3.5 hover:scale-[1.02] active:scale-95 transition-all shadow-md relative z-10"
+            >
+              ยอดเยี่ยม!
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

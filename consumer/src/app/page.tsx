@@ -47,8 +47,29 @@ interface UserProfile {
   last_name?: string;
 }
 
+interface Donation {
+  id: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  target_points: number;
+  collected_points: number;
+  status: string;
+  donor_count: number;
+}
+
+interface LuckyDraw {
+  id: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  point_cost: number;
+  status: string;
+  end_date: string | null;
+}
+
 /* ───────── Helpers ───────── */
-const mediaUrl = (url?: string) => {
+const mediaUrl = (url?: string | null) => {
   if (!url) return null;
   if (url.startsWith("http")) return url;
   const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
@@ -92,7 +113,7 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
           {/* ═══ ข้อมูล ═══ */}
           <div className="jh-card-detail">
             <div className="jh-card-detail-top">
-              <div className="jh-card-free-label">แลกรับฟรี !</div>
+              <div className="jh-card-free-label w-fit">แลกรับฟรี !</div>
               <div className="jh-card-name">{reward.name}</div>
               <div className="jh-card-price">{price} <span>บาท</span></div>
             </div>
@@ -110,15 +131,15 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
                   <>
                     <strong>พิเศษ! ลดแลกแต้มสินค้า</strong>
                     <div>
-                      เพียง <span className="jh-pts">{reward.point_cost.toLocaleString()}</span> แต้ม{" "}
+                      เพียง <span className="jh-pts">{(reward.point_cost || 0).toLocaleString()}</span> แต้ม{" "}
                       <span className="jh-pts-old">
-                        (ปกติ <s>{reward.normal_point_cost.toLocaleString()}</s> แต้ม)
+                        (ปกติ <s>{(reward.normal_point_cost || 0).toLocaleString()}</s> แต้ม)
                       </span>
                     </div>
                   </>
                 ) : (
                   <div>
-                    <span className="jh-pts" style={{ fontSize: '24px' }}>{reward.point_cost.toLocaleString()}</span> แต้ม
+                    <span className="jh-pts" style={{ fontSize: '24px' }}>{(reward.point_cost || 0).toLocaleString()}</span> แต้ม
                   </div>
                 )}
               </div>
@@ -135,6 +156,89 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
   );
 }
 
+function DonationCard({ donation }: { donation: Donation }) {
+  const imgSrc = mediaUrl(donation.image_url);
+  const progress = donation.target_points > 0 ? Math.min(100, (donation.collected_points / donation.target_points) * 100) : 0;
+  
+  return (
+    <Link href={`/donations/${donation.id}`}>
+      <div className="jh-card">
+        <div className="jh-card-inner">
+          <div className="jh-card-img jh-bg-teal">
+            {imgSrc ? (
+              <img src={imgSrc} alt="" className="jh-card-product-img" />
+            ) : (
+              <div className="jh-card-emoji">❤️</div>
+            )}
+          </div>
+          
+          <div className="jh-card-detail">
+            <div className="jh-card-detail-top">
+              <div className="jh-card-free-label w-fit">ร่วมบุญ</div>
+              <div className="jh-card-name line-clamp-2" style={{ fontSize: '16px' }}>{donation.title}</div>
+            </div>
+
+            <div className="jh-card-detail-bottom mt-1">
+              <div className="w-full text-[13px] text-[var(--on-surface-variant)] mb-1 flex justify-between">
+                <span>สะสมแล้ว {(donation.collected_points || 0).toLocaleString()} / {(donation.target_points || 0).toLocaleString()} แต้ม</span>
+              </div>
+              <div className="h-1.5 w-full bg-[var(--outline-variant)] rounded-[var(--radius-sm)] overflow-hidden mb-2">
+                <div
+                  className="h-full bg-[var(--primary)] rounded-[var(--radius-sm)]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              
+              <div className="jh-card-point-btn">
+                ร่วมบริจาค
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function LuckyDrawCard({ lucky }: { lucky: LuckyDraw }) {
+  const imgSrc = mediaUrl(lucky.image_url);
+  
+  return (
+    <Link href={`/lucky-draws/${lucky.id}`}>
+      <div className="jh-card">
+        <div className="jh-card-inner">
+          <div className="jh-card-img jh-bg-teal">
+            {imgSrc ? (
+              <img src={imgSrc} alt="" className="jh-card-product-img" />
+            ) : (
+              <div className="jh-card-emoji">🎁</div>
+            )}
+          </div>
+          
+          <div className="jh-card-detail">
+            <div className="jh-card-detail-top">
+              <div className="jh-card-free-label !bg-amber-100 !text-amber-600 w-fit">ลุ้นโชค</div>
+              <div className="jh-card-name line-clamp-2" style={{ fontSize: '16px' }}>{lucky.title}</div>
+            </div>
+
+            <div className="jh-card-detail-bottom mt-2">
+              <div className="w-full text-[13px] text-[var(--on-surface-variant)] mb-2 flex items-center justify-between">
+                <div>
+                  ใช้ <span className="text-[var(--primary)] font-bold text-[14px]">{(lucky.point_cost || 0).toLocaleString()}</span> แต้ม/สิทธิ์
+                </div>
+              </div>
+              
+              <div className="jh-card-point-btn !bg-orange-500 hover:!bg-orange-600 shadow-sm border-0 text-white">
+                ร่วมสนุก
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 /* ═══════════════════════════════════
    Home Page
    ═══════════════════════════════════ */
@@ -142,6 +246,8 @@ function JulaHerbHome() {
   const { brandName } = useTenant();
   const [activeTab, setActiveTab] = useState("julaherb");
   const [rewards, setRewards] = useState<RewardItem[]>([]);
+  const [donations, setDonations] = useState<Donation[]>([]);
+  const [luckyDraws, setLuckyDraws] = useState<LuckyDraw[]>([]);
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [balances, setBalances] = useState<MultiBalance[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -171,6 +277,10 @@ function JulaHerbHome() {
         });
         setRewards(items);
       }).catch(() => {});
+    api.get<{ data: Donation[] }>("/api/v1/public/donations")
+      .then((d) => setDonations(d.data || [])).catch(() => {});
+    api.get<{ data: LuckyDraw[] }>("/api/v1/public/lucky-draw")
+      .then((d) => setLuckyDraws(d.data || [])).catch(() => {});
     api.get<{ data: NewsItem[] }>("/api/v1/public/news?limit=5")
       .then((d) => setNewsList(d.data || [])).catch(() => {});
     if (loggedIn) {
@@ -191,6 +301,7 @@ function JulaHerbHome() {
     { id: "premium", label: "สินค้าพรีเมียม" },
     { id: "lifestyle", label: "ไลฟ์สไตล์" },
     { id: "donate", label: "ร่วมบริจาค" },
+    { id: "lucky", label: "ลุ้นโชค" },
   ];
 
   const filteredRewards =
@@ -255,25 +366,42 @@ function JulaHerbHome() {
         <h2 className="jh-section-title">แลกสิทธิพิเศษสำหรับคุณ</h2>
 
         <div className="jh-tabs">
-          {tabs.map((tab) => {
-            if (tab.id === "julaherb") {
-              return (
-                <Link key={tab.id} href="/history/redeems" className={`jh-tab ${activeTab === tab.id ? "active" : ""}`}>
-                  {tab.label}
-                </Link>
-              );
-            }
-            return (
-              <span key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`jh-tab ${activeTab === tab.id ? "active" : ""}`}>
-                {tab.label}
-              </span>
-            );
-          })}
+          {tabs.map((tab) => (
+            <span key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`jh-tab ${activeTab === tab.id ? "active" : ""}`}>
+              {tab.label}
+            </span>
+          ))}
         </div>
 
-        {filteredRewards.length === 0 ? (
+        {activeTab === "donate" ? (
+          donations.length === 0 ? (
+            <div className="jh-empty">
+              <div className="jh-empty-icon">❤️</div>
+              <p>ยังไม่มีโครงการบริจาคในขณะนี้</p>
+            </div>
+          ) : (
+            <>
+              {donations.map((d) => (
+                <DonationCard key={d.id} donation={d} />
+              ))}
+            </>
+          )
+        ) : activeTab === "lucky" ? (
+          luckyDraws.length === 0 ? (
+            <div className="jh-empty">
+              <div className="jh-empty-icon">🎁</div>
+              <p>ยังไม่มีกิจกรรมลุ้นโชคในขณะนี้</p>
+            </div>
+          ) : (
+            <>
+              {luckyDraws.map((l) => (
+                <LuckyDrawCard key={l.id} lucky={l} />
+              ))}
+            </>
+          )
+        ) : filteredRewards.length === 0 ? (
           <div className="jh-empty">
             <div className="jh-empty-icon">🎁</div>
             <p>ยังไม่มีของรางวัลในหมวดนี้</p>

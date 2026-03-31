@@ -13,10 +13,32 @@ interface DrawerMenuItem {
   link: string;
 }
 
+interface ProfileData {
+  display_name?: string;
+  first_name?: string;
+  last_name?: string;
+  profile_picture?: string;
+  avatar?: string;
+}
+
+interface Tier {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  min_points: number;
+}
+
+interface TierResponse {
+  tier: Tier | null;
+}
+
 export default function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
   const [balances, setBalances] = useState<MultiBalance[]>([]);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [tier, setTier] = useState<Tier | null>(null);
   const { brandName, branding } = useTenant();
   const primaryBalance = getPrimaryBalance(balances);
 
@@ -27,8 +49,19 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
       api.get<{ data: MultiBalance[] }>("/api/v1/my/balances")
         .then((d) => setBalances(d.data ?? []))
         .catch(() => {});
+      api.get<ProfileData>("/api/v1/profile")
+        .then((d) => setProfile(d))
+        .catch(() => {});
+      api.get<TierResponse>("/api/v1/my/tier")
+        .then((d) => setTier(d.tier))
+        .catch(() => {});
     }
   }, [open]);
+
+  const displayName =
+    profile?.display_name ||
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    "สมาชิก";
 
   const navigate = (href: string) => {
     router.push(href);
@@ -137,7 +170,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
               <div className="flex flex-col gap-3 mt-4">
                 <div className="w-16 h-16 rounded-full border-2 border-[var(--jh-green)] p-0.5 relative">
                   <img
-                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jula"
+                    src={profile?.profile_picture || profile?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`}
                     alt="avatar"
                     className="w-full h-full rounded-full object-cover bg-gray-100"
                   />
@@ -146,7 +179,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
                 <div>
                   <div className="flex items-center gap-1.5">
                     <h2 className="text-[22px] font-bold text-gray-900 leading-none">
-                      {loggedIn ? "ฉัตรธิดา สุขสบาย" : "ผู้เยี่ยมชม"}
+                      {loggedIn ? displayName : "ผู้เยี่ยมชม"}
                     </h2>
                     {loggedIn && (
                       <div className="w-5 h-5 rounded-full bg-[#10C836] flex items-center justify-center text-white shrink-0">
@@ -159,8 +192,8 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
                   
                   {loggedIn && (
                     <div className="flex items-center gap-2 mt-3">
-                      <span className="bg-[#FFC600] text-black text-xs font-black px-2.5 py-1 rounded shadow-sm">
-                        JULA VIP
+                      <span className="text-black text-xs font-black px-2.5 py-1 rounded shadow-sm border border-black/10" style={{ background: tier?.color || "#FFC600" }}>
+                        {tier?.name || "MEMBER"}
                       </span>
                       <span className="bg-gray-100 text-gray-600 font-bold text-xs px-2.5 py-1 rounded">
                         {(primaryBalance?.balance ?? 0).toLocaleString()} Point

@@ -9,7 +9,7 @@ import HistoryTabs from "@/components/HistoryTabs";
 import { isLoggedIn } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 
-export default function MissionsHistoryPage() {
+export default function DonationsHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,8 +24,8 @@ export default function MissionsHistoryPage() {
 
       <div className="pt-24">
         <PageHeader
-          title="ประวัติภารกิจ"
-          subtitle="ภารกิจและกิจกรรมที่คุณเข้าร่วม"
+          title="ประวัติการบริจาค"
+          subtitle="โครงการที่คุณร่วมบริจาคด้วยแต้มสะสม"
         />
 
         <HistoryTabs />
@@ -52,15 +52,13 @@ export default function MissionsHistoryPage() {
                 <EmptyState
                   icon={
                     <svg viewBox="0 0 24 24" fill="none" stroke="var(--jh-green)" strokeWidth="1.5" className="w-10 h-10">
-                      <line x1="12" y1="20" x2="12" y2="10" />
-                      <line x1="18" y1="20" x2="18" y2="4" />
-                      <line x1="6" y1="20" x2="6" y2="16" />
+                      <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
                   }
-                  title="ยังไม่มีประวัติภารกิจ"
-                  subtitle="เข้าร่วมและทำภารกิจให้สำเร็จเพื่อรับแต้มพิเศษ"
-                  ctaLabel="ดูภารกิจทั้งหมด"
-                  ctaHref="/missions"
+                  title="ยังไม่มีประวัติการบริจาค"
+                  subtitle="ร่วมแบ่งปันรอยยิ้มด้วยการบริจาคแต้มสะสม"
+                  ctaLabel="ดูโครงการบริจาค"
+                  ctaHref="/"
                 />
               </CardContent>
             </Card>

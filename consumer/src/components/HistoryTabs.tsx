@@ -7,7 +7,7 @@ const TABS = [
   { href: "/history", label: "สะสมแต้ม" },
   { href: "/history/redeems", label: "แลกแต้ม" },
   { href: "/history/lucky-draw", label: "ลุ้นโชค" },
-  { href: "/history/missions", label: "ภารกิจ" },
+  { href: "/history/donations", label: "บริจาค" },
 ];
 
 export default function HistoryTabs() {
