@@ -108,6 +108,13 @@ async function uploadFormData<T>(endpoint: string, formData: FormData): Promise<
   return data as T;
 }
 
+export function mediaUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
+  return `${base}/media/${url}`;
+}
+
 export const api = {
   get: <T>(endpoint: string) => request<T>(endpoint),
   post: <T>(endpoint: string, body: unknown, idempotencyKey?: string) =>

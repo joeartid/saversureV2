@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { api } from "@/lib/api";
+import { api, mediaUrl } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
 
 interface Mission {
@@ -799,7 +799,7 @@ export default function GamificationPage() {
                         <td className="px-6 py-4">
                           {b.icon_url ? (
                             <img
-                              src={b.icon_url}
+                              src={mediaUrl(b.icon_url) || ""}
                               alt=""
                               className="w-10 h-10 rounded-[var(--md-radius-sm)] object-cover"
                             />

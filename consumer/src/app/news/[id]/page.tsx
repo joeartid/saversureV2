@@ -113,10 +113,10 @@ export default function NewsDetailPage({ params }: { params: Promise<{ id: strin
     <div className="min-h-screen pb-24 bg-[#FCFCFD]">
       <Navbar />
 
-      <div className="pt-16 pb-20 max-w-lg mx-auto bg-white min-h-screen shadow-[0_0_24px_rgba(0,0,0,0.02)] relative">
+      <div className="pt-[110px] pb-20 max-w-lg mx-auto bg-white min-h-screen shadow-[0_0_24px_rgba(0,0,0,0.02)] relative">
         <button 
           onClick={() => router.back()}
-          className={`absolute top-[80px] left-4 z-20 w-10 h-10 rounded-full flex items-center justify-center transition active:scale-90 shadow-[0_4px_12px_rgba(0,0,0,0.1)] backdrop-blur-md ${
+          className={`absolute top-[120px] left-4 z-20 w-10 h-10 rounded-full flex items-center justify-center transition active:scale-90 shadow-[0_4px_12px_rgba(0,0,0,0.1)] backdrop-blur-md ${
             imgSrc ? "bg-black/30 text-white hover:bg-black/40" : "bg-white text-gray-800 hover:bg-gray-50 border border-gray-100"
           }`}
         >
@@ -127,17 +127,15 @@ export default function NewsDetailPage({ params }: { params: Promise<{ id: strin
 
         {/* Hero Image */}
         {imgSrc && (
-          <div className="w-full aspect-[4/3] sm:aspect-[16/10] relative bg-gray-100 overflow-hidden">
-            <Image
+          <div className="w-full relative bg-gray-100 overflow-hidden">
+            <img
               src={imgSrc}
               alt={news.title}
-              fill
-              className="object-cover"
-              priority
+              className="w-full h-auto block"
             />
             {/* Gradient Overlay */}
-            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 to-transparent" />
-            <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/40 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+            <div className="absolute top-0 inset-x-0 h-24 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
             <div className="absolute bottom-5 left-5 right-5 z-10">
               <span className={`inline-block px-3 py-1.5 backdrop-blur-md rounded-md text-[10px] font-bold text-white uppercase tracking-widest shadow-sm ${
                 news.type === "banner" ? "bg-[#EE4D2D]/80" : "bg-[var(--jh-green)]/80"
@@ -149,7 +147,7 @@ export default function NewsDetailPage({ params }: { params: Promise<{ id: strin
         )}
 
         {/* Content Body */}
-        <div className={`px-6 ${imgSrc ? "pb-8 bg-white shrink-0 relative z-10 rounded-t-[32px] -mt-5" : "pt-28 mt-0 pb-8"}`}>
+        <div className={`px-6 ${imgSrc ? "pb-8 bg-white shrink-0 relative z-10 rounded-t-[32px] mt-2" : "pt-28 mt-0 pb-8"}`}>
           {imgSrc && (
             <div className="w-full flex justify-center py-4">
               <div className="w-12 h-1.5 bg-gray-200 rounded-full" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
@@ -246,6 +246,27 @@ function JulaHerbHome() {
   const { brandName } = useTenant();
   const [activeTab, setActiveTab] = useState("julaherb");
   const [rewards, setRewards] = useState<RewardItem[]>([]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeftState, setScrollLeftState] = useState(0);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setScrollLeftState(scrollRef.current.scrollLeft);
+  };
+  const onMouseLeave = () => setIsDragging(false);
+  const onMouseUp = () => setIsDragging(false);
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 2;
+    scrollRef.current.scrollLeft = scrollLeftState - walk;
+  };
   const [donations, setDonations] = useState<Donation[]>([]);
   const [luckyDraws, setLuckyDraws] = useState<LuckyDraw[]>([]);
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
@@ -329,7 +350,15 @@ function JulaHerbHome() {
 
       {/* ══════ Banner ══════ */}
       <div className="jh-banner-section">
-        <div className="jh-banner-scroll">
+        <div 
+          className="jh-banner-scroll cursor-grab active:cursor-grabbing"
+          ref={scrollRef}
+          onMouseDown={onMouseDown}
+          onMouseLeave={onMouseLeave}
+          onMouseUp={onMouseUp}
+          onMouseMove={onMouseMove}
+          style={{ scrollSnapType: isDragging ? "none" : "x mandatory" }}
+        >
           {banners
             ? banners.map((news) => {
                 const img = mediaUrl(news.banner_image || news.image_url);
@@ -341,7 +370,6 @@ function JulaHerbHome() {
                     ) : (
                       <div className="jh-banner-placeholder">{news.title}</div>
                     )}
-                    <p className="jh-banner-caption">{news.title}</p>
                   </Link>
                 );
               })

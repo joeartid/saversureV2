@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, mediaUrl } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
 import toast from "react-hot-toast";
 
@@ -294,7 +294,7 @@ export default function NewsPage() {
                     <div className="flex items-center gap-3">
                       {item.image_url ? (
                         <img
-                          src={item.image_url}
+                          src={mediaUrl(item.image_url) || ""}
                           alt={item.title}
                           className="w-9 h-9 rounded-[var(--md-radius-sm)] object-cover"
                         />

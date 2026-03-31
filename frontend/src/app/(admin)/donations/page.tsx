@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { api } from "@/lib/api";
+import { api, mediaUrl } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
 
 interface Donation {
@@ -282,7 +282,7 @@ export default function DonationsPage() {
                       <div className="flex items-center gap-3">
                         {d.image_url ? (
                           <img
-                            src={d.image_url}
+                            src={mediaUrl(d.image_url) || ""}
                             alt={d.title}
                             className="w-9 h-9 rounded-[var(--md-radius-sm)] object-cover"
                           />
