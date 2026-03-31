@@ -164,7 +164,7 @@ func (s *Service) RefundPoints(ctx context.Context, tenantID, userID string, amo
 				ORDER BY created_at DESC LIMIT 1), 0) + $3,
 			'refund', $4, $5, 'point')
 		 RETURNING id, tenant_id, user_id, campaign_id, entry_type, amount, balance_after, currency,
-				   reference_type, reference_id, description, created_at::text`,
+				   reference_type, reference_id, description, created_at`,
 		tenantID, userID, amount, adminUserID, reason,
 	).Scan(&e.ID, &e.TenantID, &e.UserID, &e.CampaignID, &e.EntryType, &e.Amount, &e.BalanceAfter,
 		&e.Currency, &e.ReferenceType, &e.ReferenceID, &e.Description, &e.CreatedAt)
