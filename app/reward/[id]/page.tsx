@@ -11,13 +11,38 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const [selectedAddressId, setSelectedAddressId] = useState(1);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
 
-  const mockAddresses = [
-    { id: 1, name: "ศุภกร แก้วประเสริฐ", tel: "081-999-XXXX", text: "123/45 เอ็กซ์ทรีมคอนโดพาร์ค อาคาร C ชั้น 8 ซ.พหลโยธิน 21 เขตจตุจักร กรุงเทพฯ 10900", isDefault: true },
-    { id: 2, name: "คุณแม่ (รับแทน)", tel: "089-123-XXXX", text: "88/9 หมู่บ้านสุขสันต์ ซอย 5 ถนนบางนา-ตราด กม.8 บางแก้ว บางพลี สมุทรปราการ 10540", isDefault: false }
-  ];
-  const currentAddress = mockAddresses.find(a => a.id === selectedAddressId) || mockAddresses[0];
+  // Fetch real addresses from API
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      try {
+        setLoadingAddresses(true);
+        const response = await fetch('/api/v1/profile/addresses');
+        if (response.ok) {
+          const data = await response.json();
+          setAddresses(data.data || []);
+          // Set default address if available
+          const defaultAddr = data.data?.find((addr: any) => addr.is_default);
+          if (defaultAddr) {
+            setSelectedAddressId(defaultAddr.id);
+          } else if (data.data?.length > 0) {
+            setSelectedAddressId(data.data[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch addresses:', error);
+      } finally {
+        setLoadingAddresses(false);
+      }
+    };
+    
+    fetchAddresses();
+  }, []);
+
+  const currentAddress = addresses.find(a => a.id === selectedAddressId) || addresses[0];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -65,11 +90,35 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
     setShowConfirmModal(true);
   };
 
-  const handleConfirmRedeem = () => {
-    setShowConfirmModal(false);
-    setTimeout(() => {
-       setShowSuccessModal(true);
-    }, 300);
+  const handleConfirmRedeem = async () => {
+    try {
+      const payload = {
+        reward_id: resolvedParams.id,
+        address_id: rewardData.type === 'physical' ? selectedAddressId : undefined
+      };
+
+      const response = await fetch('/api/v1/redeem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        setShowConfirmModal(false);
+        setTimeout(() => {
+           setShowSuccessModal(true);
+        }, 300);
+      } else {
+        const errorData = await response.json();
+        console.error('Redeem failed:', errorData);
+        alert(errorData.message || 'เกิดข้อผิดพลาดในการแลกรางวัล');
+      }
+    } catch (error) {
+      console.error('Network error:', error);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    }
   };
 
   return (
@@ -208,15 +257,26 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
                        <div className="text-[13px] font-bold text-gray-800">จัดส่งไปที่</div>
                        <button onClick={() => setShowAddressModal(true)} className="text-[11.5px] text-[#2E7D32] bg-green-50 px-2 py-0.5 rounded-md font-bold active:bg-green-100">เปลี่ยนที่อยู่</button>
                    </div>
-                   <div className="bg-white border border-[#4CAF50] rounded-[12px] p-3.5 relative overflow-hidden shadow-[0_2px_8px_rgba(76,175,80,0.08)]">
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#4CAF50]"></div>
-                      <div className="text-[12.5px] font-bold text-gray-800 mb-1 flex items-center gap-2">
-                         {currentAddress.name} <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 font-medium">{currentAddress.tel}</span>
-                      </div>
-                      <div className="text-[11px] text-gray-500 font-medium leading-relaxed max-w-[90%] line-clamp-2">
-                         {currentAddress.text}
-                      </div>
-                   </div>
+                   {currentAddress ? (
+                     <div className="bg-white border border-[#4CAF50] rounded-[12px] p-3.5 relative overflow-hidden shadow-[0_2px_8px_rgba(76,175,80,0.08)]">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#4CAF50]"></div>
+                        <div className="text-[12.5px] font-bold text-gray-800 mb-1 flex items-center gap-2">
+                           {currentAddress.recipient_name} <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 font-medium">{currentAddress.phone}</span>
+                        </div>
+                        <div className="text-[11px] text-gray-500 font-medium leading-relaxed max-w-[90%]">
+                           {currentAddress.address_line1} {currentAddress.address_line2 && `${currentAddress.address_line2}, `} 
+                           {currentAddress.sub_district && `${currentAddress.sub_district}, `} 
+                           {currentAddress.district && `${currentAddress.district}, `} 
+                           {currentAddress.province && `${currentAddress.province} `} 
+                           {currentAddress.postal_code}
+                        </div>
+                     </div>
+                   ) : (
+                     <div className="bg-red-50 border border-red-200 rounded-[12px] p-3.5">
+                        <div className="text-red-600 font-bold text-sm">ไม่พบที่อยู่จัดส่งที่เลือก</div>
+                        <div className="text-red-500 text-xs mt-1">กรุณาเลือกที่อยู่จัดส่ง</div>
+                     </div>
+                   )}
                 </div>
               )}
 
@@ -259,47 +319,67 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
       {showAddressModal && (
         <div className="fixed inset-0 z-[48] flex items-center justify-center p-4 pb-[80px] bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
             <div className="absolute inset-0 cursor-pointer" onClick={() => setShowAddressModal(false)}></div>
-            <div className="bg-white w-full max-w-[380px] rounded-[24px] mx-auto p-5 pb-6 shadow-2xl relative z-10 animate-[dropIn_0.3s_cubic-bezier(0.175,0.885,0.32,1.275)_forwards] flex flex-col max-h-[85vh]">
-               <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3 shrink-0">
+            <div className="bg-white w-full max-w-[380px] h-[600px] rounded-[24px] mx-auto shadow-2xl relative z-10 animate-[dropIn_0.3s_cubic-bezier(0.175,0.885,0.32,1.275)_forwards] flex flex-col">
+               <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
                   <h2 className="text-[18px] font-black text-gray-800 tracking-tight">เลือกที่อยู่จัดส่ง</h2>
                   <button onClick={() => setShowAddressModal(false)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold active:bg-gray-200 transition-colors">✕</button>
                </div>
                
-               <div className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto mb-4">
-                  {mockAddresses.map((addr) => (
-                    <div 
-                       key={addr.id} 
-                       onClick={() => setSelectedAddressId(addr.id)}
-                       className={`p-3.5 border rounded-[12px] cursor-pointer transition-all ${selectedAddressId === addr.id ? 'border-[#4CAF50] bg-green-50 shadow-[0_2px_8px_rgba(76,175,80,0.15)] ring-1 ring-[#4CAF50]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
-                    >
-                       <div className="flex items-start justify-between">
-                         <div className="flex flex-col gap-1 pr-4">
-                            <div className="text-[13.5px] font-bold text-gray-800 flex items-center gap-2">
-                               {addr.name} 
-                               <span className="text-[10.5px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-medium">{addr.tel}</span>
-                               {addr.isDefault && <span className="text-[9px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded-sm">ค่าเริ่มต้น</span>}
-                            </div>
-                            <div className="text-[11.5px] text-gray-600 leading-snug">{addr.text}</div>
-                         </div>
-                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 ${selectedAddressId === addr.id ? 'border-[#4CAF50] bg-[#4CAF50]' : 'border-gray-300'}`}>
-                           {selectedAddressId === addr.id && <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
-                         </div>
-                       </div>
+               <div className="flex-1 overflow-y-auto px-5 py-4">
+                  {loadingAddresses ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-gray-500 text-sm">กำลังโหลดที่อยู่...</div>
                     </div>
-                  ))}
+                  ) : addresses.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-gray-500 text-sm">ไม่พบที่อยู่จัดส่ง</div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {addresses.map((addr) => (
+                        <div 
+                           key={addr.id} 
+                           onClick={() => setSelectedAddressId(addr.id)}
+                           className={`p-3.5 border rounded-[12px] cursor-pointer transition-all ${selectedAddressId === addr.id ? 'border-[#4CAF50] bg-green-50 shadow-[0_2px_8px_rgba(76,175,80,0.15)] ring-1 ring-[#4CAF50]' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                        >
+                           <div className="flex items-start justify-between">
+                             <div className="flex flex-col gap-1 pr-4">
+                                <div className="text-[13.5px] font-bold text-gray-800 flex items-center gap-2">
+                                   {addr.recipient_name} 
+                                   <span className="text-[10.5px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-medium">{addr.phone}</span>
+                                   {addr.is_default && <span className="text-[9px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded-sm">ค่าเริ่มต้น</span>}
+                                </div>
+                                <div className="text-[11.5px] text-gray-600 leading-snug">
+                                   {addr.address_line1} {addr.address_line2 && `${addr.address_line2}, `} 
+                                   {addr.sub_district && `${addr.sub_district}, `} 
+                                   {addr.district && `${addr.district}, `} 
+                                   {addr.province && `${addr.province} `} 
+                                   {addr.postal_code}
+                                </div>
+                             </div>
+                             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 ${selectedAddressId === addr.id ? 'border-[#4CAF50] bg-[#4CAF50]' : 'border-gray-300'}`}>
+                               {selectedAddressId === addr.id && <svg className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                             </div>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                </div>
                
-               <button className="w-full py-3.5 border-2 border-dashed border-gray-300 rounded-[12px] text-gray-500 font-bold hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2 mb-4">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-                  เพิ่มที่อยู่ใหม่
-               </button>
-               
-               <button 
-                 onClick={() => setShowAddressModal(false)}
-                 className="w-full py-4 flex items-center justify-center gap-2 bg-[#4CAF50] hover:bg-[#43a047] text-white font-black rounded-full text-[15px] shadow-[0_4px_12px_rgba(76,175,80,0.3)] active:scale-[0.98] transition-all tracking-wide"
-               >
-                  ยืนยันที่อยู่จัดส่ง
-               </button>
+               <div className="p-5 pt-0 space-y-3 shrink-0">
+                  <button className="w-full py-3.5 border-2 border-dashed border-gray-300 rounded-[12px] text-gray-500 font-bold hover:bg-gray-50 hover:border-gray-400 transition-colors flex items-center justify-center gap-2">
+                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                     เพิ่มที่อยู่ใหม่
+                  </button>
+                  
+                  <button 
+                    onClick={() => setShowAddressModal(false)}
+                    className="w-full py-4 flex items-center justify-center gap-2 bg-[#4CAF50] hover:bg-[#43a047] text-white font-black rounded-full text-[15px] shadow-[0_4px_12px_rgba(76,175,80,0.3)] active:scale-[0.98] transition-all tracking-wide"
+                  >
+                     ยืนยันที่อยู่จัดส่ง
+                  </button>
+               </div>
             </div>
         </div>
       )}

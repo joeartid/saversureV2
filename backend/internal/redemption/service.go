@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -116,6 +117,11 @@ func (s *Service) loadRewardMeta(ctx context.Context, tx pgx.Tx, tenantID, rewar
 }
 
 func (s *Service) getAddressByID(ctx context.Context, tx pgx.Tx, tenantID, userID, addressID string) (*shippingAddress, error) {
+	// Validate UUID format before querying database
+	if _, err := uuid.Parse(addressID); err != nil {
+		return nil, nil // Return nil to trigger address not found flow
+	}
+
 	var addr shippingAddress
 	err := tx.QueryRow(ctx,
 		`SELECT id, recipient_name, phone, address_line1, address_line2, district, sub_district, province, postal_code
@@ -246,21 +252,11 @@ func (s *Service) RedeemNow(ctx context.Context, tenantID, userID string, input 
 	var confirmedAt *string
 	err = tx.QueryRow(ctx,
 		`INSERT INTO reward_reservations (
-			user_id, reward_id, tenant_id, status, idempotency_key, expires_at, address_id, delivery_type,
-			recipient_name, recipient_phone, shipping_address_line1, shipping_address_line2,
-			shipping_district, shipping_sub_district, shipping_province, shipping_postal_code
+			user_id, reward_id, tenant_id, status, idempotency_key, expires_at, address_id
 		)
-		 VALUES ($1, $2, $3, 'PENDING', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		 VALUES ($1, $2, $3, 'PENDING', $4, $5, $6)
 		 RETURNING id, status, created_at::text`,
-		userID, input.RewardID, tenantID, idempotencyKey, expiresAt, addressID, meta.DeliveryType,
-		nullIfNoAddress(shippingAddr, func(a *shippingAddress) string { return a.RecipientName }),
-		nullIfNoAddress(shippingAddr, func(a *shippingAddress) string { return a.Phone }),
-		nullIfNoAddress(shippingAddr, func(a *shippingAddress) string { return a.AddressLine1 }),
-		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.AddressLine2 }),
-		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.District }),
-		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.SubDistrict }),
-		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.Province }),
-		nullIfNoAddressPtr(shippingAddr, func(a *shippingAddress) *string { return a.PostalCode }),
+		userID, input.RewardID, tenantID, idempotencyKey, expiresAt, addressID,
 	).Scan(&reservationID, &status, &createdAt)
 	if err != nil {
 		var pgErr *pgconn.PgError

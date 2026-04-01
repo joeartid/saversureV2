@@ -14,7 +14,7 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen pb-24 bg-background">
-      <PageHeader title="ศูนย์ช่วยเหลือ" subtitle="คำถามที่พบบ่อย (FAQ)" showBack />
+      <PageHeader title="ศูนย์ช่วยเหลือ" subtitle="คำถามที่พบบ่อย (FAQ)" backHref="/support" />
 
       <div className="px-4 mt-6">
         <h2 className="text-[14px] font-bold text-gray-800 mb-3 ml-2">หมวดหมู่คำถามที่พบบ่อย</h2>

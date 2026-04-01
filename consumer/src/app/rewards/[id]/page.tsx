@@ -121,8 +121,10 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
   const [showConfirm, setShowConfirm] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<AddressEntry[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
-  const [useNewAddress, setUseNewAddress] = useState(false);
   const [addressForm, setAddressForm] = useState<AddressFormState>(emptyAddressForm);
+  const [showAddressSelector, setShowAddressSelector] = useState(false);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [profilePrefill, setProfilePrefill] = useState<{name: string, phone: string} | null>(null);
 
   const getIcon = (code: string) => {
     const c = currencyMap[code.toLowerCase()];
@@ -192,24 +194,23 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
         .get<{ data: AddressEntry[] }>("/api/v1/profile/addresses")
         .then((d) => {
           let items = d.data || [];
-          try {
-            const mockExt = localStorage.getItem("mockAddress");
-            if (mockExt) {
-              const parsed = JSON.parse(mockExt);
-              if (!items.find(i => i.id === parsed.id)) {
-                items = [parsed, ...items];
-              }
-            }
-          } catch(e) {}
           setSavedAddresses(items);
           const defaultAddress = items.find((item) => item.is_default) || items[0];
           if (defaultAddress) {
             setSelectedAddressId(defaultAddress.id);
-          } else {
-            setUseNewAddress(true);
           }
         })
         .catch(() => {});
+
+      api.get<any>("/api/v1/profile")
+        .then(prof => {
+          if (prof) {
+            setProfilePrefill({
+              name: [prof.first_name, prof.last_name].filter(Boolean).join(" "),
+              phone: prof.phone || ""
+            });
+          }
+        }).catch(() => {});
     }
   }, [id]);
 
@@ -220,29 +221,10 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
 
     try {
       if (reward.id === "mock-0-point-test") {
-        if (reward.delivery_type === "shipping" && (useNewAddress || !selectedAddressId)) {
-          if (!addressForm.recipient_name.trim() || !addressForm.phone.trim() || !addressForm.address_line1.trim()) {
-            setError("กรุณากรอกชื่อผู้รับ เบอร์โทร และที่อยู่จัดส่งให้ครบ (โหมดจำลอง)");
-            setRedeeming(false);
-            return;
-          }
-          const mockAddr = {
-            id: "mock-addr-" + Date.now(),
-            label: "home",
-            recipient_name: addressForm.recipient_name.trim(),
-            phone: addressForm.phone.trim(),
-            address_line1: addressForm.address_line1.trim(),
-            address_line2: addressForm.address_line2.trim(),
-            district: addressForm.district.trim(),
-            sub_district: addressForm.sub_district.trim(),
-            province: addressForm.province.trim(),
-            postal_code: addressForm.postal_code.trim(),
-            is_default: true
-          };
-          try { localStorage.setItem("mockAddress", JSON.stringify(mockAddr)); } catch(e) {}
-          setSavedAddresses(prev => [mockAddr, ...prev]);
-          setSelectedAddressId(mockAddr.id);
-          setUseNewAddress(false);
+        if (reward.delivery_type === "shipping" && !selectedAddressId) {
+          setError("กรุณาเลือกที่อยู่จัดส่ง");
+          setRedeeming(false);
+          return;
         }
 
         setTimeout(() => {
@@ -261,31 +243,20 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
 
       let addressId: string | undefined;
       if (reward.delivery_type === "shipping") {
-        if (useNewAddress || !selectedAddressId) {
-          if (!addressForm.recipient_name.trim() || !addressForm.phone.trim() || !addressForm.address_line1.trim()) {
-            setError("กรุณากรอกชื่อผู้รับ เบอร์โทร และที่อยู่จัดส่งให้ครบ");
-            setRedeeming(false);
-            return;
-          }
+        // Validate that selectedAddressId actually exists in current fetched list
+        // (protects against stale state / old mock IDs)
+        const validAddress = savedAddresses.find(a => a.id === selectedAddressId)
+          || savedAddresses.find(a => a.is_default)
+          || savedAddresses[0];
 
-          const createdAddress = await api.post<AddressEntry>("/api/v1/profile/addresses", {
-            label: addressForm.label || "home",
-            recipient_name: addressForm.recipient_name.trim(),
-            phone: addressForm.phone.trim(),
-            address_line1: addressForm.address_line1.trim(),
-            address_line2: addressForm.address_line2.trim() || undefined,
-            district: addressForm.district.trim() || undefined,
-            sub_district: addressForm.sub_district.trim() || undefined,
-            province: addressForm.province.trim() || undefined,
-            postal_code: addressForm.postal_code.trim() || undefined,
-            is_default: savedAddresses.length === 0,
-          });
-          addressId = createdAddress.id;
-          setSavedAddresses((prev) => [createdAddress, ...prev]);
-          setSelectedAddressId(createdAddress.id);
-        } else {
-          addressId = selectedAddressId;
+        if (!validAddress) {
+          setError("กรุณาเลือกที่อยู่จัดส่ง");
+          setRedeeming(false);
+          return;
         }
+        // Auto-correct to the valid address
+        setSelectedAddressId(validAddress.id);
+        addressId = validAddress.id;
       }
 
       const idempotencyKey = `redeem-${reward.id}-${Date.now()}`;
@@ -311,6 +282,34 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
       }
     } finally {
       setRedeeming(false);
+    }
+  };
+
+  const handleSaveNewAddress = async () => {
+    if (!addressForm.recipient_name.trim() || !addressForm.phone.trim() || !addressForm.address_line1.trim()) {
+      setError("กรุณากรอกชื่อผู้รับ เบอร์โทร และที่อยู่ให้ครบ");
+      return;
+    }
+    try {
+      const createdAddress = await api.post<AddressEntry>("/api/v1/profile/addresses", {
+        label: "home",
+        recipient_name: addressForm.recipient_name.trim(),
+        phone: addressForm.phone.trim(),
+        address_line1: addressForm.address_line1.trim(),
+        address_line2: addressForm.address_line2.trim() || undefined,
+        district: addressForm.district.trim() || undefined,
+        sub_district: addressForm.sub_district.trim() || undefined,
+        province: addressForm.province.trim() || undefined,
+        postal_code: addressForm.postal_code.trim() || undefined,
+        is_default: savedAddresses.length === 0,
+      });
+      setSavedAddresses(prev => [createdAddress, ...prev]);
+      setSelectedAddressId(createdAddress.id);
+      setShowAddressForm(false);
+      setShowAddressSelector(false); // Close selector too if it was open
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || "ไม่สามารถเพิ่มที่อยู่ได้ กรุณาลองใหม่");
     }
   };
 
@@ -587,18 +586,16 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
                 <div className="mb-5">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[14px] font-bold text-gray-800">จัดส่งไปที่</p>
-                    {savedAddresses.length > 0 && (
-                      <button
-                        onClick={() => setUseNewAddress((prev) => !prev)}
-                        type="button"
-                        className="text-[12px] font-bold bg-green-50 text-[var(--jh-green)] px-3 py-1.5 rounded-full hover:bg-green-100 transition-colors"
-                      >
-                        {useNewAddress ? "อิงที่อยู่เดิม" : "เปลี่ยนที่อยู่"}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setShowAddressSelector(true)}
+                      type="button"
+                      className="text-[12px] font-bold bg-green-50 text-[var(--jh-green)] px-3 py-1.5 rounded-full hover:bg-green-100 transition-colors"
+                    >
+                      {savedAddresses.length > 0 ? (selectedAddress ? "เปลี่ยนที่อยู่" : "เลือกที่อยู่") : "เพิ่มที่อยู่"}
+                    </button>
                   </div>
                   
-                  {!useNewAddress && selectedAddress && (
+                  {selectedAddress ? (
                     <div className="rounded-2xl border border-[var(--jh-green)] p-3 relative bg-white overflow-hidden shadow-sm">
                       <div className="absolute top-0 bottom-0 left-0 w-[5px] bg-[var(--jh-green)]"></div>
                       <div className="pl-3">
@@ -611,21 +608,13 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
                         <p className="text-[12px] text-gray-500 leading-relaxed pr-2">{formatAddress(selectedAddress)}</p>
                       </div>
                     </div>
-                  )}
-
-                  {(useNewAddress || !selectedAddress) && (
-                    <div className="grid grid-cols-1 gap-3">
-                      <input value={addressForm.recipient_name} onChange={(e) => setAddressForm((prev) => ({ ...prev, recipient_name: e.target.value }))} placeholder="ชื่อผู้รับ" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
-                      <input value={addressForm.phone} onChange={(e) => setAddressForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="เบอร์โทร" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
-                      <input value={addressForm.address_line1} onChange={(e) => setAddressForm((prev) => ({ ...prev, address_line1: e.target.value }))} placeholder="ที่อยู่ (เลขที่, ซอย, ถนน) *" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
-                      <div className="grid grid-cols-2 gap-3">
-                        <input value={addressForm.sub_district} onChange={(e) => setAddressForm((prev) => ({ ...prev, sub_district: e.target.value }))} placeholder="แขวง/ตำบล" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
-                        <input value={addressForm.district} onChange={(e) => setAddressForm((prev) => ({ ...prev, district: e.target.value }))} placeholder="เขต/อำเภอ" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <input value={addressForm.province} onChange={(e) => setAddressForm((prev) => ({ ...prev, province: e.target.value }))} placeholder="จังหวัด" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
-                        <input value={addressForm.postal_code} onChange={(e) => setAddressForm((prev) => ({ ...prev, postal_code: e.target.value }))} placeholder="รหัสไปรษณีย์" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
-                      </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-gray-300 p-4 bg-gray-50 text-center flex flex-col items-center justify-center min-h-[100px] cursor-pointer" onClick={() => {
+                        setAddressForm({ ...emptyAddressForm, recipient_name: profilePrefill?.name || "", phone: profilePrefill?.phone || "" });
+                        setShowAddressForm(true);
+                      }}>
+                      <span className="text-xl mb-1 text-gray-400">🏡</span>
+                      <p className="text-[14px] font-bold text-[var(--jh-green)]">+ แตะเพื่อเพิ่มที่อยู่จัดส่ง</p>
                     </div>
                   )}
                 </div>
@@ -662,6 +651,84 @@ export default function RewardDetailPage({ params }: { params: Promise<{ id: str
                 {redeeming ? "กำลังดำเนินการ..." : "ยืนยันแลกแต้ม"}
               </button>
             </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Address Selector Modal */}
+      {showAddressSelector && !showAddressForm && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center p-0 sm:p-4">
+          <Card className="w-full sm:max-w-md rounded-t-[24px] sm:rounded-[24px] rounded-b-none sm:rounded-b-[24px] border-0 shadow-2xl bg-gray-50 overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-white p-4 flex justify-between items-center border-b border-gray-100 shrink-0 sticky top-0 z-10">
+              <h3 className="text-[16px] font-extrabold text-gray-900">เลือกที่อยู่จัดส่ง</h3>
+              <button onClick={() => setShowAddressSelector(false)} className="bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <CardContent className="p-4 overflow-y-auto flex-1 space-y-3 relative">
+              {savedAddresses.length === 0 ? (
+                 <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-200">
+                   <p className="text-gray-500 font-medium">ไม่มีที่อยู่จัดส่งในระบบ</p>
+                 </div>
+              ) : (
+                savedAddresses.map((addr) => (
+                  <div key={addr.id} onClick={() => { setSelectedAddressId(addr.id); setShowAddressSelector(false); }} className={`cursor-pointer rounded-2xl border ${selectedAddressId === addr.id ? 'border-[var(--jh-green)] bg-green-50/30 ring-1 ring-[var(--jh-green)]' : 'border-gray-200 bg-white hover:border-gray-300'} p-4 relative shadow-sm transition-all`}>
+                    <div className="flex items-start gap-3">
+                       <div className={`mt-0.5 shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedAddressId === addr.id ? 'border-[var(--jh-green)] bg-[var(--jh-green)]' : 'border-gray-300'}`}>
+                         {selectedAddressId === addr.id && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-3 h-3 text-white"><path d="M20 6L9 17l-5-5"/></svg>}
+                       </div>
+                       <div className="flex-1">
+                         <div className="flex items-center gap-2 mb-1">
+                           <h4 className="font-bold text-[14px] text-gray-900">{addr.recipient_name}</h4>
+                           <span className="text-[11px] font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">{addr.phone}</span>
+                         </div>
+                         <p className="text-[12px] text-gray-600 leading-relaxed pr-2">{formatAddress(addr)}</p>
+                       </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+            <div className="p-4 bg-white border-t border-gray-100 shrink-0">
+               <button onClick={() => { setAddressForm({ ...emptyAddressForm, recipient_name: profilePrefill?.name || "", phone: profilePrefill?.phone || "" }); setShowAddressForm(true); }} className="w-full rounded-[24px] border-2 border-[var(--jh-green)] bg-white hover:bg-green-50 py-3.5 text-[14px] font-bold text-[var(--jh-green)] shadow-sm">
+                 + เพิ่มที่อยู่ใหม่
+               </button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* New Address Form Modal */}
+      {showAddressForm && (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center p-0 sm:p-4">
+          <Card className="w-full sm:max-w-md rounded-t-[24px] sm:rounded-[24px] rounded-b-none sm:rounded-b-[24px] border-0 shadow-2xl bg-white overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-white p-4 flex justify-between items-center border-b border-gray-100 shrink-0 sticky top-0 z-10">
+              <h3 className="text-[16px] font-extrabold text-gray-900">ที่อยู่จัดส่งใหม่</h3>
+              <button onClick={() => setShowAddressForm(false)} className="bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <CardContent className="p-5 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 gap-3">
+                <input value={addressForm.recipient_name} onChange={(e) => setAddressForm((prev) => ({ ...prev, recipient_name: e.target.value }))} placeholder="ชื่อผู้รับ *" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                <input value={addressForm.phone} onChange={(e) => setAddressForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="เบอร์โทร *" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                <input value={addressForm.address_line1} onChange={(e) => setAddressForm((prev) => ({ ...prev, address_line1: e.target.value }))} placeholder="ที่อยู่ (เลขที่, ซอย, ถนน) *" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={addressForm.sub_district} onChange={(e) => setAddressForm((prev) => ({ ...prev, sub_district: e.target.value }))} placeholder="แขวง/ตำบล" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                  <input value={addressForm.district} onChange={(e) => setAddressForm((prev) => ({ ...prev, district: e.target.value }))} placeholder="เขต/อำเภอ" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={addressForm.province} onChange={(e) => setAddressForm((prev) => ({ ...prev, province: e.target.value }))} placeholder="จังหวัด" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                  <input value={addressForm.postal_code} onChange={(e) => setAddressForm((prev) => ({ ...prev, postal_code: e.target.value }))} placeholder="รหัสไปรษณีย์" className="w-full rounded-[24px] border border-gray-200 px-5 py-3.5 text-[14px] outline-none focus:border-[var(--jh-green)] focus:ring-1 focus:ring-[var(--jh-green)] transition-all bg-white" />
+                </div>
+              </div>
+              {error && <p className="text-red-500 text-xs font-bold mt-3 text-center">{error}</p>}
+            </CardContent>
+            <div className="p-4 bg-white border-t border-gray-100 shrink-0">
+               <button onClick={handleSaveNewAddress} className="w-full rounded-[24px] bg-[var(--jh-green)] hover:bg-[#3da342] py-4 text-[15px] font-bold text-white shadow-md transition-all active:scale-[0.98]">
+                 บันทึกที่อยู่ และใช้งาน
+               </button>
+            </div>
           </Card>
         </div>
       )}

@@ -11,7 +11,7 @@ import (
 
 func main() {
 	hash, _ := bcrypt.GenerateFromPassword([]byte("Admin@1234"), bcrypt.DefaultCost)
-	conn, err := pgx.Connect(context.Background(), "postgres://saversure_app:julaherb789@localhost:5433/saversure?sslmode=disable")
+	conn, err := pgx.Connect(context.Background(), "postgres://saversure_app:julaherb789@localhost:15433/saversure?sslmode=disable")
 	if err != nil {
 		fmt.Println("connect error:", err)
 		os.Exit(1)

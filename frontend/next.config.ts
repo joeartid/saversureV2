@@ -22,15 +22,15 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:30400/api/:path*",
+        destination: "http://localhost:30400/api/:path*",
       },
       {
         source: "/auth/:path*",
-        destination: "http://127.0.0.1:30400/auth/:path*",
+        destination: "http://localhost:30400/auth/:path*",
       },
       {
         source: "/media/:path*",
-        destination: "http://127.0.0.1:30400/media/:path*",
+        destination: "http://localhost:30400/media/:path*",
       },
     ];
   },

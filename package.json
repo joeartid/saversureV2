@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev:admin": "npm run dev --prefix frontend",
+    "dev:consumer": "npm run dev --prefix consumer",
+    "dev:backend": "cd backend && go run ./cmd/api",
+    "dev": "concurrently -c \"cyan,magenta,yellow\" -n \"admin,consumer,backend\" \"npm run dev:admin\" \"npm run dev:consumer\" \"npm run dev:backend\"",
     "build": "next build",
     "start": "next start"
   },
@@ -17,6 +20,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
