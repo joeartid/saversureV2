@@ -34,6 +34,7 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
   const [points, setPoints] = useState(0);
   const [registering, setRegistering] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [ticketNumber, setTicketNumber] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
@@ -73,8 +74,11 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
     setShowConfirm(false);
     setRegistering(true);
     try {
-      await api.post(`/api/v1/my/lucky-draw/${campaign.id}/register`, {});
+      const res = await api.post<{ ticket_number: string }>(`/api/v1/my/lucky-draw/${campaign.id}/register`, {});
       setPoints((p) => p - (campaign.point_cost || 0));
+      if (res?.ticket_number) {
+        setTicketNumber(res.ticket_number);
+      }
       setSuccess(true);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด หรือคุณมีตั๋วเต็มจำนวนโควต้าแล้ว");
@@ -217,8 +221,14 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
           <div className="bg-white rounded-3xl w-full max-w-[320px] p-6 text-center shadow-2xl relative overflow-hidden animate-bounce-in">
             <div className="text-7xl mb-4 animate-wiggle inline-block">🎟️</div>
             <h2 className="text-[22px] font-black text-gray-800 mb-2">แลกสิทธิ์สำเร็จ!</h2>
-            <p className="text-[14px] text-gray-600 mb-6">
-              คุณใช้ {(campaign.point_cost || 0).toLocaleString()} แต้ม เพื่อแลก 1 สิทธิ์ลุ้นโชคเรียบร้อย ขอให้โชคดีนะครับ!
+            {ticketNumber && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl py-3 px-4 mb-4 mx-auto inline-block min-w-[200px]">
+                <p className="text-[12px] text-orange-600 font-bold mb-1">หมายเลขตั๋วของคุณ</p>
+                <p className="text-[20px] font-black text-orange-700 tracking-wider font-mono">{ticketNumber}</p>
+              </div>
+            )}
+            <p className="text-[14px] text-gray-600 mb-6 px-1 leading-relaxed">
+              คุณใช้ <span className="font-bold text-gray-800">{(campaign.point_cost || 0).toLocaleString()}</span> แต้ม เพื่อแลก <span className="font-bold text-gray-800">1</span> สิทธิ์ลุ้นโชคเรียบร้อย ขอให้โชคดีนะครับ!
             </p>
             <div className="flex flex-col gap-3 relative z-10">
               <Link

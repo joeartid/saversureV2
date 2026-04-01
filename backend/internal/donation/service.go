@@ -38,6 +38,15 @@ type DonationHistory struct {
 	CreatedAt  string `json:"created_at"`
 }
 
+type MyDonationEntry struct {
+	ID               string  `json:"id"`
+	DonationID       string  `json:"donation_id"`
+	DonationTitle    string  `json:"donation_title"`
+	DonationImageURL *string `json:"donation_image_url"`
+	Points           int     `json:"points"`
+	CreatedAt        string  `json:"created_at"`
+}
+
 type CreateInput struct {
 	TenantID     string `json:"-"`
 	Title        string `json:"title" binding:"required"`
@@ -232,6 +241,34 @@ func (s *Service) Donate(ctx context.Context, tenantID, donationID, userID strin
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 	return &h, nil
+}
+
+func (s *Service) GetMyDonations(ctx context.Context, userID string, limit, offset int) ([]MyDonationEntry, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT dh.id, dh.donation_id, d.title, d.image_url, dh.points, dh.created_at::text
+		 FROM donation_histories dh
+		 JOIN donations d ON d.id = dh.donation_id
+		 WHERE dh.user_id = $1
+		 ORDER BY dh.created_at DESC LIMIT $2 OFFSET $3`,
+		userID, limit, offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list my donations: %w", err)
+	}
+	defer rows.Close()
+
+	var items []MyDonationEntry
+	for rows.Next() {
+		var e MyDonationEntry
+		if err := rows.Scan(&e.ID, &e.DonationID, &e.DonationTitle, &e.DonationImageURL, &e.Points, &e.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan my donation: %w", err)
+		}
+		items = append(items, e)
+	}
+	return items, nil
 }
 
 func (s *Service) GetHistory(ctx context.Context, donationID string, limit, offset int) ([]DonationHistory, error) {

@@ -829,6 +829,13 @@ func main() {
 	// Popups — cosmetic, no tenant required (graceful fallback in handler)
 	api.GET("/public/popups", popupHandler.ListActive)
 
+	// Public Donations (no auth required)
+	publicDonationRoutes := api.Group("/public/donations")
+	publicDonationRoutes.Use(mw.TenantFromHeader())
+	{
+		publicDonationRoutes.GET("", donationHandler.ListActive)
+	}
+
 	// Rewards API (public - no auth required)
 	publicRewardRoutes := api.Group("/rewards")
 	publicRewardRoutes.Use(mw.TenantFromHeader())
@@ -856,6 +863,7 @@ func main() {
 		myRoutes.POST("/lucky-draw/:id/register", luckyDrawHandler.Register)
 		myRoutes.GET("/lucky-draw/:id/tickets", luckyDrawHandler.GetUserTickets)
 		myRoutes.POST("/donations/:id/donate", donationHandler.Donate)
+		myRoutes.GET("/donations", donationHandler.GetMyDonations)
 		myRoutes.GET("/balances", currencyHandler.GetMultiBalance)
 		myRoutes.GET("/redeem-transactions", transactionHandler.ListMine)
 		myRoutes.GET("/missions", gamifyHandler.GetUserMissions)

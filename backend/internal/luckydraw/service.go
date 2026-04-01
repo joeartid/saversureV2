@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"saversure/internal/apperror"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -311,7 +313,7 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 		return nil, fmt.Errorf("campaign not found")
 	}
 	if c.Status != "active" {
-		return nil, fmt.Errorf("campaign is not active")
+		return nil, apperror.BadRequest("not_active", "กิจกรรมนี้ยังไม่เปิดให้แลกสิทธิ์หรือหมดเวลาแล้ว")
 	}
 
 	var ticketCount int
@@ -320,23 +322,30 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 		campaignID, userID,
 	).Scan(&ticketCount)
 	if ticketCount >= c.MaxTicketsPerUser {
-		return nil, fmt.Errorf("max tickets reached (%d/%d)", ticketCount, c.MaxTicketsPerUser)
+		return nil, apperror.BadRequest("max_tickets", fmt.Sprintf("คุณมีสิทธิ์ลุ้นโชคเต็มโควต้าแล้ว (%d/%d)", ticketCount, c.MaxTicketsPerUser))
 	}
+
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
 
 	if c.CostPoints > 0 {
 		var balance int
-		_ = s.db.QueryRow(ctx,
-			`SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END), 0) FROM point_ledger WHERE user_id = $1`,
+		_ = tx.QueryRow(ctx,
+			`SELECT COALESCE(SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE -amount END), 0) FROM point_ledger WHERE user_id = $1`,
 			userID,
 		).Scan(&balance)
 		if balance < c.CostPoints {
-			return nil, fmt.Errorf("insufficient points (need %d, have %d)", c.CostPoints, balance)
+			return nil, apperror.BadRequest("insufficient_points", fmt.Sprintf("แต้มไม่เพียงพอ (ต้องการ %d, มี %d)", c.CostPoints, balance))
 		}
 
-		_, err := s.db.Exec(ctx,
-			`INSERT INTO point_ledger (user_id, tenant_id, type, amount, source, ref_id)
-			 VALUES ($1, $2, 'debit', $3, 'lucky_draw', $4)`,
-			userID, tenantID, c.CostPoints, campaignID,
+		balanceAfter := balance - c.CostPoints
+		_, err := tx.Exec(ctx,
+			`INSERT INTO point_ledger (user_id, tenant_id, entry_type, amount, balance_after, reference_type, reference_id, description)
+			 VALUES ($1, $2, 'debit', $3, $4, 'lucky_draw', $5, 'แลกสิทธิ์ลุ้นโชค')`,
+			userID, tenantID, c.CostPoints, balanceAfter, campaignID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("deduct points: %w", err)
@@ -345,7 +354,7 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 
 	ticketNum := generateTicketNumber()
 	var t Ticket
-	err = s.db.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`INSERT INTO lucky_draw_tickets (campaign_id, user_id, ticket_number, points_spent)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, campaign_id, user_id, ticket_number, points_spent, created_at::text`,
@@ -355,7 +364,15 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 		return nil, fmt.Errorf("register ticket: %w", err)
 	}
 
-	s.db.Exec(ctx, `UPDATE lucky_draw_campaigns SET total_tickets = total_tickets + 1 WHERE id = $1`, campaignID)
+	_, err = tx.Exec(ctx, `UPDATE lucky_draw_campaigns SET total_tickets = total_tickets + 1 WHERE id = $1`, campaignID)
+	if err != nil {
+		return nil, fmt.Errorf("update campaign total tickets: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+
 	return &t, nil
 }
 

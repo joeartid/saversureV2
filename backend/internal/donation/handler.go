@@ -110,3 +110,16 @@ func (h *Handler) GetHistory(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": items})
 }
+
+func (h *Handler) GetMyDonations(c *gin.Context) {
+	userID := c.GetString("user_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
+	items, err := h.svc.GetMyDonations(c.Request.Context(), userID, limit, offset)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
