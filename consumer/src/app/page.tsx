@@ -8,6 +8,7 @@ import BottomNav from "@/components/BottomNav";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { useTenant } from "@/components/TenantProvider";
+import toast from "react-hot-toast";
 import {
   type MultiBalance,
   getPrimaryBalance,
@@ -156,47 +157,45 @@ function RewardCard({ reward, idx }: { reward: RewardItem; idx: number }) {
   );
 }
 
-function DonationCard({ donation }: { donation: Donation }) {
+function DonationCard({ donation, onDonate }: { donation: Donation; onDonate: (d: Donation) => void }) {
   const imgSrc = mediaUrl(donation.image_url);
   const progress = donation.target_points > 0 ? Math.min(100, (donation.collected_points / donation.target_points) * 100) : 0;
   
   return (
-    <Link href={`/donations/${donation.id}`}>
-      <div className="jh-card">
-        <div className="jh-card-inner">
-          <div className="jh-card-img jh-bg-teal">
-            {imgSrc ? (
-              <img src={imgSrc} alt="" className="jh-card-product-img" />
-            ) : (
-              <div className="jh-card-emoji">❤️</div>
-            )}
+    <div className="jh-card cursor-pointer" onClick={() => onDonate(donation)}>
+      <div className="jh-card-inner">
+        <div className="jh-card-img jh-bg-teal">
+          {imgSrc ? (
+            <img src={imgSrc} alt="" className="jh-card-product-img" />
+          ) : (
+            <div className="jh-card-emoji">❤️</div>
+          )}
+        </div>
+        
+        <div className="jh-card-detail">
+          <div className="jh-card-detail-top">
+            <div className="jh-card-free-label w-fit">ร่วมบุญ</div>
+            <div className="jh-card-name line-clamp-2" style={{ fontSize: '16px' }}>{donation.title}</div>
           </div>
-          
-          <div className="jh-card-detail">
-            <div className="jh-card-detail-top">
-              <div className="jh-card-free-label w-fit">ร่วมบุญ</div>
-              <div className="jh-card-name line-clamp-2" style={{ fontSize: '16px' }}>{donation.title}</div>
-            </div>
 
-            <div className="jh-card-detail-bottom mt-1">
-              <div className="w-full text-[13px] text-[var(--on-surface-variant)] mb-1 flex justify-between">
-                <span>สะสมแล้ว {(donation.collected_points || 0).toLocaleString()} / {(donation.target_points || 0).toLocaleString()} แต้ม</span>
-              </div>
-              <div className="h-1.5 w-full bg-[var(--outline-variant)] rounded-[var(--radius-sm)] overflow-hidden mb-2">
-                <div
-                  className="h-full bg-[var(--primary)] rounded-[var(--radius-sm)]"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              
-              <div className="jh-card-point-btn">
-                ร่วมบริจาค
-              </div>
+          <div className="jh-card-detail-bottom mt-1">
+            <div className="w-full text-[13px] text-[var(--on-surface-variant)] mb-1 flex justify-between">
+              <span>สะสมแล้ว {(donation.collected_points || 0).toLocaleString()} / {(donation.target_points || 0).toLocaleString()} แต้ม</span>
+            </div>
+            <div className="h-1.5 w-full bg-[var(--outline-variant)] rounded-[var(--radius-sm)] overflow-hidden mb-2">
+              <div
+                className="h-full bg-[var(--primary)] rounded-[var(--radius-sm)]"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            
+            <div className="jh-card-point-btn">
+              ร่วมบริจาค
             </div>
           </div>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -247,6 +246,10 @@ function JulaHerbHome() {
   const [activeTab, setActiveTab] = useState("julaherb");
   const [rewards, setRewards] = useState<RewardItem[]>([]);
 
+  const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null);
+  const [donateAmount, setDonateAmount] = useState<number>(10);
+  const [donating, setDonating] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -277,6 +280,18 @@ function JulaHerbHome() {
   const primaryBal = getPrimaryBalance(balances);
   const secondaryBals = getSecondaryBalances(balances);
 
+  const fetchBalances = () => {
+    if (loggedIn) {
+      api.get<{ data: MultiBalance[] }>("/api/v1/my/balances")
+        .then((d) => setBalances(d.data ?? [])).catch(() => {});
+    }
+  };
+
+  const fetchDonations = () => {
+    api.get<{ data: Donation[] }>("/api/v1/public/donations")
+      .then((d) => setDonations(d.data || [])).catch(() => {});
+  };
+
   useEffect(() => {
     api.get<{ data: RewardItem[] }>("/api/v1/public/rewards?limit=20")
       .then((d) => {
@@ -298,19 +313,42 @@ function JulaHerbHome() {
         });
         setRewards(items);
       }).catch(() => {});
-    api.get<{ data: Donation[] }>("/api/v1/public/donations")
-      .then((d) => setDonations(d.data || [])).catch(() => {});
+    
+    fetchDonations();
+    
     api.get<{ data: LuckyDraw[] }>("/api/v1/public/lucky-draw")
       .then((d) => setLuckyDraws(d.data || [])).catch(() => {});
     api.get<{ data: NewsItem[] }>("/api/v1/public/news?limit=5")
       .then((d) => setNewsList(d.data || [])).catch(() => {});
     if (loggedIn) {
-      api.get<{ data: MultiBalance[] }>("/api/v1/my/balances")
-        .then((d) => setBalances(d.data ?? [])).catch(() => {});
+      fetchBalances();
       api.get<UserProfile>("/api/v1/profile")
         .then((d) => setProfile(d)).catch(() => {});
     }
   }, [loggedIn]);
+
+  const handleDonate = async () => {
+    if (!selectedDonation) return;
+    if (!loggedIn) {
+      toast.error("กรุณาเข้าสู่ระบบก่อนร่วมบริจาค");
+      return;
+    }
+
+    setDonating(true);
+    try {
+      await api.post(`/api/v1/my/donations/${selectedDonation.id}/donate`, {
+        points: donateAmount
+      });
+      toast.success("ขอบคุณที่ร่วมบริจาคแต้ม!");
+      setSelectedDonation(null);
+      fetchBalances();
+      fetchDonations();
+    } catch (err: any) {
+      toast.error(err.message || "เกิดข้อผิดพลาดในการบริจาค");
+    } finally {
+      setDonating(false);
+    }
+  };
 
   const displayName =
     profile?.display_name ||
@@ -412,7 +450,7 @@ function JulaHerbHome() {
           ) : (
             <>
               {donations.map((d) => (
-                <DonationCard key={d.id} donation={d} />
+                <DonationCard key={d.id} donation={d} onDonate={setSelectedDonation} />
               ))}
             </>
           )
@@ -440,6 +478,87 @@ function JulaHerbHome() {
           ))
         )}
       </div>
+
+      {/* ══════ Donation Modal ══════ */}
+      {selectedDonation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-[24px] w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
+            <div className="relative h-40 bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)]">
+              {selectedDonation.image_url ? (
+                <img 
+                  src={mediaUrl(selectedDonation.image_url) || ""} 
+                  className="w-full h-full object-cover opacity-40" 
+                  alt="" 
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">❤️</div>
+              )}
+              <button 
+                onClick={() => setSelectedDonation(null)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/40 transition-colors"
+              >
+                ✕
+              </button>
+              <div className="absolute bottom-4 left-6 right-6">
+                <h3 className="text-white font-bold text-xl line-clamp-1">{selectedDonation.title}</h3>
+                <p className="text-white/80 text-xs mt-1">ร่วมเป็นส่วนหนึ่งในการช่วยเหลือสังคม</p>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-6">
+                <label className="text-sm font-bold text-gray-500 mb-3 block">เลือกจำนวนแต้มที่ต้องการบริจาค</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {[10, 50, 100, 500, 1000].map((amt) => (
+                    <button
+                      key={amt}
+                      onClick={() => setDonateAmount(amt)}
+                      className={`py-2.5 rounded-xl font-bold text-sm transition-all border-2 ${
+                        donateAmount === amt 
+                          ? "border-[var(--jh-green)] bg-green-50 text-[var(--jh-green)]" 
+                          : "border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200"
+                      }`}
+                    >
+                      {amt.toLocaleString()}
+                    </button>
+                  ))}
+                  <div className="relative">
+                    <input
+                      type="number"
+                      placeholder="ระบุเอง"
+                      className="w-full py-2.5 px-3 rounded-xl font-bold text-sm border-2 border-gray-100 bg-gray-50 outline-none focus:border-[var(--jh-green)] text-center"
+                      onChange={(e) => setDonateAmount(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-xl p-4 mb-6 flex items-start gap-3">
+                <div className="text-amber-500 mt-0.5">💡</div>
+                <p className="text-[12px] text-amber-700 leading-relaxed">
+                  แต้มของคุณจะถูกหักทันทีหลังจากกดยืนยัน และคุณสามารถตรวจสอบประวัติได้ที่หน้า "ประวัติการบริจาค"
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSelectedDonation(null)}
+                  className="flex-1 py-3.5 rounded-2xl font-bold text-gray-400 bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleDonate}
+                  disabled={donating || donateAmount <= 0}
+                  className="flex-[2] py-3.5 rounded-2xl font-bold text-white bg-[linear-gradient(135deg,var(--jh-green)_0%,var(--jh-teal)_100%)] shadow-lg shadow-green-200 disabled:opacity-50 disabled:shadow-none transition-all"
+                >
+                  {donating ? "กำลังประมวลผล..." : "ยืนยันบริจาค"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

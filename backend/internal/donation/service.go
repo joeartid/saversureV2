@@ -189,18 +189,13 @@ func (s *Service) Donate(ctx context.Context, tenantID, donationID, userID strin
 	}
 
 	var status string
-	_ = s.db.QueryRow(ctx, `SELECT status FROM donations WHERE id = $1 AND tenant_id = $2`, donationID, tenantID).Scan(&status)
+	var title string
+	err := s.db.QueryRow(ctx, `SELECT status, title FROM donations WHERE id = $1 AND tenant_id = $2`, donationID, tenantID).Scan(&status, &title)
+	if err != nil {
+		return nil, fmt.Errorf("donation not found: %w", err)
+	}
 	if status != "active" {
 		return nil, fmt.Errorf("donation is not active")
-	}
-
-	var balance int
-	_ = s.db.QueryRow(ctx,
-		`SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE -amount END), 0)
-		 FROM point_ledger WHERE user_id = $1`, userID,
-	).Scan(&balance)
-	if balance < points {
-		return nil, fmt.Errorf("insufficient points (need %d, have %d)", points, balance)
 	}
 
 	tx, err := s.db.Begin(ctx)
@@ -209,10 +204,26 @@ func (s *Service) Donate(ctx context.Context, tenantID, donationID, userID strin
 	}
 	defer tx.Rollback(ctx)
 
+	// User lock to prevent race conditions on balance deduction
+	var dummy int
+	err = tx.QueryRow(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&dummy)
+	if err != nil {
+		return nil, fmt.Errorf("lock user: %w", err)
+	}
+
+	var balance int
+	_ = tx.QueryRow(ctx,
+		`SELECT COALESCE(SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE -amount END), 0)
+		 FROM point_ledger WHERE user_id = $1 AND currency = 'point'`, userID,
+	).Scan(&balance)
+	if balance < points {
+		return nil, fmt.Errorf("insufficient points (need %d, have %d)", points, balance)
+	}
+
 	_, err = tx.Exec(ctx,
-		`INSERT INTO point_ledger (user_id, tenant_id, type, amount, source, ref_id)
-		 VALUES ($1, $2, 'debit', $3, 'donation', $4)`,
-		userID, tenantID, points, donationID,
+		`INSERT INTO point_ledger (user_id, tenant_id, entry_type, amount, balance_after, reference_type, reference_id, currency)
+		 VALUES ($1, $2, 'debit', $3, $4, 'donation', $5, 'point')`,
+		userID, tenantID, points, balance-points, donationID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("deduct points: %w", err)
@@ -235,6 +246,17 @@ func (s *Service) Donate(ctx context.Context, tenantID, donationID, userID strin
 	).Scan(&h.ID, &h.DonationID, &h.UserID, &h.Points, &h.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create history: %w", err)
+	}
+
+	// Insert notification
+	notifBody := fmt.Sprintf("คุณได้ร่วมบริจาค %d แต้ม ให้โครงการ %s สำเร็จแล้ว", points, title)
+	_, err = tx.Exec(ctx,
+		`INSERT INTO notifications (tenant_id, user_id, type, title, body, ref_type, ref_id)
+		 VALUES ($1, $2, 'campaign', 'ร่วมบริจาคสำเร็จ', $3, 'donation', $4)`,
+		tenantID, userID, notifBody, donationID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create notification: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

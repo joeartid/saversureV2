@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import TenantProvider from "@/components/TenantProvider";
 import PopupRenderer from "@/components/PopupRenderer";
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <TenantProvider>
           {children}
           <PopupRenderer />
+          <Toaster position="top-center" reverseOrder={false} />
         </TenantProvider>
       </body>
     </html>

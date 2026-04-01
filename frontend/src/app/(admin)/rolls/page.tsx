@@ -1066,7 +1066,7 @@ function RollsPage() {
                           <span className="text-[11px] text-[var(--md-error)]">Expired</span>
                         ) : (
                           <button
-                            onClick={() => copyToClipboard(`${window.location.origin.replace(':30401', ':30400')}/api/v1/exports/download/${log.download_token}`)}
+                            onClick={() => copyToClipboard(`${window.location.origin.replace(':30402', ':30400')}/api/v1/exports/download/${log.download_token}`)}
                             className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800"
                           >
                             Copy Link
