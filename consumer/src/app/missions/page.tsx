@@ -53,10 +53,43 @@ export default function MissionsPage() {
   const [mounted, setMounted] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
 
+
   useEffect(() => {
     setMounted(true);
     setLoggedIn(isLoggedIn());
   }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!mounted) return;
+      
+      try {
+        const [missionsRes, progressRes] = await Promise.all([
+          api.get<{ data?: Mission[] } | Mission[]>("/api/v1/public/missions"),
+          loggedIn ? api.get<{ data?: MissionProgress[] } | MissionProgress[]>("/api/v1/my/missions").catch(() => null) : null,
+        ]);
+
+        const missionsList = Array.isArray(missionsRes) ? missionsRes : missionsRes.data ?? [];
+
+        setMissions(missionsList);
+
+        if (progressRes) {
+          const list = progressRes ? (Array.isArray(progressRes) ? progressRes : progressRes.data ?? []) : [];
+          const map: Record<string, MissionProgress> = {};
+          list.forEach((p: any) => {
+            map[p.mission_id] = p;
+          });
+          setProgressMap(map);
+        }
+      } catch (err) {
+        console.error("Failed to load missions:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, [mounted, loggedIn]);
 
   const handleClaim = async (e: React.MouseEvent, mission: Mission) => {
     e.preventDefault();
@@ -142,24 +175,25 @@ export default function MissionsPage() {
           </div>
         )}
 
-        <div className={`px-5 ${!loggedIn ? "mt-4" : "-mt-6 relative z-10"} mb-4`}>
-          <div className="bg-white/90 backdrop-blur-sm p-1.5 rounded-2xl flex gap-1 shadow-sm border border-gray-100">
+        {/* Tab Navigation */}
+        <div className="px-5 -mt-6 relative z-10 mb-6">
+          <div className="bg-white/95 backdrop-blur-sm p-1.5 rounded-2xl flex gap-1 shadow-lg border border-gray-100">
             <button
               onClick={() => setActiveTab('all')}
-              className={`flex-1 py-2 text-[14px] font-bold rounded-xl transition-all ${
+              className={`flex-1 py-2.5 text-[14px] font-bold rounded-xl transition-all ${
                 activeTab === 'all'
-                  ? 'bg-white text-[var(--jh-green)] shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                  ? 'bg-white text-[var(--jh-green)] shadow-md'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
               }`}
             >
               ทั้งหมด
             </button>
             <button
               onClick={() => setActiveTab('completed')}
-              className={`flex-1 py-2 text-[14px] font-bold rounded-xl transition-all ${
+              className={`flex-1 py-2.5 text-[14px] font-bold rounded-xl transition-all ${
                 activeTab === 'completed'
-                  ? 'bg-white text-[var(--jh-green)] shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                  ? 'bg-white text-[var(--jh-green)] shadow-md'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
               }`}
             >
               สำเร็จแล้ว
@@ -167,6 +201,7 @@ export default function MissionsPage() {
           </div>
         </div>
 
+        
         <div className="px-5 mt-2">
           {loading ? (
             <div className="space-y-3">
@@ -245,6 +280,9 @@ export default function MissionsPage() {
                       </div>
                       
                       <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="bg-green-100 text-green-600 text-[9px] font-bold px-2 py-0.5 rounded-full">ภารกิจ</span>
+                        </div>
                         <h3 className="text-[15px] font-extrabold text-gray-800 truncate tracking-tight">{m.title}</h3>
                         {m.description && (
                           <p className="text-[12px] font-medium text-gray-400 mt-0.5 truncate">{m.description}</p>

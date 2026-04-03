@@ -69,15 +69,6 @@ interface LuckyDraw {
   end_date: string | null;
 }
 
-interface Campaign {
-  id: string;
-  name: string;
-  description: string | null;
-  image_url: string | null;
-  type: string;
-  start_date: string | null;
-  end_date: string | null;
-}
 
 /* ───────── Helpers ───────── */
 const mediaUrl = (url?: string | null) => {
@@ -248,41 +239,6 @@ function LuckyDrawCard({ lucky }: { lucky: LuckyDraw }) {
   );
 }
 
-function CampaignCard({ campaign }: { campaign: Campaign }) {
-  const imgSrc = mediaUrl(campaign.image_url);
-  
-  return (
-    <div className="jh-card">
-      <div className="jh-card-inner">
-        <div className="jh-card-img jh-bg-gradient-to-br from-purple-500 to-pink-500">
-          {imgSrc ? (
-            <img src={imgSrc} alt={campaign.name} className="jh-card-product-img" />
-          ) : (
-            <div className="jh-card-emoji">🎯</div>
-          )}
-        </div>
-        
-        <div className="jh-card-detail">
-          <div className="jh-card-detail-top">
-            <div className="jh-card-free-label !bg-purple-100 !text-purple-600 w-fit">แคมเปญ</div>
-            <div className="jh-card-name line-clamp-2" style={{ fontSize: '16px' }}>{campaign.name}</div>
-            {campaign.description && (
-              <div className="text-[13px] text-[var(--on-surface-variant)] line-clamp-2 mt-1">
-                {campaign.description}
-              </div>
-            )}
-          </div>
-
-          <div className="jh-card-detail-bottom mt-2">
-            <div className="jh-card-point-btn !bg-purple-500 hover:!bg-purple-600 text-white">
-              ดูรายละเอียด
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════
    Home Page
@@ -318,7 +274,6 @@ function JulaHerbHome() {
   };
   const [donations, setDonations] = useState<Donation[]>([]);
   const [luckyDraws, setLuckyDraws] = useState<LuckyDraw[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [balances, setBalances] = useState<MultiBalance[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -339,10 +294,6 @@ function JulaHerbHome() {
       .then((d) => setDonations(d.data || [])).catch(() => {});
   };
 
-  const fetchCampaigns = () => {
-    api.get<{ data: Campaign[] }>("/api/v1/public/campaigns?limit=5")
-      .then((d) => setCampaigns(d.data || [])).catch(() => {});
-  };
 
   useEffect(() => {
     api.get<{ data: RewardItem[] }>("/api/v1/public/rewards?limit=20")
@@ -352,7 +303,6 @@ function JulaHerbHome() {
       }).catch(() => {});
     
     fetchDonations();
-    fetchCampaigns();
     
     api.get<{ data: LuckyDraw[] }>("/api/v1/public/lucky-draw")
       .then((d) => setLuckyDraws(d.data || [])).catch(() => {});
@@ -466,18 +416,7 @@ function JulaHerbHome() {
         </div>
       </div>
 
-      {/* ══════ Campaign Section ══════ */}
-      {campaigns.length > 0 && (
-        <div className="jh-rewards-section">
-          <h2 className="jh-section-title">แคมเปญพิเศษ</h2>
-          <div className="jh-campaigns-container">
-            {campaigns.map((campaign) => (
-              <CampaignCard key={campaign.id} campaign={campaign} />
-            ))}
-          </div>
-        </div>
-      )}
-
+      
       <div className="jh-rewards-section">
         <h2 className="jh-section-title">แลกสิทธิพิเศษสำหรับคุณ</h2>
 

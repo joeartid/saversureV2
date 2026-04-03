@@ -111,9 +111,78 @@ export default function MissionHubPage() {
     }
   ];
 
+  const campaigns = [
+    {
+      id: 1,
+      name: "สะแกนสะสมแต้ม ดีดีครีมแตงโม ครบ 6 ชิ้น",
+      description: "เพียงสแกนสะสมแต้ม ดีดีครีมแตงโม ครบ 6 ชิ้น ริบแต้มฟรี 20 แต้ม",
+      image_url: "https://shop.julasherb.in.th/wp-content/uploads/2021/04/0J5A1303-1-300x300.jpg",
+      progress: 0,
+      max: 6,
+      timeLeft: "เหลืออีก 7 วัน",
+      reward: "20 แต้ม ส่วนลด"
+    },
+    {
+      id: 2,
+      name: "นักสแกนมือใหม่",
+      description: "สแกน QR Code ครบ 3 ครั้ง",
+      image_url: "https://shop.julasherb.in.th/wp-content/uploads/2021/04/0J5A1312-300x300.jpg",
+      progress: 0,
+      max: 3,
+      timeLeft: "เหลืออีก 57 วัน",
+      reward: "20 แต้ม แต้มพิเศษ"
+    },
+    {
+      id: 3,
+      name: "นักสะสมตัวยง",
+      description: "สแกน QR Code ครบ 10 ครั้ง",
+      image_url: "https://shop.julasherb.in.th/wp-content/uploads/2023/07/Lotion_Shopee1.jpg",
+      progress: 0,
+      max: 10,
+      timeLeft: "เหลืออีก 57 วัน",
+      reward: "50 แต้ม ลุ้นโชค"
+    }
+  ];
+
   const displayMissions = activeFilter === 'all' 
     ? allMissions 
     : allMissions.filter(m => m.type === activeFilter);
+
+  const CampaignCard = ({ campaign }: { campaign: any }) => {
+    const percent = (campaign.progress / campaign.max) * 100;
+    
+    return (
+      <div className="bg-white rounded-[16px] p-4 flex items-center justify-between border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] active:scale-[0.98] transition-all cursor-pointer group hover:border-purple-300">
+        {/* Left Side */}
+        <div className="flex-1 flex flex-col pt-1 pr-3">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="bg-purple-100 text-purple-600 text-[9px] font-bold px-2 py-0.5 rounded-full">แคมเปญพิเศษ</div>
+          </div>
+          <h3 className="font-bold text-[14.5px] text-gray-800 tracking-tight leading-snug">{campaign.name}</h3>
+          <p className="text-[10px] text-gray-500 mt-0.5 font-medium">{campaign.description}</p>
+          
+          <div className="mt-4 mb-2 w-full relative h-[6px] bg-gray-100 rounded-full flex items-center">
+            <div className="absolute top-0 left-0 h-full bg-purple-500 rounded-full transition-all duration-700 shadow-sm" style={{ width: `${percent}%` }}></div>
+          </div>
+          
+          <div className="flex items-center justify-between text-[11px] font-medium text-gray-500 mt-1.5">
+            <span className="font-bold text-gray-700">{campaign.progress}/{campaign.max}</span>
+            <span className="text-orange-600 font-bold">{campaign.timeLeft}</span>
+          </div>
+        </div>
+
+        {/* Right Side (Image & Reward) */}
+        <div className="w-[70px] h-[70px] flex items-center justify-center shrink-0">
+          <div className="w-full h-full rounded-full border-[3px] border-purple-200 flex flex-col items-center justify-center relative overflow-hidden shadow-sm bg-purple-50">
+            <div className="absolute inset-0 bg-white/40"></div>
+            <div className="relative z-10 font-black text-center text-purple-600">
+              <div className="text-[10px] leading-none tracking-tighter px-1 break-words pb-0.5">{campaign.reward}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="w-full flex flex-col bg-[#F5F7F6] min-h-screen relative font-sans pb-[100px]">
@@ -162,7 +231,19 @@ export default function MissionHubPage() {
          </div>
       </div>
 
-      {/* 3. Horizontal Multi-Filters (Dynamic Categories) */}
+      {/* 3. Campaign Section */}
+      <div className="bg-white px-4 py-4 shadow-[0_4px_12px_rgba(0,0,0,0.02)] border-b border-gray-100 w-full max-w-[480px]">
+        <h2 className="text-[16px] font-black text-gray-800 mb-3 flex items-center gap-2">
+          <span>🎯</span> แคมเปญพิเศษ
+        </h2>
+        <div className="space-y-3">
+          {campaigns.map((campaign) => (
+            <CampaignCard key={campaign.id} campaign={campaign} />
+          ))}
+        </div>
+      </div>
+
+      {/* 4. Horizontal Multi-Filters (Dynamic Categories) */}
       <div className="bg-white px-4 pb-3 shadow-[0_4px_12px_rgba(0,0,0,0.02)] border-b border-gray-100 w-full max-w-[480px] sticky top-[56px] z-[39]">
          <div className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1 pt-0.5">
             {filterCategories.map((cat) => (
@@ -199,6 +280,9 @@ export default function MissionHubPage() {
                     
                     {/* Left Side (Labels & Progress) */}
                     <div className="flex-1 flex flex-col pt-1 pr-3">
+                       <div className="flex items-center gap-2 mb-1">
+                         <div className="bg-green-100 text-green-600 text-[9px] font-bold px-2 py-0.5 rounded-full">ภารกิจ</div>
+                       </div>
                        <h3 className="font-bold text-[14.5px] text-gray-800 tracking-tight leading-snug">{item.title}</h3>
                        <p className="text-[10px] text-gray-500 mt-0.5 font-medium">{item.desc}</p>
                        
