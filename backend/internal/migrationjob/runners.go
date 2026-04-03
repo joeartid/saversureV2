@@ -440,14 +440,14 @@ func (s *Service) runRewards(ctx context.Context, mc moduleContext) (*moduleOutc
 	}
 
 	if err := s.ensureCurrency(ctx, mc.TenantID, "point", "Point", "⭐"); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ensureCurrency(point): %w", err)
 	}
 	if err := s.ensureCurrency(ctx, mc.TenantID, "diamond", "Diamond Point", "💎"); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ensureCurrency(diamond): %w", err)
 	}
 	campaignID, err := s.ensureMigrationCampaign(ctx, mc.TenantID, mc.RequestedBy)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ensureMigrationCampaign: %w", err)
 	}
 
 	rows, err := mc.Source.pool.Query(ctx,
@@ -473,14 +473,25 @@ func (s *Service) runRewards(ctx context.Context, mc moduleContext) (*moduleOutc
 			partnerCouponJSON                                     *string
 			pointCost, diamondCost, quota, quotaBalance           *int32
 			expiresAt, createdAt, updatedAt                       *time.Time
-			images                                                []string
+			imagesRaw                                             *string
 			rewardType                                            *int32
 		)
-		if err := rows.Scan(&v1ID, &name, &description, &pointCost, &diamondCost, &quota, &quotaBalance, &statusText, &expiresAt, &images, &rewardType, &goodsJSON, &couponJSON, &partnerCouponJSON, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&v1ID, &name, &description, &pointCost, &diamondCost, &quota, &quotaBalance, &statusText, &expiresAt, &imagesRaw, &rewardType, &goodsJSON, &couponJSON, &partnerCouponJSON, &createdAt, &updatedAt); err != nil {
 			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeReward, strconv.FormatInt(v1ID, 10), err.Error(), nil)
 			outcome.Failed++
 			outcome.Processed++
 			continue
+		}
+		// V1 stores images as text (PostgreSQL array literal), parse manually
+		var images []string
+		if imagesRaw != nil && *imagesRaw != "" {
+			raw := strings.Trim(*imagesRaw, "{}")
+			for _, part := range strings.Split(raw, ",") {
+				trimmed := strings.Trim(strings.TrimSpace(part), "\"")
+				if trimmed != "" {
+					images = append(images, trimmed)
+				}
+			}
 		}
 
 		currencyCode, pointValue, rewardKind, deliveryType, rewardWarnings := mapRewardShape(pointCost, diamondCost, rewardType, goodsJSON, couponJSON, partnerCouponJSON)
@@ -572,6 +583,10 @@ func (s *Service) runRewards(ctx context.Context, mc moduleContext) (*moduleOutc
 				return nil, err
 			}
 		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating v1 rewards: %w", err)
 	}
 
 	outcome.Summary["rewards_total"] = total

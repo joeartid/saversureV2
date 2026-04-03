@@ -682,15 +682,19 @@ func (s *Service) upsertEntityMap(ctx context.Context, tx pgx.Tx, tenantID, enti
 		metadata = map[string]any{}
 	}
 	raw, _ := json.Marshal(metadata)
+	var jobIDParam any
+	if jobID != "" {
+		jobIDParam = jobID
+	}
 	_, err := tx.Exec(ctx,
 		`INSERT INTO migration_entity_maps (
 			tenant_id, entity_type, source_system, source_id, target_id, latest_job_id, metadata, created_at, updated_at
 		)
 		 VALUES ($1, $2, 'v1', $3, $4, $5, $6::jsonb, NOW(), NOW())
 		 ON CONFLICT (tenant_id, entity_type, source_system, source_id)
-		 DO UPDATE SET target_id = EXCLUDED.target_id, latest_job_id = EXCLUDED.latest_job_id,
+		 DO UPDATE SET target_id = EXCLUDED.target_id, latest_job_id = COALESCE(EXCLUDED.latest_job_id, migration_entity_maps.latest_job_id),
 		               metadata = EXCLUDED.metadata, updated_at = NOW()`,
-		tenantID, entityType, sourceID, targetID, jobID, string(raw),
+		tenantID, entityType, sourceID, targetID, jobIDParam, string(raw),
 	)
 	return err
 }
