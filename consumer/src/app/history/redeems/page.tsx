@@ -14,17 +14,31 @@ import HistoryTabs from "@/components/HistoryTabs";
 
 export default function RedeemHistoryPage() {
   const [entries, setEntries] = useState<RedeemEntry[]>([]);
+  const [fulfillmentData, setFulfillmentData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn()) { setLoading(false); return; }
+    
+    // Fetch redemption data
     api.get<{ data: RedeemEntry[] }>("/api/v1/my/redeem-transactions")
       .then((d) => {
         const physical = (d.data || []).filter((e) =>
           ["shipping", "pickup"].includes(e.delivery_type || "")
         );
         setEntries(physical);
+      })
+      .catch(() => {});
+
+    // Fetch fulfillment data
+    api.get<{ data: any[] }>("/api/v1/fulfillment")
+      .then((d) => {
+        const fulfillmentMap: Record<string, any> = {};
+        (d.data || []).forEach((item) => {
+          fulfillmentMap[item.id] = item;
+        });
+        setFulfillmentData(fulfillmentMap);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -79,14 +93,23 @@ export default function RedeemHistoryPage() {
             </Card>
           ) : (
             <div className="space-y-2 stagger-children">
-              {entries.map((e) => (
-                <RedeemCard
-                  key={e.id}
-                  entry={e}
-                  expanded={expandedId === e.id}
-                  onToggleDetail={handleToggle}
-                />
-              ))}
+              {entries.map((e) => {
+                const fulfillment = fulfillmentData[e.id];
+                // Merge fulfillment status with entry
+                const enhancedEntry = {
+                  ...e,
+                  fulfillment_status: fulfillment?.fulfillment_status,
+                  tracking_number: fulfillment?.tracking_number || e.tracking
+                };
+                return (
+                  <RedeemCard
+                    key={e.id}
+                    entry={enhancedEntry}
+                    expanded={expandedId === e.id}
+                    onToggleDetail={handleToggle}
+                  />
+                );
+              })}
             </div>
           )}
         </div>

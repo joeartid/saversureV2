@@ -11,6 +11,10 @@ const statusMap: Record<
   COMPLETED: { label: "สำเร็จแล้ว", bg: "bg-green-50", text: "text-[var(--jh-green)]" },
   EXPIRED: { label: "หมดอายุ", bg: "bg-gray-100", text: "text-gray-500" },
   CANCELLED: { label: "ยกเลิก", bg: "bg-red-50", text: "text-red-600" },
+  // Fulfillment statuses
+  preparing: { label: "กำลังเตรียมจัดส่ง", bg: "bg-purple-50", text: "text-purple-700" },
+  shipped: { label: "กำลังจัดส่ง", bg: "bg-blue-50", text: "text-blue-700" },
+  delivered: { label: "จัดส่งสำเร็จ", bg: "bg-green-50", text: "text-green-700" },
   // Mission statuses
   completed: { label: "สำเร็จแล้ว", bg: "bg-green-50", text: "text-[var(--jh-green)]" },
   in_progress: { label: "กำลังดำเนินการ", bg: "bg-blue-50", text: "text-blue-700" },
