@@ -52,6 +52,18 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 		return outcome, nil
 	}
 
+	// Fast skip: if V2 already has ≥95% of V1 users migrated, skip entire module
+	var v2UserCount int64
+	_ = s.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND v1_user_id IS NOT NULL`, mc.TenantID).Scan(&v2UserCount)
+	if v2UserCount > 0 && float64(v2UserCount)/float64(userCount) >= 0.95 {
+		outcome.Processed = outcome.Estimated
+		outcome.Summary["fast_skip"] = true
+		outcome.Summary["v2_users_exist"] = v2UserCount
+		outcome.Summary["v1_users_total"] = userCount
+		outcome.Summary["message"] = "Customer data already migrated (≥95%), skipping"
+		return outcome, nil
+	}
+
 	rows, err := mc.Source.pool.Query(ctx,
 		`SELECT id, name, surname, email, telephone, line_user_id, birth_date, gender, profile_image,
 		        province, occupation, flag, status, created_at, updated_at
@@ -616,6 +628,12 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 		return nil, err
 	}
 
+	// Load existing entity maps into memory for fast duplicate check (skip DB query per row)
+	existingScans, err := s.loadExistingScanMap(ctx, mc.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("load existing scan map: %w", err)
+	}
+
 	rows, err := mc.Source.pool.Query(ctx,
 		`SELECT id, user_id, points, extra_points, province, created_at, status
 		 FROM qrcode_scan_history
@@ -626,11 +644,70 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 	}
 	defer rows.Close()
 
+	const batchSize = 500
+	type scanRow struct {
+		targetID   string
+		userID     string
+		points     int32
+		province   *string
+		createdAt  *time.Time
+		scanType   string
+		v1ID       int64
+		v1UserID   int64
+	}
+
 	var inserted, skipped int64
-	for rows.Next() {
-		if err := s.ensureNotCancelled(ctx, mc.JobID); err != nil {
-			return nil, err
+	batch := make([]scanRow, 0, batchSize)
+
+	flushBatch := func() error {
+		if len(batch) == 0 {
+			return nil
 		}
+		tx, err := s.db.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		// Batch insert scan_history
+		for _, r := range batch {
+			_, err = tx.Exec(ctx,
+				`INSERT INTO scan_history (
+					id, tenant_id, user_id, code_id, campaign_id, batch_id, points_earned, province, scanned_at, scan_type
+				) VALUES (
+					$1, $2, $3, NULL, NULL, NULL, $4, $5, COALESCE($6, NOW()), $7
+				) ON CONFLICT DO NOTHING`,
+				r.targetID, mc.TenantID, r.userID, r.points, r.province, r.createdAt, r.scanType,
+			)
+			if err != nil {
+				tx.Rollback(ctx)
+				return fmt.Errorf("insert scan %d: %w", r.v1ID, err)
+			}
+		}
+		// Batch insert entity maps
+		for _, r := range batch {
+			var jobIDParam any = mc.JobID
+			raw := fmt.Sprintf(`{"v1_user_id":%d}`, r.v1UserID)
+			_, err = tx.Exec(ctx,
+				`INSERT INTO migration_entity_maps (
+					tenant_id, entity_type, source_system, source_id, target_id, latest_job_id, metadata, created_at, updated_at
+				) VALUES ($1, $2, 'v1', $3, $4, $5, $6::jsonb, NOW(), NOW())
+				ON CONFLICT (tenant_id, entity_type, source_system, source_id) DO NOTHING`,
+				mc.TenantID, EntityTypeScan, strconv.FormatInt(r.v1ID, 10), r.targetID, jobIDParam, raw,
+			)
+			if err != nil {
+				tx.Rollback(ctx)
+				return fmt.Errorf("insert entity map scan %d: %w", r.v1ID, err)
+			}
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return err
+		}
+		inserted += int64(len(batch))
+		outcome.Success += int64(len(batch))
+		batch = batch[:0]
+		return nil
+	}
+
+	for rows.Next() {
 		var (
 			v1ID      int64
 			v1UserID  *int64
@@ -641,72 +718,97 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 			status    *int32
 		)
 		if err := rows.Scan(&v1ID, &v1UserID, &points, &extra, &province, &createdAt, &status); err != nil {
-			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeScan, strconv.FormatInt(v1ID, 10), err.Error(), nil)
 			outcome.Failed++
 			outcome.Processed++
 			continue
 		}
-		if _, found, err := s.getEntityMap(ctx, mc.TenantID, EntityTypeScan, strconv.FormatInt(v1ID, 10)); err == nil && found {
+		outcome.Processed++
+
+		// Fast in-memory duplicate check
+		if existingScans[v1ID] {
 			skipped++
-			outcome.Processed++
 			continue
 		}
 		if v1UserID == nil {
 			skipped++
-			outcome.Processed++
-			outcome.Warnings = appendLimited(outcome.Warnings, fmt.Sprintf("scan %d skipped because user_id is null", v1ID))
 			continue
 		}
 		targetUserID, ok := userMap[*v1UserID]
 		if !ok {
 			skipped++
-			outcome.Processed++
-			outcome.Warnings = appendLimited(outcome.Warnings, fmt.Sprintf("scan %d skipped because user %d is missing", v1ID, *v1UserID))
 			continue
 		}
-		targetID := newUUID()
-		tx, err := s.db.Begin(ctx)
-		if err != nil {
-			return nil, err
+
+		batch = append(batch, scanRow{
+			targetID:  newUUID(),
+			userID:    targetUserID,
+			points:    int32(intOrDefault(points, 0) + intOrDefault(extra, 0)),
+			province:  nullableString(province),
+			createdAt: createdAt,
+			scanType:  mapScanStatus(status),
+			v1ID:      v1ID,
+			v1UserID:  *v1UserID,
+		})
+
+		if len(batch) >= batchSize {
+			if err := flushBatch(); err != nil {
+				s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeScan, "batch", err.Error(), nil)
+				outcome.Failed += int64(len(batch))
+				batch = batch[:0]
+			}
 		}
-		_, err = tx.Exec(ctx,
-			`INSERT INTO scan_history (
-				id, tenant_id, user_id, code_id, campaign_id, batch_id, points_earned, province, scanned_at, scan_type
-			) VALUES (
-				$1, $2, $3, NULL, NULL, NULL, $4, $5, COALESCE($6, NOW()), $7
-			)`,
-			targetID, mc.TenantID, targetUserID, intOrDefault(points, 0)+intOrDefault(extra, 0), nullableString(province), createdAt, mapScanStatus(status),
-		)
-		if err == nil {
-			err = s.upsertEntityMap(ctx, tx, mc.TenantID, EntityTypeScan, strconv.FormatInt(v1ID, 10), targetID, mc.JobID, map[string]any{
-				"v1_user_id": *v1UserID,
-			})
-		}
-		if err != nil {
-			tx.Rollback(ctx)
-			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeScan, strconv.FormatInt(v1ID, 10), err.Error(), nil)
-			outcome.Failed++
-			outcome.Processed++
-			continue
-		}
-		if err := tx.Commit(ctx); err != nil {
-			return nil, err
-		}
-		inserted++
-		outcome.Success++
-		outcome.Processed++
-		if outcome.Processed%200 == 0 {
+
+		if outcome.Processed%5000 == 0 {
+			if err := s.ensureNotCancelled(ctx, mc.JobID); err != nil {
+				return nil, err
+			}
 			if err := s.updateModuleProgress(ctx, mc.JobID, mc.ModuleName, "migrating_scan_history", *outcome); err != nil {
 				return nil, err
 			}
 		}
 	}
 
+	// Flush remaining
+	if len(batch) > 0 {
+		if err := flushBatch(); err != nil {
+			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeScan, "batch_final", err.Error(), nil)
+			outcome.Failed += int64(len(batch))
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating v1 scan history: %w", err)
+	}
+
 	outcome.Summary["scan_history_total"] = total
 	outcome.Summary["scan_history_inserted"] = inserted
 	outcome.Summary["scan_history_skipped"] = skipped
-	outcome.Summary["mode"] = "historical_snapshot"
+	outcome.Summary["mode"] = "historical_snapshot_batched"
 	return outcome, nil
+}
+
+// loadExistingScanMap loads all existing scan entity maps into memory for fast duplicate check
+func (s *Service) loadExistingScanMap(ctx context.Context, tenantID string) (map[int64]bool, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT source_id FROM migration_entity_maps
+		 WHERE tenant_id = $1 AND entity_type = $2 AND source_system = 'v1'`,
+		tenantID, EntityTypeScan,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := map[int64]bool{}
+	for rows.Next() {
+		var sourceID string
+		if err := rows.Scan(&sourceID); err != nil {
+			return nil, err
+		}
+		if id, err := strconv.ParseInt(sourceID, 10, 64); err == nil {
+			result[id] = true
+		}
+	}
+	return result, nil
 }
 
 func (s *Service) runRedeemHistory(ctx context.Context, mc moduleContext) (*moduleOutcome, error) {
