@@ -1,233 +1,174 @@
 # Migration Log: saversurejulaherb (V1) → saversure (V2)
 
-**วันที่ดำเนินการ:** 2026-04-03 ~ 2026-04-04
+**วันที่ดำเนินการ:** 2026-04-03 ~ 2026-04-05
 **ผู้ดำเนินการ:** Super Admin + Claude AI Assistant
 **Branch:** `dev/bugfixes-and-setup`
-**V1 DB:** `saversurejulaherb` @ localhost:5432 (12 GB, 67 tables)
-**V2 DB:** `saversure` @ localhost:5433 Docker (schema: 41 migrations)
+**สถานะ:** ✅ **Phase 1 เสร็จสมบูรณ์**
 
 ---
 
-## สถานะล่าสุด (2026-04-04 02:30+07:00)
+## ผลลัพธ์สุดท้าย
 
-| รายการ | ค่า |
-|--------|-----|
-| **V2 DB Size** | **1,763 MB** (จาก V1 12 GB → ลด 85%) |
-| **scan_history กำลังรัน** | 303,915 / 12,094,802 (~2.5%) |
-| **ประมาณเวลาที่เหลือ** | ~50 ชม. (scan_history ช้า ~3.6K/นาที) |
+| | V1 (เก่า) | V2 (ใหม่) | ลดลง |
+|---|---:|---:|---:|
+| **DB Size** | 12 GB | **6.1 GB** | 49% |
+| Schema Migrations | - | 42 (001-041) | - |
 
-### สรุปข้อมูลใน V2 ตอนนี้
+### ข้อมูลที่ Migrate สำเร็จ
 
-| ข้อมูล | จำนวน | หมายเหตุ |
-|--------|------:|----------|
-| Users (total) | 803,210 | |
-| Users (V1 migrated) | 803,195 | จาก V1 819,185 |
-| User Addresses | 40,911 | จาก V1 41,577 |
-| Point Ledger (V1) | 1,241,293 | |
-| Products | 160 | 149 จาก V1 + 11 seed |
-| Rewards | 163 | 153 จาก V1 + 10 seed |
-| Coupon Codes | 1,100 | imported จาก V1 JSONB |
-| Campaigns | 2 | 1 seed + 1 legacy_migration |
-| Scan History | 303,915 | **กำลัง migrate (2.5% ของ 12M)** |
-| Reward Reservations | 10 | seed data (ยังไม่ migrate redeem) |
-| Entity Maps | 345,087 | tracking V1→V2 ID |
-| Schema Migrations | 41 | ครบ (001-040) |
+| ข้อมูล | V1 | V2 | Success Rate |
+|--------|---:|---:|:-----------:|
+| Users | 819,185 | 803,195 | 98% |
+| Addresses | 41,577 | 40,911 | 98.4% |
+| Point Ledger | - | 1,241,340 | ✅ |
+| Products | 176 | 149 (กรอง 23 + fail 4) | 85% |
+| Rewards | 154 | 153 | 99.4% |
+| Coupon Codes | - | 1,100 | ✅ |
+| Scan History | 12,094,802 | 11,872,062 | 98.2% |
+| Redeem History | 77,502 | 76,033 | 98.1% |
 
-### Entity Maps Breakdown
+### ข้อมูลที่ไม่ Migrate (ตั้งใจตัดออก)
 
-| Entity Type | จำนวน |
-|-------------|------:|
-| scan_history | 303,987 |
-| address | 40,910 |
-| reward | 153 |
-| product | 149 |
-| campaign | 1 |
+| ข้อมูล | V1 ขนาด/จำนวน | เหตุผล |
+|--------|-------------:|--------|
+| QR Codes | 41.5M rows / 2.7 GB | V2 ใช้ HMAC stateless |
+| Unregistered Scans | 5.1M rows / 2.1 GB | ไม่จำเป็น |
+| JSONB location/device_info | ~3-4 GB | V2 เก็บ latitude/longitude + province แทน |
+| FB integration | 176 คน | 0.02% ไม่คุ้มค่า |
 
-### V2 Table Sizes (Top 10)
+### ข้อมูลที่เลือกไม่ Migrate (Phase 2 ถ้าต้องการ)
 
-| Table | Size | Rows |
-|-------|-----:|-----:|
-| users | 802 MB | 803,210 |
-| point_ledger | 456 MB | 1,241,340 |
-| user_roles | 192 MB | ~803K |
-| migration_entity_maps | 153 MB | 345,087 |
-| scan_history | 124 MB | 303,915 (กำลังเพิ่ม) |
-| user_addresses | 16 MB | 40,911 |
-| migration_job_errors | 15 MB | 48,009 |
+| ข้อมูล V1 | จำนวน | เหตุผล |
+|-----------|------:|--------|
+| Lucky Draw Campaigns | 57 | ต้องสร้าง runner ใหม่ (~2-3 วัน) |
+| Lucky Draw Histories | 330,967 | ประวัติเก่า ไม่เชื่อมกับ V2 |
+| News | 36 | สร้าง content ใหม่ง่ายกว่า |
+| Support Cases | 3,369 | เคสเก่าปิดแล้ว |
+| Support Messages | 11,322 | ข้อความในเคสเก่า |
+| User Flag Histories | 15,006 | V2 เก็บ flag ปัจจุบันใน users.customer_flag แล้ว |
+| Partner Shops | 1,237 | ต้องตัดสินใจว่าใช้ใน V2 ไหม |
+| Staffs | 22 | V2 ใช้ user_roles สร้างใหม่ได้ |
+| Settings | 7 | V2 ใช้ tenant.settings (JSONB) แทน |
+| Donations/Histories | 0 | V1 ว่างเปล่า |
 
 ---
 
-## สิ่งที่ทำทั้งหมด (Timeline)
+## Timeline ทั้งหมด
 
 ### Phase 0: เตรียมการ (2026-04-03 14:00-15:00)
 
-| # | งาน | ไฟล์ | Commit |
-|---|------|------|--------|
-| 1 | ลบ .exe ออกจาก git + เพิ่ม .gitignore | `.gitignore`, `backend/*.exe` | `e57bff1` |
-| 2 | แก้ API_BASE frontend fallback | `frontend/src/lib/api.ts` บรรทัด 1 | `98e40ee` |
-| 3 | Pull branch `dev/bugfixes-and-setup` จาก remote | - | - |
-| 4 | ตรวจสอบ DB port mismatch (.env vs docker-compose) | `backend/.env` | - |
+| งาน | Commit |
+|------|--------|
+| ลบ .exe ออกจาก git + เพิ่ม .gitignore | `e57bff1` |
+| แก้ API_BASE frontend fallback | `98e40ee` |
+| Pull branch dev/bugfixes-and-setup | - |
+| Schema Migration 038-040 | - |
 
-### Phase 1: Schema Migration (2026-04-03 15:00-15:30)
+### Phase 1: Data Migration (2026-04-03 15:00 ~ 2026-04-04 10:30)
 
-| # | งาน | รายละเอียด |
-|---|------|-----------|
-| 1 | สร้าง Baseline Snapshot | `backup/v2_dev_baseline.dump` |
-| 2 | รัน `make migrate-up` | apply 038, 039, 040 |
-| 3 | แก้ migration 039 | เพิ่ม `IF NOT EXISTS` เพราะ columns มีอยู่แล้ว |
-| 4 | Restart PM2 `saversure-api-prod` | ตรวจว่า API ทำงานปกติ |
+| Module | เวลา | ผลลัพธ์ |
+|--------|------|---------|
+| Dry Run | 1 วินาที | ✅ estimated 1.6M items |
+| **Customer** (Job 1) | 3 ชม. 19 นาที | 179K success (interrupted) |
+| **Customer** (Retry) | 1 ชม. 33 นาที | ✅ 1.3M success |
+| **Product** | < 1 นาที | ✅ 149 inserted |
+| **Rewards** (5 attempts) | ~15 นาที | ✅ 153 inserted + 1,100 coupons |
+| **Scan History** | ~3 ชม. | ✅ 11.2M inserted (0 failed!) |
+| **Redeem History** | ~7 นาที | ✅ 76K inserted |
 
-### Phase 2: เตรียม Data Migration (2026-04-03 15:30-16:30)
+### Phase 2: Optimization & Cleanup (2026-04-04 ~ 2026-04-05)
 
-| # | งาน | รายละเอียด |
-|---|------|-----------|
-| 1 | เพิ่ม `LEGACY_V1_DB_*` ใน `backend/.env` | ชี้ไป V1 DB localhost:5432 |
-| 2 | เพิ่ม `LEGACY_V1_DB_*` ใน `Production/saversure-api/.env` | PM2 อ่าน config จากที่นี่ |
-| 3 | Restart API + ตรวจ `/migration-jobs/config/source` | ยืนยันว่าเชื่อมต่อ V1 ได้ |
-| 4 | Dry Run ทดสอบ (customer, product, rewards) | สำเร็จ 100%, estimated 1.6M items |
-
-### Phase 3: Data Migration — Customer (2026-04-03 16:37-01:02+1)
-
-| Job | Mode | Status | Success | Failed | เวลา |
-|-----|------|--------|--------:|-------:|------|
-| `8f2d4cc1` | execute | completed (11%) | 179,235 | 1,165 | 3 ชม. 19 นาที (interrupted) |
-| `f5e798f0` | execute (retry) | **completed 100%** | 1,326,464 | 16,000 | 1 ชม. 33 นาที |
-
-**ผลลัพธ์:**
-- Users: 803,195 migrated (จาก 819,185)
-- Addresses: 40,910 migrated (จาก 41,577)
-- Point Balances: 1,241,293 entries สร้างใหม่
-- Placeholder emails: 15,989 users
-
-### Phase 4: Data Migration — Product + Rewards (2026-04-03 01:49-02:03+1)
-
-**Product:**
-| Job | Status | Inserted | Skipped | Failed |
-|-----|--------|-------:|-------:|-------:|
-| `6f107d9a` | completed (product only) | 149 | 23 | 4 |
-
-**Rewards (5 attempts — 4 failed จาก bugs, 1 สำเร็จ):**
-| Job | Status | Error |
-|-----|--------|-------|
-| `6f107d9a` | ❌ failed | `images` type mismatch (text vs []string) |
-| `d5c922bc` | ❌ failed | UUID empty string |
-| `05a34c6a` | ❌ failed | UUID empty string |
-| `8bf2ff32` | ❌ failed | UUID empty string |
-| `a8581fe4` | ❌ failed | UUID empty string (with better error msg) |
-| **`3783a49d`** | **✅ completed** | 153 inserted, 1,100 coupons |
-
-### Phase 5: Data Migration — Scan History (กำลังรัน)
-
-| Job | Status | Progress | Success | เริ่ม |
-|-----|--------|----------|--------:|------|
-| `22c49ec3` | **running** | 2.5% (303K/12M) | 1,148,075 | 2026-04-04 01:32 |
-
-**ประมาณเวลาที่เหลือ:** ~50 ชม. (ช้าเพราะต้อง lookup user map ทุก row)
+| งาน | ผลลัพธ์ |
+|------|---------|
+| Batch scan_history (500 rows/tx) | เร็วขึ้น 16 เท่า |
+| Fast customer skip (≥95%) | < 1 วินาทีแทน 40 นาที |
+| ลบ entity_maps scan_history | ลด DB 5 GB |
+| สร้าง Migration 041 | rewards constraint >= 0 |
+| สร้าง Baseline Snapshot ใหม่ | `backup/v2_dev_baseline.dump` |
 
 ---
 
-## Bugs ที่พบและแก้ไข (5 จุด)
+## Bugs ที่พบและแก้ไข (7 จุด)
 
-### Bug 1: `rewards.images` column type mismatch
-- **ปัญหา:** V1 `rewards.images` = `text` แต่ Go scan เป็น `[]string` → pgx fail ทันที → module 0%
-- **ไฟล์:** `backend/internal/migrationjob/runners.go` (~บรรทัด 476)
-- **แก้ไข:** เปลี่ยนเป็น `*string` แล้ว parse `{url1,url2}` เป็น `[]string` เอง
+### Bug 1: API_BASE frontend เป็น string ว่าง
+- **ไฟล์:** `frontend/src/lib/api.ts` บรรทัด 1
+- **Commit:** `98e40ee`
+
+### Bug 2: rewards `images` column type mismatch
+- **ปัญหา:** V1 `text` แต่ Go scan เป็น `[]string`
+- **ไฟล์:** `backend/internal/migrationjob/runners.go`
 - **Commit:** `3ac67d6`
 
-### Bug 2: `upsertEntityMap` empty string UUID
-- **ปัญหา:** `ensureMigrationCampaign()` ส่ง `""` เป็น jobID → UUID column reject → `ERROR: invalid input syntax for type uuid: ""`
-- **ไฟล์:** `backend/internal/migrationjob/service.go` (~บรรทัด 680)
-- **แก้ไข:** ถ้า `jobID == ""` ส่ง `nil` (NULL) + ใช้ `COALESCE` ใน SQL
+### Bug 3: `upsertEntityMap` empty string UUID
+- **ปัญหา:** ส่ง `""` เป็น jobID → UUID column reject
+- **ไฟล์:** `backend/internal/migrationjob/service.go`
 - **Commit:** `3ac67d6`
 
-### Bug 3: `rewards_point_cost_check` constraint
-- **ปัญหา:** V1 มี 2 rewards ที่ point = 0 → ชน `CHECK (point_cost > 0)`
-- **แก้ไข:** `ALTER TABLE rewards` เปลี่ยนเป็น `CHECK (point_cost >= 0)`
-- **หมายเหตุ:** แก้ตรง DB เท่านั้น ยังไม่อัปเดต migration SQL (ควรเพิ่ม migration 041)
+### Bug 4: `rewards_point_cost_check` constraint
+- **ปัญหา:** V1 มี 2 rewards ที่ point = 0
+- **แก้:** constraint `>= 0` + migration 041
+- **Commit:** `5a69d26`
 
-### Bug 4: `runRewards` ไม่มี `rows.Err()` check
-- **ปัญหา:** หลัง loop ไม่เช็ค `rows.Err()` → debug ยากเมื่อ iteration fail
-- **ไฟล์:** `backend/internal/migrationjob/runners.go` (หลัง rewards loop)
-- **แก้ไข:** เพิ่ม `rows.Err()` check
+### Bug 5: `runRewards` ไม่มี `rows.Err()` check
 - **Commit:** `3ac67d6`
 
-### Bug 5: Error messages ไม่ระบุจุดที่ fail
-- **ปัญหา:** `ensureCurrency` / `ensureMigrationCampaign` return error ไม่มี context
-- **ไฟล์:** `backend/internal/migrationjob/runners.go` (ใน `runRewards`)
-- **แก้ไข:** เพิ่ม `fmt.Errorf` wrap ด้วยชื่อ function
+### Bug 6: Error messages ไม่ระบุจุดที่ fail
 - **Commit:** `3ac67d6`
 
----
-
-## งานอื่นที่ทำ (ไม่ใช่ migration)
-
-| # | งาน | รายละเอียด |
-|---|------|-----------|
-| 1 | แก้ API_BASE frontend | `api.ts` fallback เป็น `""` → เปลี่ยนเป็น `http://localhost:30400` |
-| 2 | ลบ .exe จาก git | 3 binary files (api.exe, saversure-api.exe, saversure.exe) ~72 MB |
-| 3 | หยุด Docker containers ไม่จำเป็น | `webootsx-db-tiktok`, `minio` (ลด CPU) |
-| 4 | Restart Docker Desktop | แก้ปัญหา `com.docker.backend` กิน CPU 51% → ลดเหลือ ~19% |
-| 5 | ตรวจสอบ admin login 400/401 | สาเหตุ: API_BASE ว่าง + credentials ถูกต้อง (admin@saversure.com / Admin123!) |
+### Bug 7: scan_history ช้ามาก (50 ชม.)
+- **สาเหตุ:** 1 row/transaction + DB query duplicate check ทุก row
+- **แก้:** batch 500 rows/tx + in-memory duplicate map + fast customer skip
+- **ผลลัพธ์:** เร็วขึ้น 16 เท่า (3.6K → 57K rows/นาที)
+- **Commit:** `5a69d26`
 
 ---
 
-## Error Summary (ทั้งหมด 48,009 error records)
+## Commits ทั้งหมด (บน dev/bugfixes-and-setup)
 
-| Module | Error Type | จำนวน | สาเหตุ |
-|--------|-----------|------:|--------|
-| customer | transaction aborted | 31,978 | duplicate key → cascade abort |
-| customer (address) | invalid UTF8 | 20 | Thai text encoding เสีย |
-| customer (user) | duplicate phone | 2 | phone ซ้ำกัน |
-| product | invalid UTF8 | 4 | Thai text encoding เสีย |
-| rewards | invalid UTF8 | 1 | Thai text encoding เสีย |
-| scan_history | (กำลังรัน) | TBD | |
+| Commit | Message |
+|--------|---------|
+| `e57bff1` | chore: remove Go binaries from git and add *.exe to .gitignore |
+| `98e40ee` | fix: restore API_BASE fallback to localhost:30400 for frontend |
+| `3ac67d6` | fix(migration): resolve rewards module bugs + add migration log |
+| `5a69d26` | feat(migration): batch scan_history, fast customer skip, migration 041 |
 
 ---
 
-## Commits ที่ push ไปแล้ว
+## Migration Jobs History (13 jobs)
 
-| Commit | Message | ไฟล์ที่เปลี่ยน |
-|--------|---------|---------------|
-| `e57bff1` | chore: remove Go binaries from git and add *.exe to .gitignore | .gitignore |
-| `98e40ee` | fix: restore API_BASE fallback to localhost:30400 for frontend | frontend/src/lib/api.ts |
-| `3ac67d6` | fix(migration): resolve rewards module bugs + add migration log | runners.go, service.go, 039.sql, MIGRATION_LOG |
+| # | Mode | Modules | Status | Success | Failed |
+|---|------|---------|:------:|--------:|-------:|
+| 1 | dry_run | customer,product,rewards | ✅ | 0 | 0 |
+| 2 | execute | customer | ✅ (11%) | 179,235 | 1,165 |
+| 3 | execute | customer (retry) | ✅ | 1,326,464 | 16,000 |
+| 4 | execute | product,rewards | ❌ | 149 | 4 |
+| 5-8 | execute | rewards | ❌ x4 | 0 | 0 |
+| 9 | execute | rewards | ✅ | 153 | 1 |
+| 10 | execute | scan_history (slow) | ❌ cancelled | 303K | 0 |
+| 11 | execute | scan_history (slow v2) | ❌ cancelled | - | - |
+| 12 | execute | **scan_history (batch)** | **✅** | **11,244,988** | **0** |
+| 13 | execute | **redeem_history** | **✅** | **76,176** | **1** |
 
 ---
 
-## Infrastructure Status
+## Infrastructure
 
-### Docker Containers
-| Container | Status | Port |
-|-----------|--------|------|
-| saversure-postgres | ✅ healthy | 5433 |
-| saversure-redis | ✅ healthy | 6379 |
-| saversure-nats | ✅ healthy | 4222 |
-| saversure-minio | ✅ healthy | 59300 |
-| minio (other) | ⚠️ running (ไม่จำเป็น) | 9500 |
-| webootsx-db-tiktok | ⏹ stopped | - |
-
-### PM2 Services
 | Service | Status | Port |
-|---------|--------|------|
-| saversure-api-prod | ✅ online | 30400 |
-| saversure-admin-prod | ✅ online | 30401 |
-| saversure-consumer-prod | ✅ online | 30403 |
-
-### Config Files ที่แก้ไข (ไม่ได้ commit)
-| ไฟล์ | การเปลี่ยนแปลง |
-|------|---------------|
-| `backend/.env` | เพิ่ม LEGACY_V1_DB_* |
-| `D:\AI_WORKSPACE\Production\saversure-api\.env` | เพิ่ม LEGACY_V1_DB_* |
+|---------|:------:|------|
+| saversure-postgres | ✅ | 5433 |
+| saversure-redis | ✅ | 6379 |
+| saversure-nats | ✅ | 4222 |
+| saversure-minio | ✅ | 59300 |
+| saversure-api-prod (PM2) | ✅ | 30400 |
+| saversure-admin-prod (PM2) | ✅ | 30401 |
+| saversure-consumer-prod (PM2) | ✅ | 30403 |
 
 ---
 
-## สิ่งที่ต้องทำต่อ
+## ต้องทำต่อ (Phase 2)
 
-- [ ] รอ **scan_history** เสร็จ (~50 ชม.)
-- [ ] รัน **redeem_history** module (77K rows)
-- [ ] สร้าง migration 041 แก้ `rewards_point_cost_check` ถาวร
-- [ ] สร้าง Baseline Snapshot ใหม่หลังเสร็จทั้งหมด
-- [ ] อัปเดต Migration Log ครั้งสุดท้าย + commit
-- [ ] ทดสอบ frontend + consumer app
-- [ ] พิจารณา Phase 2: lucky_draw, support_cases, donations
-- [ ] พิจารณาเพิ่ม chunk_size หรือ batch insert เพื่อเร่ง scan_history
+- [ ] ทดสอบ Frontend Consumer (LINE login, คะแนน, แลกรางวัล)
+- [ ] ทดสอบ Admin Dashboard (จำนวนลูกค้า, สินค้า, scan)
+- [ ] พิจารณา Lucky Draw migration (57 campaigns + 330K histories)
+- [ ] พิจารณา Partner Shops migration (1,237 ร้าน)
+- [ ] พิจารณา News migration (36 บทความ)
