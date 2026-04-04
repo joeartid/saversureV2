@@ -10,6 +10,7 @@ import { api, ApiError } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { mediaUrl } from "@/lib/media";
 
 interface RewardDetail {
   id: string;
@@ -87,13 +88,6 @@ const deliveryLabel: Record<string, { label: string; icon: string; desc: string 
   digital: { label: "ดิจิทัล", icon: "📱", desc: "รับทางดิจิทัลทันที" },
   ticket: { label: "ตั๋ว/บัตรเข้างาน", icon: "🎟️", desc: "รับ QR Code เป็นตั๋วเข้าร่วมงาน" },
   none: { label: "ติดต่อรับสินค้า", icon: "📋", desc: "ทีมงานจะติดต่อกลับเพื่อนัดรับสินค้า" },
-};
-
-const mediaUrl = (url?: string) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
 };
 
 const emptyAddressForm: AddressFormState = {

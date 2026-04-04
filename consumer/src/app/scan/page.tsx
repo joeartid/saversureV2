@@ -23,6 +23,7 @@ import {
   resolvePendingCodeFromSearch,
   setPendingScan,
 } from "@/lib/pendingScan";
+import { mediaUrl } from "@/lib/media";
 
 const QrScanner = dynamic(() => import("@/components/QrScanner"), { ssr: false });
 
@@ -160,12 +161,6 @@ function ScanPageInner() {
       if (cParam) return cParam;
     } catch { /* Not a URL */ }
     return text;
-  };
-
-  const mediaUrl = (url?: string | null) => {
-    if (!url) return null;
-    if (url.startsWith("http")) return url;
-    return `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400"}/media/${url}`;
   };
 
   const handleQrScan = (decodedText: string) => {

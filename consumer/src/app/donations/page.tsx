@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
+import { mediaUrl } from "@/lib/media";
 
 interface DonationEntry {
   id: string;
@@ -79,13 +80,6 @@ export default function DonationHistoryPage() {
     }
     groups[groups.length - 1].items.push(e);
   }
-
-  const mediaUrl = (url?: string | null) => {
-    if (!url) return null;
-    if (url.startsWith("http")) return url;
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-    return `${base}/media/${url}`;
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">

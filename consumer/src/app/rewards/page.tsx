@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { mediaUrl } from "@/lib/media";
 
 interface RewardItem {
   id: string;
@@ -46,13 +47,6 @@ const deliveryLabel: Record<string, string> = {
   digital: "ดิจิทัล",
   ticket: "ตั๋ว/บัตรเข้างาน",
   none: "",
-};
-
-const mediaUrl = (url?: string) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
 };
 
 export default function RewardsPage() {

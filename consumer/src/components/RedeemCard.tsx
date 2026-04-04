@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import StatusBadge from "./StatusBadge";
+import { mediaUrl } from "@/lib/media";
 
 const QRCodeSVG = dynamic(
   () => import("qrcode.react").then((m) => m.QRCodeSVG),
@@ -32,13 +33,6 @@ export interface RedeemEntry {
   fulfillment_status?: string;
   tracking_number?: string | null;
 }
-
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 const deliveryLabels: Record<string, string> = {
   shipping: "จัดส่งถึงบ้าน",

@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
+import { mediaUrl } from "@/lib/media";
 
 interface NewsItem {
   id: string;
@@ -21,13 +22,6 @@ interface NewsItem {
   published_at: string | null;
   created_at: string;
 }
-
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "";

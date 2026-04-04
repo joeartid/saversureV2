@@ -14,6 +14,7 @@ import {
   getPrimaryBalance,
   getSecondaryBalances,
 } from "@/lib/currency";
+import { mediaUrl } from "@/lib/media";
 
 /* ───────── Types ───────── */
 interface RewardItem {
@@ -69,14 +70,6 @@ interface LuckyDraw {
   end_date: string | null;
 }
 
-
-/* ───────── Helpers ───────── */
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 /* ═══════════════════════════════════
    ListItemCard — ตาม mockup จริงที่ run

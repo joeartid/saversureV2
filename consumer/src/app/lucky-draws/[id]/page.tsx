@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
+import { mediaUrl } from "@/lib/media";
 
 interface LuckyDraw {
   id: string;
@@ -18,13 +19,6 @@ interface LuckyDraw {
   status: string;
   end_date: string | null;
 }
-
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

@@ -8,6 +8,7 @@ import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
+import { mediaUrl } from "@/lib/media";
 
 const badgeColors = [
   { border: "border-[#f44336]", text: "text-[#f44336]", label: "ส่วนลด" },
@@ -35,13 +36,6 @@ interface MissionProgress {
   progress: number;
   completed_at?: string | null;
 }
-
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 export default function MissionsPage() {
   const [missions, setMissions] = useState<Mission[]>([]);

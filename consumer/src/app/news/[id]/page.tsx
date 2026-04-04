@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api";
+import { mediaUrl } from "@/lib/media";
 
 interface NewsItem {
   id: string;
@@ -18,13 +19,6 @@ interface NewsItem {
   type: string;
   created_at: string;
 }
-
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 export default function NewsDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);

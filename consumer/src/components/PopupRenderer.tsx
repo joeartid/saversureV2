@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import DOMPurify from "dompurify";
 import { api } from "@/lib/api";
 import { useTenant } from "@/components/TenantProvider";
+import { mediaUrl } from "@/lib/media";
 
 interface PopupData {
   id: string;
@@ -42,12 +43,6 @@ function markSeen(popup: PopupData) {
     localStorage.setItem(key, "1");
   }
 }
-
-const mediaUrl = (url: string) => {
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 export default function PopupRenderer() {
   const [popup, setPopup] = useState<PopupData | null>(null);

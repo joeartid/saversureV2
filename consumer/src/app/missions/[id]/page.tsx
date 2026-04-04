@@ -10,6 +10,7 @@ import StatusBadge from "@/components/StatusBadge";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
+import { mediaUrl } from "@/lib/media";
 
 interface Mission {
   id: string;
@@ -43,13 +44,6 @@ interface ConditionRule {
   target?: number;
   [key: string]: unknown;
 }
-
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:30400";
-  return `${base}/media/${url}`;
-};
 
 function parseRules(conditionStr: string): string[] {
   try {
