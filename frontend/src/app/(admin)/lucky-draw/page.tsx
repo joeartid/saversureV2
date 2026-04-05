@@ -355,7 +355,7 @@ export default function LuckyDrawPage() {
                 </div>
               </div>
               {campaign.description && (
-                <p className="text-[14px] text-[var(--md-on-surface-variant)] mt-4">{campaign.description}</p>
+                <div className="text-[14px] text-[var(--md-on-surface-variant)] mt-4 max-h-[200px] overflow-y-auto" dangerouslySetInnerHTML={{ __html: campaign.description }} />
               )}
             </div>
 
