@@ -893,6 +893,13 @@ func main() {
 		publicPageConfigRoutes.GET("/:slug", pageConfigHandler.GetPublic)
 	}
 
+	// Tiers API (public - consumer tier badges/progress)
+	publicTierRoutes := api.Group("/public/tiers")
+	publicTierRoutes.Use(mw.TenantFromHeader())
+	{
+		publicTierRoutes.GET("", tierHandler.List)
+	}
+
 	// Consumer Profile (self)
 	profileRoutes := tenanted.Group("/profile")
 	{

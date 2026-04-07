@@ -46,7 +46,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
   useEffect(() => {
     const li = isLoggedIn();
     setLoggedIn(li);
-    if (open && li) {
+    if (li) {
       api.get<{ data: MultiBalance[] }>("/api/v1/my/balances")
         .then((d) => setBalances(d.data ?? []))
         .catch(() => {});
@@ -62,7 +62,7 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
   const displayName =
     profile?.display_name ||
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-    "Future";
+    "ผู้เยี่ยมชม";
 
   const navigate = (href: string) => {
     router.push(href);
