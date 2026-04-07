@@ -293,7 +293,7 @@ export default function MissionDetailPage({ params }: { params: Promise<{ id: st
                 </div>
                 <div>
                   <p className="text-lg font-bold text-[var(--jh-green)]">
-                    +{mission.reward_points.toLocaleString()} {mission.reward_currency === "point" ? "แต้ม" : mission.reward_currency}
+                    +{(mission.reward_points ?? 0).toLocaleString()} {mission.reward_currency === "point" ? "แต้ม" : mission.reward_currency}
                   </p>
                   {mission.reward_type === "badge" && (
                     <p className="text-xs text-muted-foreground">+ Badge พิเศษ</p>
