@@ -886,6 +886,13 @@ func main() {
 		publicNewsRoutes.GET("/:id", newsHandler.GetByID)
 	}
 
+	// Page Config API (public - consumer page builder rendering)
+	publicPageConfigRoutes := api.Group("/public/page-config")
+	publicPageConfigRoutes.Use(mw.TenantFromHeader())
+	{
+		publicPageConfigRoutes.GET("/:slug", pageConfigHandler.GetPublic)
+	}
+
 	// Consumer Profile (self)
 	profileRoutes := tenanted.Group("/profile")
 	{

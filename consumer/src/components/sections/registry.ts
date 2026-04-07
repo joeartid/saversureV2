@@ -10,6 +10,12 @@ const RichText = dynamic(() => import("./RichText"));
 const RecentNews = dynamic(() => import("./RecentNews"));
 const Spacer = dynamic(() => import("./Spacer"));
 const FeatureList = dynamic(() => import("./FeatureList"));
+const ProfileHeaderCard = dynamic(() => import("./ProfileHeaderCard"));
+const ProfileTierProgress = dynamic(() => import("./ProfileTierProgress"));
+const ProfilePointsCard = dynamic(() => import("./ProfilePointsCard"));
+const ProfileWarningAlert = dynamic(() => import("./ProfileWarningAlert"));
+const ProfileMenuGroup = dynamic(() => import("./ProfileMenuGroup"));
+const ProfileLogoutButton = dynamic(() => import("./ProfileLogoutButton"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -22,6 +28,12 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   recent_news: RecentNews,
   spacer: Spacer,
   feature_list: FeatureList,
+  profile_header_card: ProfileHeaderCard,
+  profile_tier_progress: ProfileTierProgress,
+  profile_points_card: ProfilePointsCard,
+  profile_warning_alert: ProfileWarningAlert,
+  profile_menu_group: ProfileMenuGroup,
+  profile_logout_button: ProfileLogoutButton,
 };
 
 export interface SectionDefinition {
@@ -80,5 +92,35 @@ export const sectionMeta: Record<
     label: "Feature List",
     icon: "📋",
     description: "รายการ feature พร้อมไอคอนและคำอธิบาย",
+  },
+  profile_header_card: {
+    label: "Profile Header Card",
+    icon: "👤",
+    description: "การ์ดแสดงโปรไฟล์ + tier badge + verified badge",
+  },
+  profile_tier_progress: {
+    label: "Tier Progress",
+    icon: "🏆",
+    description: "แถบความคืบหน้า tier ระดับสมาชิก",
+  },
+  profile_points_card: {
+    label: "Points Card",
+    icon: "💰",
+    description: "การ์ดแสดงแต้มสะสม + ปุ่มใช้แต้ม + สรุปประวัติ",
+  },
+  profile_warning_alert: {
+    label: "Warning Alert",
+    icon: "⚠️",
+    description: "แจ้งเตือน (เช่น กรอกข้อมูลไม่ครบ) แสดงตามเงื่อนไข",
+  },
+  profile_menu_group: {
+    label: "Menu Group",
+    icon: "📋",
+    description: "กลุ่มเมนูลิงก์ พร้อมไอคอน (เพิ่มได้หลายกลุ่ม)",
+  },
+  profile_logout_button: {
+    label: "Logout Button",
+    icon: "🚪",
+    description: "ปุ่มออกจากระบบ (สีแดง)",
   },
 };

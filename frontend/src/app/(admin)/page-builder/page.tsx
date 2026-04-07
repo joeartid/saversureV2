@@ -253,6 +253,135 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     defaultProps: { height: 16 },
     fields: [{ key: "height", label: "ความสูง (px)", type: "number" }],
   },
+  profile_header_card: {
+    label: "Profile Header Card",
+    icon: "👤",
+    description: "การ์ดโปรไฟล์ + tier badge + verified badge",
+    defaultProps: {
+      show_tier: true,
+      show_verified_badge: true,
+      show_completed_badge: true,
+      fallback_name: "สมาชิก",
+    },
+    fields: [
+      { key: "show_tier", label: "แสดง Tier Badge", type: "boolean" },
+      { key: "show_verified_badge", label: "แสดง Badge ยืนยันเบอร์", type: "boolean" },
+      { key: "show_completed_badge", label: "แสดง Badge สถานะข้อมูล", type: "boolean" },
+      { key: "fallback_name", label: "ชื่อ default (กรณีไม่มีชื่อ)", type: "text" },
+    ],
+  },
+  profile_tier_progress: {
+    label: "Tier Progress",
+    icon: "🏆",
+    description: "แถบความคืบหน้า tier ระดับสมาชิก",
+    defaultProps: { show_next_tier_hint: true },
+    fields: [
+      { key: "show_next_tier_hint", label: "แสดงข้อความ \"อีกกี่แต้มถึงระดับถัดไป\"", type: "boolean" },
+    ],
+  },
+  profile_points_card: {
+    label: "Points Card",
+    icon: "💰",
+    description: "การ์ดแต้มสะสม + ปุ่มใช้แต้ม",
+    defaultProps: {
+      show_use_button: true,
+      show_summary: true,
+      cta_text: "ใช้แต้ม",
+      cta_link: "/history",
+      label: "แต้มสะสมใช้งานได้",
+    },
+    fields: [
+      { key: "show_use_button", label: "แสดงปุ่มใช้แต้ม", type: "boolean" },
+      { key: "show_summary", label: "แสดงสรุป (ใช้ไป/สะสมทั้งหมด)", type: "boolean" },
+      { key: "label", label: "ข้อความหัวข้อ", type: "text" },
+      { key: "cta_text", label: "ข้อความปุ่ม", type: "text" },
+      { key: "cta_link", label: "ลิงก์ปุ่ม", type: "text" },
+    ],
+  },
+  profile_warning_alert: {
+    label: "Warning Alert",
+    icon: "⚠️",
+    description: "แจ้งเตือน (แสดงตามเงื่อนไข)",
+    defaultProps: {
+      icon: "⚠️",
+      title: "กรอกข้อมูลให้ครบถ้วน",
+      description: "ยืนยันรหัส OTP และข้อมูลเพื่อรับสิทธิประโยชน์",
+      cta_text: "รีบทำเลย",
+      cta_link: "/register/complete",
+      show_if: "profile_incomplete",
+    },
+    fields: [
+      { key: "icon", label: "Emoji", type: "text" },
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "description", label: "คำอธิบาย", type: "textarea" },
+      { key: "cta_text", label: "ข้อความปุ่ม", type: "text" },
+      { key: "cta_link", label: "ลิงก์ปุ่ม", type: "text" },
+      {
+        key: "show_if",
+        label: "เงื่อนไขแสดง",
+        type: "select",
+        options: [
+          { value: "profile_incomplete", label: "ข้อมูลไม่ครบ" },
+          { value: "phone_unverified", label: "ยังไม่ยืนยันเบอร์" },
+          { value: "always", label: "แสดงเสมอ" },
+        ],
+      },
+    ],
+  },
+  profile_menu_group: {
+    label: "Menu Group",
+    icon: "📋",
+    description: "กลุ่มเมนูลิงก์ (สามารถมีหลาย group)",
+    defaultProps: {
+      title: "บัญชีและการทำรายการ",
+      items: [
+        { icon: "user", label: "ข้อมูลส่วนตัว", href: "/profile/edit", color: "text-blue-500", bg: "bg-blue-50" },
+        { icon: "list", label: "สมุดที่อยู่จัดส่ง", href: "/profile/addresses", color: "text-amber-500", bg: "bg-amber-50" },
+        { icon: "history", label: "ประวัติแต้มและกิจกรรม", href: "/history", color: "text-[var(--jh-green)]", bg: "bg-green-50" },
+      ],
+    },
+    fields: [
+      { key: "title", label: "ชื่อกลุ่ม", type: "text" },
+      {
+        key: "items",
+        label: "รายการเมนู",
+        type: "items",
+        itemFields: [
+          {
+            key: "icon",
+            label: "ไอคอน",
+            type: "select",
+            options: [
+              { value: "user", label: "User" },
+              { value: "history", label: "History" },
+              { value: "gift", label: "Gift" },
+              { value: "help", label: "Help" },
+              { value: "list", label: "List" },
+              { value: "settings", label: "Settings" },
+              { value: "docs", label: "Docs" },
+            ],
+          },
+          { key: "label", label: "ข้อความ", type: "text" },
+          { key: "href", label: "ลิงก์", type: "text" },
+          { key: "color", label: "สีไอคอน (Tailwind class)", type: "text" },
+          { key: "bg", label: "สีพื้นหลังไอคอน (Tailwind class)", type: "text" },
+        ],
+      },
+    ],
+  },
+  profile_logout_button: {
+    label: "Logout Button",
+    icon: "🚪",
+    description: "ปุ่มออกจากระบบ (สีแดง)",
+    defaultProps: {
+      label: "ออกจากระบบ",
+      confirm_message: "",
+    },
+    fields: [
+      { key: "label", label: "ข้อความปุ่ม", type: "text" },
+      { key: "confirm_message", label: "ข้อความยืนยัน (เว้นว่าง = ไม่ confirm)", type: "text" },
+    ],
+  },
 };
 
 /* ------------------------------------------------------------------ */
