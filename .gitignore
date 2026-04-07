@@ -28,6 +28,12 @@ node_modules/
 *.exe
 *.exe~
 
+# Go debug scripts (must be in cmd/<toolname>/ subdir, not backend root)
+backend/check_*.go
+backend/*_cmd.go
+backend/temp_*.go
+backend/debug_*.go
+
 # debug
 npm-debug.log*
 yarn-debug.log*
