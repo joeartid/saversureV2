@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 30401,
+      "cwd": "frontend"
+    },
+    {
+      "name": "consumer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 30403,
+      "cwd": "consumer"
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "go",
+      "runtimeArgs": ["run", "./cmd/api"],
+      "port": 30400,
+      "cwd": "backend"
+    }
+  ]
+}

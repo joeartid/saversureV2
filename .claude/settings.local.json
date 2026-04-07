@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(docker ps:*)",
+      "Bash(cloudflared --version)",
+      "Bash(cloudflared tunnel:*)",
+      "Bash(git fetch:*)",
+      "Bash(xargs -I {} git cat-file -s HEAD:{})",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "mcp__my-db__query",
+      "Bash(PGPASSWORD=julaherb789 psql -h 192.168.0.60 -p 5433 -U saversure_app -d saversure -c \"SELECT type, COUNT\\(*\\) FROM rewards GROUP BY type ORDER BY 2 DESC;\")",
+      "Bash(where psql:*)",
+      "Read(//c/Program Files/PostgreSQL/**)",
+      "Bash(\"/c/Program Files/PostgreSQL/17/bin/psql.exe\" -h 192.168.0.60 -p 5433 -U saversure_app -d saversure -c \"SELECT type, COUNT\\(*\\) FROM rewards GROUP BY type ORDER BY 2 DESC;\")",
+      "Bash(claude mcp:*)",
+      "Bash(node -e \"const{Client}=require\\(''pg''\\);const c=new Client\\({connectionString:''postgresql://saversure_app:julaherb789@192.168.0.60:5433/saversure?sslmode=disable''}\\);c.connect\\(\\).then\\(\\(\\)=>c.query\\(\"\"SELECT type, COUNT\\(*\\) FROM rewards GROUP BY type ORDER BY 2 DESC\"\"\\)\\).then\\(r=>{console.log\\(JSON.stringify\\(r.rows,null,2\\)\\);c.end\\(\\)}\\).catch\\(e=>{console.error\\(e.message\\);process.exit\\(1\\)}\\)\")",
+      "Read(//c/tmp/**)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const{Client}=require\\(''pg''\\);const c=new Client\\({connectionString:''postgresql://saversure_app:julaherb789@192.168.0.60:5433/saversure?sslmode=disable''}\\);c.connect\\(\\).then\\(\\(\\)=>c.query\\(\"\"SELECT type, COUNT\\(*\\) as count FROM rewards GROUP BY type ORDER BY count DESC\"\"\\)\\).then\\(r=>{console.table\\(r.rows\\);c.end\\(\\)}\\).catch\\(e=>{console.error\\(e.message\\);process.exit\\(1\\)}\\)\")",
+      "mcp__saversure-db__query"
+    ]
+  }
+}
