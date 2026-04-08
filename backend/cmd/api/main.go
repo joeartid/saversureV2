@@ -601,6 +601,8 @@ func main() {
 		navMenuRoutes.GET("/:type", navMenuHandler.GetByType)
 		navMenuRoutes.PUT("", navMenuHandler.Upsert)
 		navMenuRoutes.DELETE("/:type", navMenuHandler.Delete)
+		navMenuRoutes.GET("/:type/versions", navMenuHandler.ListVersions)
+		navMenuRoutes.POST("/:type/restore", navMenuHandler.RestoreVersion)
 	}
 
 	// News Management (Admin)

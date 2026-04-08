@@ -22,6 +22,7 @@ type MenuItem struct {
 	Link      string `json:"link"`
 	Visible   bool   `json:"visible"`
 	BadgeType string `json:"badge_type,omitempty"`
+	Group     string `json:"group,omitempty"`
 }
 
 type NavMenu struct {
@@ -29,18 +30,21 @@ type NavMenu struct {
 	TenantID  string     `json:"tenant_id"`
 	MenuType  string     `json:"menu_type"`
 	Items     []MenuItem `json:"items"`
+	Version   int        `json:"version"`
+	UpdatedBy *string    `json:"updated_by"`
 	UpdatedAt string     `json:"updated_at"`
 }
 
 type UpsertInput struct {
 	TenantID string     `json:"-"`
+	UserID   string     `json:"-"`
 	MenuType string     `json:"menu_type" binding:"required"`
 	Items    []MenuItem `json:"items" binding:"required"`
 }
 
 func (s *Service) List(ctx context.Context, tenantID string) ([]NavMenu, error) {
 	rows, err := s.db.Query(ctx,
-		`SELECT id, tenant_id, menu_type, items, updated_at::text
+		`SELECT id, tenant_id, menu_type, items, version, updated_at::text
 		 FROM nav_menus WHERE tenant_id = $1 ORDER BY menu_type`, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("list nav_menus: %w", err)
@@ -51,7 +55,7 @@ func (s *Service) List(ctx context.Context, tenantID string) ([]NavMenu, error) 
 	for rows.Next() {
 		var m NavMenu
 		var itemsJSON []byte
-		if err := rows.Scan(&m.ID, &m.TenantID, &m.MenuType, &itemsJSON, &m.UpdatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.TenantID, &m.MenuType, &itemsJSON, &m.Version, &m.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan nav_menu: %w", err)
 		}
 		if err := json.Unmarshal(itemsJSON, &m.Items); err != nil {
@@ -66,10 +70,10 @@ func (s *Service) GetByType(ctx context.Context, tenantID, menuType string) (*Na
 	var m NavMenu
 	var itemsJSON []byte
 	err := s.db.QueryRow(ctx,
-		`SELECT id, tenant_id, menu_type, items, updated_at::text
+		`SELECT id, tenant_id, menu_type, items, version, updated_at::text
 		 FROM nav_menus WHERE tenant_id = $1 AND menu_type = $2`,
 		tenantID, menuType,
-	).Scan(&m.ID, &m.TenantID, &m.MenuType, &itemsJSON, &m.UpdatedAt)
+	).Scan(&m.ID, &m.TenantID, &m.MenuType, &itemsJSON, &m.Version, &m.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("nav_menu not found: %w", err)
 	}
@@ -90,21 +94,30 @@ func (s *Service) Upsert(ctx context.Context, input UpsertInput) (*NavMenu, erro
 		return nil, fmt.Errorf("marshal items: %w", err)
 	}
 
+	var userIDArg interface{}
+	if input.UserID != "" {
+		userIDArg = input.UserID
+	}
+
 	var m NavMenu
 	var outJSON []byte
 	err = s.db.QueryRow(ctx,
 		`INSERT INTO nav_menus (tenant_id, menu_type, items)
 		 VALUES ($1, $2, $3)
 		 ON CONFLICT (tenant_id, menu_type)
-		 DO UPDATE SET items = $3, updated_at = NOW()
-		 RETURNING id, tenant_id, menu_type, items, updated_at::text`,
+		 DO UPDATE SET items = $3, version = nav_menus.version + 1, updated_at = NOW()
+		 RETURNING id, tenant_id, menu_type, items, version, updated_at::text`,
 		input.TenantID, input.MenuType, itemsJSON,
-	).Scan(&m.ID, &m.TenantID, &m.MenuType, &outJSON, &m.UpdatedAt)
+	).Scan(&m.ID, &m.TenantID, &m.MenuType, &outJSON, &m.Version, &m.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("upsert nav_menu: %w", err)
 	}
 	if err := json.Unmarshal(outJSON, &m.Items); err != nil {
 		m.Items = []MenuItem{}
+	}
+	if userIDArg != nil {
+		uid := input.UserID
+		m.UpdatedBy = &uid
 	}
 	return &m, nil
 }

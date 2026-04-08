@@ -11,12 +11,21 @@ interface MenuItem {
   link: string;
   visible: boolean;
   badge_type?: string;
+  group?: string;
 }
 
 interface NavMenuData {
   id?: string;
   menu_type: string;
   items: MenuItem[];
+  version?: number;
+}
+
+interface VersionEntry {
+  version: number;
+  items: MenuItem[];
+  updated_by?: string | null;
+  updated_at: string;
 }
 
 const MENU_TYPES = [
@@ -164,6 +173,10 @@ export default function MenuEditorPage() {
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [linkOptions, setLinkOptions] = useState(STATIC_LINK_OPTIONS);
+  const [version, setVersion] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [versions, setVersions] = useState<VersionEntry[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
 
   useEffect(() => {
     api.get<{ data: PageConfigItem[] }>("/api/v1/page-configs")
@@ -184,19 +197,48 @@ export default function MenuEditorPage() {
   const fetchMenu = useCallback(async (menuType: string) => {
     setLoading(true);
     setDirty(false);
+    setShowHistory(false);
     try {
       const data = await api.get<NavMenuData>(`/api/v1/nav-menus/${menuType}`);
       setItems(data.items?.length ? data.items : []);
+      setVersion(data.version || 0);
     } catch {
       if (menuType === "bottom_nav") {
         setItems(DEFAULT_BOTTOM_NAV);
       } else {
         setItems([]);
       }
+      setVersion(0);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const fetchVersions = async (menuType: string) => {
+    setLoadingVersions(true);
+    try {
+      const data = await api.get<{ data: VersionEntry[] }>(`/api/v1/nav-menus/${menuType}/versions`);
+      setVersions(data.data || []);
+    } catch {
+      setVersions([]);
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  const restoreVersion = async (ver: number) => {
+    if (!confirm(`Restore version ${ver}?`)) return;
+    try {
+      const result = await api.post<NavMenuData>(`/api/v1/nav-menus/${activeType}/restore`, { version: ver });
+      setItems(result.items || []);
+      setVersion(result.version || 0);
+      setShowHistory(false);
+      setDirty(false);
+      toast.success(`Restored v${ver}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Restore failed");
+    }
+  };
 
   useEffect(() => {
     fetchMenu(activeType);
@@ -206,10 +248,11 @@ export default function MenuEditorPage() {
     setSaving(true);
     setSaved(false);
     try {
-      await api.put("/api/v1/nav-menus", {
+      const result = await api.put<NavMenuData>("/api/v1/nav-menus", {
         menu_type: activeType,
         items,
       });
+      setVersion(result.version || version + 1);
       setSaved(true);
       setDirty(false);
       setTimeout(() => setSaved(false), 3000);
@@ -221,10 +264,11 @@ export default function MenuEditorPage() {
   };
 
   const addItem = () => {
-    setItems((prev) => [
-      ...prev,
-      { icon: "star", label: "New Item", link: "/", visible: true },
-    ]);
+    const newItem: MenuItem = { icon: "star", label: "New Item", link: "/", visible: true };
+    if (activeType === "drawer") {
+      newItem.group = "เมนู";
+    }
+    setItems((prev) => [...prev, newItem]);
     setDirty(true);
   };
 
@@ -276,6 +320,20 @@ export default function MenuEditorPage() {
               ✓ บันทึกแล้ว
             </span>
           )}
+          {version > 0 && (
+            <span className="text-[11px] text-[var(--md-on-surface-variant)] font-mono">
+              v{version}
+            </span>
+          )}
+          <button
+            onClick={() => {
+              setShowHistory(!showHistory);
+              if (!showHistory) fetchVersions(activeType);
+            }}
+            className="h-[40px] px-3 text-[12px] font-medium text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container)] rounded-[var(--md-radius-sm)] transition-all"
+          >
+            History
+          </button>
           <button
             onClick={handleSave}
             disabled={saving}
@@ -302,6 +360,57 @@ export default function MenuEditorPage() {
           </button>
         ))}
       </div>
+
+      {/* Version History Panel */}
+      {showHistory && (
+        <div className="mb-6 bg-[var(--md-surface)] border border-[var(--md-outline-variant)] rounded-[var(--md-radius-sm)] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-medium text-[var(--md-on-surface)]">
+              Version History — {MENU_TYPES.find((t) => t.value === activeType)?.label}
+            </p>
+            <button
+              onClick={() => setShowHistory(false)}
+              className="text-[var(--md-on-surface-variant)] text-[14px]"
+            >
+              ✕
+            </button>
+          </div>
+          {loadingVersions ? (
+            <p className="text-[12px] text-[var(--md-on-surface-variant)]">Loading...</p>
+          ) : versions.length === 0 ? (
+            <p className="text-[12px] text-[var(--md-on-surface-variant)]">
+              ยังไม่มี history — กด Save ครั้งแรกเพื่อสร้าง snapshot
+            </p>
+          ) : (
+            <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
+              {versions.map((v) => (
+                <div
+                  key={v.version}
+                  className="flex items-center justify-between p-2.5 rounded bg-[var(--md-surface-container)] text-[12px]"
+                >
+                  <div>
+                    <span className="font-mono font-medium text-[var(--md-on-surface)]">
+                      v{v.version}
+                    </span>
+                    <span className="ml-3 text-[var(--md-on-surface-variant)]">
+                      {v.items.length} items
+                    </span>
+                    <span className="ml-3 text-[var(--md-on-surface-variant)] text-[11px]">
+                      {v.updated_at}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => restoreVersion(v.version)}
+                    className="text-[var(--md-primary)] font-medium hover:underline text-[12px]"
+                  >
+                    Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -507,6 +616,22 @@ export default function MenuEditorPage() {
                           </button>
                         </div>
                       </div>
+
+                      {/* Group field — เฉพาะ drawer */}
+                      {activeType === "drawer" && (
+                        <div className="mt-2 pt-2 border-t border-[var(--md-outline-variant)]">
+                          <label className="text-[10px] text-[var(--md-on-surface-variant)] uppercase mb-1 block">
+                            กลุ่ม / หัวข้อ section (เว้นว่าง = ใช้ &quot;เมนู&quot;)
+                          </label>
+                          <input
+                            type="text"
+                            value={item.group || ""}
+                            onChange={(e) => updateItem(idx, "group", e.target.value)}
+                            placeholder="เช่น บริการส่วนตัว, ช่วยเหลือและการตั้งค่า"
+                            className={fieldClass}
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -8,10 +8,68 @@ import { type MultiBalance, getPrimaryBalance, getDiamondBalance } from "@/lib/c
 import { useTenant } from "./TenantProvider";
 
 interface DrawerMenuItem {
-  icon: React.ReactNode;
+  icon: string;
   label: string;
   link: string;
+  visible?: boolean;
+  group?: string;
 }
+
+// Icon registry — string name → SVG node. Reuses paths from menu-editor admin
+// so admin's icon picker stays in sync with consumer rendering.
+const DRAWER_ICONS: Record<string, React.ReactNode> = {
+  home: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  ),
+  user: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  ),
+  history: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ),
+  tag: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+    </svg>
+  ),
+  support: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  settings: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  mail: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  ),
+  gift: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+    </svg>
+  ),
+};
+
+const DEFAULT_DRAWER_ITEMS: DrawerMenuItem[] = [
+  { icon: "home", label: "หน้าแรก", link: "/", visible: true, group: "บริการส่วนตัว" },
+  { icon: "user", label: "บัญชีของฉัน", link: "/profile", visible: true, group: "บริการส่วนตัว" },
+  { icon: "history", label: "ประวัติกิจกรรมทั้งหมด", link: "/history", visible: true, group: "บริการส่วนตัว" },
+  { icon: "tag", label: "คูปองของฉัน", link: "/history/coupons", visible: true, group: "บริการส่วนตัว" },
+  { icon: "support", label: "ศูนย์ช่วยเหลือและคำถาม (FAQ)", link: "/support", visible: true, group: "ช่วยเหลือและการตั้งค่า" },
+  { icon: "settings", label: "ตั้งค่าระบบ", link: "/settings", visible: true, group: "ช่วยเหลือและการตั้งค่า" },
+  { icon: "mail", label: "ติดต่อแอดมิน", link: "/support/ticket", visible: true, group: "ช่วยเหลือและการตั้งค่า" },
+];
 
 interface ProfileData {
   display_name?: string;
@@ -39,9 +97,23 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
   const [balances, setBalances] = useState<MultiBalance[]>([]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [tier, setTier] = useState<Tier | null>(null);
+  const [menuItems, setMenuItems] = useState<DrawerMenuItem[]>(DEFAULT_DRAWER_ITEMS);
   const { brandName, branding } = useTenant();
   const primaryBalance = getPrimaryBalance(balances);
   const diamondBalance = getDiamondBalance(balances);
+
+  // Fetch menu config once on mount (independent of open/close)
+  useEffect(() => {
+    api.get<{ items: DrawerMenuItem[] }>("/api/v1/public/nav-menu/drawer")
+      .then((d) => {
+        if (d.items && d.items.length > 0) {
+          setMenuItems(d.items);
+        }
+      })
+      .catch(() => {
+        // network fail → keep DEFAULT_DRAWER_ITEMS
+      });
+  }, []);
 
   useEffect(() => {
     const li = isLoggedIn();
@@ -59,6 +131,19 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
     }
   }, [open]);
 
+  // Group menu items by `group` field, preserving original order
+  const groupedItems: { name: string; items: DrawerMenuItem[] }[] = [];
+  const groupMap = new Map<string, DrawerMenuItem[]>();
+  for (const item of menuItems) {
+    if (item.visible === false) continue;
+    const groupName = item.group || "เมนู";
+    if (!groupMap.has(groupName)) {
+      groupMap.set(groupName, []);
+      groupedItems.push({ name: groupName, items: groupMap.get(groupName)! });
+    }
+    groupMap.get(groupName)!.push(item);
+  }
+
   const displayName =
     profile?.display_name ||
     [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
@@ -74,76 +159,6 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
     router.push("/login");
     onClose();
   };
-
-  const personalItems: DrawerMenuItem[] = [
-    {
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      ),
-      label: "หน้าแรก",
-      link: "/",
-    },
-    {
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
-      label: "บัญชีของฉัน",
-      link: "/profile",
-    },
-    {
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-        </svg>
-      ),
-      label: "ประวัติกิจกรรมทั้งหมด",
-      link: "/history",
-    },
-    {
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-        </svg>
-      ),
-      label: "คูปองของฉัน",
-      link: "/history/coupons",
-    },
-  ];
-
-  const settingsItems: DrawerMenuItem[] = [
-    {
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      label: "ศูนย์ช่วยเหลือและคำถาม (FAQ)",
-      link: "/support",
-    },
-    {
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-      label: "ตั้งค่าระบบ",
-      link: "/settings",
-    },
-    {
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-      ),
-      label: "ติดต่อแอดมิน",
-      link: "/support/ticket",
-    },
-  ];
 
   return (
     <>
@@ -237,57 +252,46 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto px-5 pt-6 pb-6 space-y-5 no-scrollbar">
               
-              {/* Menu Section 1 */}
-              <div className="bg-white rounded-[24px] p-2 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
-                <div className="px-4 pt-3 pb-1 text-[11px] font-bold text-gray-400 mb-1">
-                  บริการส่วนตัว
-                </div>
-                <div className="space-y-0.5">
-                  {personalItems.map((item, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => navigate(item.link)}
-                      className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center shrink-0">
-                          {item.icon}
-                        </div>
-                        <span className="text-[15px] font-bold text-gray-800">{item.label}</span>
-                      </div>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-gray-300">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Menu Section 2 */}
-              <div className="bg-white rounded-[24px] p-2 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]">
-                <div className="px-4 pt-3 pb-1 text-[11px] font-bold text-gray-400 mb-1">
-                  ช่วยเหลือและการตั้งค่า
-                </div>
-                <div className="space-y-0.5">
-                  {settingsItems.map((item, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => navigate(item.link)}
-                      className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-600 flex items-center justify-center shrink-0">
-                          {item.icon}
-                        </div>
-                        <span className="text-[15px] font-bold text-gray-800">{item.label}</span>
-                      </div>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-gray-300">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Menu Sections — รายการมาจาก /api/v1/public/nav-menu/drawer
+                  group แรก (index 0) ใช้สีเขียว, group ถัดไปใช้สีเทา (style เดิม) */}
+              {groupedItems.map((group, gIdx) => {
+                const isFirstGroup = gIdx === 0;
+                return (
+                  <div
+                    key={group.name}
+                    className="bg-white rounded-[24px] p-2 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)]"
+                  >
+                    <div className="px-4 pt-3 pb-1 text-[11px] font-bold text-gray-400 mb-1">
+                      {group.name}
+                    </div>
+                    <div className="space-y-0.5">
+                      {group.items.map((item, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => navigate(item.link)}
+                          className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                                isFirstGroup
+                                  ? "bg-[#E8F5E9] text-[#2E7D32]"
+                                  : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {DRAWER_ICONS[item.icon] || DRAWER_ICONS.support}
+                            </div>
+                            <span className="text-[15px] font-bold text-gray-800">{item.label}</span>
+                          </div>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-gray-300">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Logout Button */}
               {loggedIn && (

@@ -16,6 +16,10 @@ const ProfilePointsCard = dynamic(() => import("./ProfilePointsCard"));
 const ProfileWarningAlert = dynamic(() => import("./ProfileWarningAlert"));
 const ProfileMenuGroup = dynamic(() => import("./ProfileMenuGroup"));
 const ProfileLogoutButton = dynamic(() => import("./ProfileLogoutButton"));
+const HistoryPageHeader = dynamic(() => import("./HistoryPageHeader"));
+const HistoryStatSummary = dynamic(() => import("./HistoryStatSummary"));
+const HistoryTabsNav = dynamic(() => import("./HistoryTabsNav"));
+const HistoryScanList = dynamic(() => import("./HistoryScanList"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -34,6 +38,10 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   profile_warning_alert: ProfileWarningAlert,
   profile_menu_group: ProfileMenuGroup,
   profile_logout_button: ProfileLogoutButton,
+  history_page_header: HistoryPageHeader,
+  history_stat_summary: HistoryStatSummary,
+  history_tabs_nav: HistoryTabsNav,
+  history_scan_list: HistoryScanList,
 };
 
 export interface SectionDefinition {
@@ -122,5 +130,25 @@ export const sectionMeta: Record<
     label: "Logout Button",
     icon: "🚪",
     description: "ปุ่มออกจากระบบ (สีแดง)",
+  },
+  history_page_header: {
+    label: "History Page Header",
+    icon: "📜",
+    description: "Header gradient ของหน้า /history + นับจำนวนสแกน",
+  },
+  history_stat_summary: {
+    label: "History Stat Summary",
+    icon: "📊",
+    description: "การ์ดสรุป 4-column (สแกนสำเร็จ / แต้มสะสม / ยอดคงเหลือ / ทั้งหมด)",
+  },
+  history_tabs_nav: {
+    label: "History Tabs Nav",
+    icon: "🗂️",
+    description: "แถบแท็บนำทาง (สะสม/แลก/คูปอง/ลุ้นโชค)",
+  },
+  history_scan_list: {
+    label: "History Scan List",
+    icon: "📋",
+    description: "รายการสแกน พร้อม infinite scroll + group by date",
   },
 };

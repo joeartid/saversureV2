@@ -382,6 +382,68 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "confirm_message", label: "ข้อความยืนยัน (เว้นว่าง = ไม่ confirm)", type: "text" },
     ],
   },
+  history_page_header: {
+    label: "History Page Header",
+    icon: "📜",
+    description: "Header gradient ของหน้า /history",
+    defaultProps: {
+      title: "ประวัติการสะสมแต้ม",
+      show_scan_count: true,
+      gradient_from: "#3C9B4D",
+      gradient_to: "#7DBD48",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "show_scan_count", label: "แสดงจำนวนสแกน", type: "boolean" },
+      { key: "gradient_from", label: "สี gradient เริ่ม (hex)", type: "text" },
+      { key: "gradient_to", label: "สี gradient จบ (hex)", type: "text" },
+    ],
+  },
+  history_stat_summary: {
+    label: "History Stat Summary",
+    icon: "📊",
+    description: "การ์ดสรุป 4-column",
+    defaultProps: {
+      show_success_count: true,
+      show_total_points: true,
+      show_balance: true,
+      show_total_scans: true,
+      balance_link: "/wallet",
+    },
+    fields: [
+      { key: "show_success_count", label: "แสดงคอลัมน์ \"สแกนสำเร็จ\"", type: "boolean" },
+      { key: "show_total_points", label: "แสดงคอลัมน์ \"แต้มสะสม\"", type: "boolean" },
+      { key: "show_balance", label: "แสดงคอลัมน์ \"ยอดคงเหลือ\"", type: "boolean" },
+      { key: "show_total_scans", label: "แสดงคอลัมน์ \"ทั้งหมด\"", type: "boolean" },
+      { key: "balance_link", label: "ลิงก์คลิกยอดคงเหลือ", type: "text" },
+    ],
+  },
+  history_tabs_nav: {
+    label: "History Tabs Nav",
+    icon: "🗂️",
+    description: "แถบแท็บ (สะสม/แลก/คูปอง/ลุ้นโชค)",
+    defaultProps: {},
+    fields: [],
+  },
+  history_scan_list: {
+    label: "History Scan List",
+    icon: "📋",
+    description: "รายการสแกน + infinite scroll",
+    defaultProps: {
+      page_size: 30,
+      group_by_date: true,
+      empty_message: "ยังไม่มีประวัติ",
+      empty_cta_text: "สแกนสะสมแต้ม",
+      empty_cta_link: "/scan",
+    },
+    fields: [
+      { key: "page_size", label: "จำนวนต่อหน้า", type: "number" },
+      { key: "group_by_date", label: "จัดกลุ่มตามวันที่", type: "boolean" },
+      { key: "empty_message", label: "ข้อความเมื่อไม่มีข้อมูล", type: "text" },
+      { key: "empty_cta_text", label: "ข้อความปุ่ม (empty state)", type: "text" },
+      { key: "empty_cta_link", label: "ลิงก์ปุ่ม (empty state)", type: "text" },
+    ],
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -673,6 +735,112 @@ function SectionEditor({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Live Preview Panel                                                 */
+/* ------------------------------------------------------------------ */
+
+const CONSUMER_URL =
+  process.env.NEXT_PUBLIC_CONSUMER_URL || "http://localhost:30300";
+
+function LivePreviewPanel({
+  pageSlug,
+  refreshKey,
+}: {
+  pageSlug: string;
+  refreshKey: number;
+}) {
+  const [device, setDevice] = useState<"mobile" | "desktop">("mobile");
+  const [manualKey, setManualKey] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  // Map slug → consumer URL path. "home" lives at "/" not "/home".
+  const path = pageSlug === "home" ? "" : pageSlug;
+  const src = `${CONSUMER_URL}/${path}?_pb=${refreshKey}_${manualKey}`;
+
+  if (!visible) {
+    return (
+      <div className="xl:w-[60px] flex-shrink-0">
+        <button
+          onClick={() => setVisible(true)}
+          className="w-full h-[40px] bg-[var(--md-surface)] md-elevation-1 rounded-[var(--md-radius-sm)] text-[11px] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container)]"
+          title="แสดง Live Preview"
+        >
+          👁️
+        </button>
+      </div>
+    );
+  }
+
+  const frameWidth = device === "mobile" ? "w-[390px]" : "w-full";
+  const frameHeight = "h-[780px]";
+
+  return (
+    <div className="xl:w-[420px] flex-shrink-0">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-4 sticky top-8">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[13px] font-medium text-[var(--md-on-surface)]">
+            Live Preview
+          </h3>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setDevice(device === "mobile" ? "desktop" : "mobile")}
+              className="h-[28px] px-2 text-[11px] bg-[var(--md-surface-container)] hover:bg-[var(--md-surface-container-high)] rounded-[var(--md-radius-sm)]"
+              title="เปลี่ยนขนาด"
+            >
+              {device === "mobile" ? "📱" : "💻"}
+            </button>
+            <button
+              onClick={() => setManualKey((k) => k + 1)}
+              className="h-[28px] px-2 text-[11px] bg-[var(--md-surface-container)] hover:bg-[var(--md-surface-container-high)] rounded-[var(--md-radius-sm)]"
+              title="รีเฟรช"
+            >
+              🔄
+            </button>
+            <a
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-[28px] px-2 text-[11px] bg-[var(--md-surface-container)] hover:bg-[var(--md-surface-container-high)] rounded-[var(--md-radius-sm)] flex items-center"
+              title="เปิดในแท็บใหม่"
+            >
+              🔗
+            </a>
+            <button
+              onClick={() => setVisible(false)}
+              className="h-[28px] px-2 text-[11px] bg-[var(--md-surface-container)] hover:bg-[var(--md-surface-container-high)] rounded-[var(--md-radius-sm)]"
+              title="ซ่อน"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <p className="text-[10px] text-[var(--md-on-surface-variant)] mb-2">
+          <span className="font-mono">{CONSUMER_URL}/{pageSlug}</span>
+        </p>
+
+        <div className="flex justify-center overflow-hidden">
+          <div
+            className={`${frameWidth} ${frameHeight} rounded-[24px] border-[6px] border-gray-800 bg-white shadow-inner overflow-hidden`}
+            style={{ maxWidth: "100%" }}
+          >
+            <iframe
+              key={`${refreshKey}-${manualKey}`}
+              src={src}
+              className="w-full h-full border-0"
+              title={`preview-${pageSlug}`}
+            />
+          </div>
+        </div>
+
+        <p className="text-[10px] text-[var(--md-on-surface-variant)] mt-2 text-center">
+          Preview reload อัตโนมัติหลังกด Save
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Add Section Modal                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -749,6 +917,7 @@ export default function PageBuilderPage() {
   const [showNewPage, setShowNewPage] = useState(false);
   const [newSlug, setNewSlug] = useState("");
   const [newLabel, setNewLabel] = useState("");
+  const [previewKey, setPreviewKey] = useState(0);
 
   const allPages = [...BUILT_IN_PAGES, ...customPages];
 
@@ -790,6 +959,7 @@ export default function PageBuilderPage() {
 
   useEffect(() => {
     fetchConfig(pageSlug);
+    setPreviewKey((k) => k + 1);
   }, [pageSlug, fetchConfig]);
 
   const handleCreatePage = async () => {
@@ -880,6 +1050,7 @@ export default function PageBuilderPage() {
       setVersion(result.version || version + 1);
       setSaved(true);
       setDirty(false);
+      setPreviewKey((k) => k + 1);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save failed");
@@ -1239,8 +1410,8 @@ export default function PageBuilderPage() {
             </div>
           </div>
 
-          {/* Right: Section Editor */}
-          <div className="flex-1">
+          {/* Middle: Section Editor */}
+          <div className="flex-1 min-w-0">
             <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-5 sticky top-8">
               {activeSection ? (
                 <SectionEditor
@@ -1262,6 +1433,9 @@ export default function PageBuilderPage() {
               )}
             </div>
           </div>
+
+          {/* Right: Live Preview */}
+          <LivePreviewPanel pageSlug={pageSlug} refreshKey={previewKey} />
         </div>
       )}
 
