@@ -238,6 +238,23 @@ func main() {
 	r.Use(mw.RequestLogger())
 	r.Use(mw.CORS(cfg.CORSOrigins))
 
+	// Routes introspection (dev tool — list all registered routes)
+	r.GET("/api/v1/_routes", func(c *gin.Context) {
+		routes := r.Routes()
+		list := make([]gin.H, 0, len(routes))
+		for _, rt := range routes {
+			list = append(list, gin.H{
+				"method":  rt.Method,
+				"path":    rt.Path,
+				"handler": rt.Handler,
+			})
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"count":  len(list),
+			"routes": list,
+		})
+	})
+
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		dbOK := db.Ping(context.Background()) == nil

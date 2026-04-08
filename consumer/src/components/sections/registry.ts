@@ -20,6 +20,10 @@ const HistoryPageHeader = dynamic(() => import("./HistoryPageHeader"));
 const HistoryStatSummary = dynamic(() => import("./HistoryStatSummary"));
 const HistoryTabsNav = dynamic(() => import("./HistoryTabsNav"));
 const HistoryScanList = dynamic(() => import("./HistoryScanList"));
+const HomeNewsBannerCarousel = dynamic(() => import("./HomeNewsBannerCarousel"));
+const HomeSectionHeading = dynamic(() => import("./HomeSectionHeading"));
+const HomeRewardsTabs = dynamic(() => import("./HomeRewardsTabs"));
+const HomeLuckyDrawList = dynamic(() => import("./HomeLuckyDrawList"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -42,6 +46,10 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   history_stat_summary: HistoryStatSummary,
   history_tabs_nav: HistoryTabsNav,
   history_scan_list: HistoryScanList,
+  home_news_banner_carousel: HomeNewsBannerCarousel,
+  home_section_heading: HomeSectionHeading,
+  home_rewards_tabs: HomeRewardsTabs,
+  home_lucky_draw_list: HomeLuckyDrawList,
 };
 
 export interface SectionDefinition {
@@ -150,5 +158,25 @@ export const sectionMeta: Record<
     label: "History Scan List",
     icon: "📋",
     description: "รายการสแกน พร้อม infinite scroll + group by date",
+  },
+  home_news_banner_carousel: {
+    label: "Home — News Banner",
+    icon: "🎠",
+    description: "Banner carousel ดึงข่าวล่าสุดจาก API",
+  },
+  home_section_heading: {
+    label: "Home — หัวข้อ Section",
+    icon: "📝",
+    description: "หัวข้อ section (title + subtitle)",
+  },
+  home_rewards_tabs: {
+    label: "Home — Rewards พร้อม Tabs",
+    icon: "🎁",
+    description: "แสดงรางวัลพร้อมแท็บหลายหมวด + ลุ้นโชค",
+  },
+  home_lucky_draw_list: {
+    label: "Home — ลุ้นโชค",
+    icon: "🏆",
+    description: "รายการกิจกรรมลุ้นโชค ดึงจาก API",
   },
 };

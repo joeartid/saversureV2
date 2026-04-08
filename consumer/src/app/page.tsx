@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import PageRenderer from "@/components/PageRenderer";
 import { api } from "@/lib/api";
 import { isLoggedIn } from "@/lib/auth";
 import { useTenant } from "@/components/TenantProvider";
@@ -234,9 +235,10 @@ function LuckyDrawCard({ lucky }: { lucky: LuckyDraw }) {
 
 
 /* ═══════════════════════════════════
-   Home Page
+   HomeFallback — original hard-coded layout
+   เก็บเป็น safety net เมื่อ page_configs slug "home" ว่าง
    ═══════════════════════════════════ */
-function JulaHerbHome() {
+function HomeFallback() {
   const { brandName } = useTenant();
   const [activeTab, setActiveTab] = useState("julaherb");
   const [rewards, setRewards] = useState<RewardItem[]>([]);
@@ -554,7 +556,9 @@ export default function HomePage() {
     <div className="min-h-screen bg-white">
       <Navbar />
       <div className="pt-24 relative z-0">
-        <JulaHerbHome />
+        {/* Page Builder controlled — admin จัดการได้
+            ถ้า config ไม่มีใน DB → fallback ไป layout เดิม (hard-coded) */}
+        <PageRenderer pageSlug="home" fallback={<HomeFallback />} />
       </div>
       <BottomNav />
     </div>

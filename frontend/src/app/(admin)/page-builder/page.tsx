@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { ImageUpload } from "@/components/ui/image-upload";
 import {
@@ -444,6 +444,100 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "empty_cta_link", label: "ลิงก์ปุ่ม (empty state)", type: "text" },
     ],
   },
+  home_news_banner_carousel: {
+    label: "Home — News Banner",
+    icon: "🎠",
+    description: "Banner carousel ดึงข่าวล่าสุดจาก API",
+    defaultProps: {
+      limit: 5,
+      auto_play: true,
+      interval_ms: 3000,
+      show_dots: true,
+    },
+    fields: [
+      { key: "limit", label: "จำนวนข่าวที่ดึง", type: "number" },
+      { key: "auto_play", label: "เลื่อนอัตโนมัติ", type: "boolean" },
+      { key: "interval_ms", label: "ความเร็วเลื่อน (ms)", type: "number" },
+      { key: "show_dots", label: "แสดงจุดนำทาง", type: "boolean" },
+    ],
+  },
+  home_section_heading: {
+    label: "Home — หัวข้อ Section",
+    icon: "📝",
+    description: "หัวข้อ section (title + subtitle)",
+    defaultProps: {
+      title: "แลกสิทธิพิเศษสำหรับคุณ",
+      subtitle: "",
+      align: "left",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำอธิบาย (ไม่บังคับ)", type: "text" },
+      {
+        key: "align",
+        label: "การจัดตำแหน่ง",
+        type: "select",
+        options: [
+          { value: "left", label: "ซ้าย" },
+          { value: "center", label: "กลาง" },
+        ],
+      },
+    ],
+  },
+  home_rewards_tabs: {
+    label: "Home — Rewards พร้อม Tabs",
+    icon: "🎁",
+    description: "แสดงรางวัลพร้อมแท็บหลายหมวด + ลุ้นโชค",
+    defaultProps: {
+      limit: 20,
+      default_tab: "julaherb",
+      show_flash_badge: true,
+      tabs: [
+        { key: "julaherb", label: "สินค้าจุฬาเฮิร์บ", source: "rewards-product" },
+        { key: "premium", label: "สินค้าพรีเมียม", source: "rewards-premium" },
+        { key: "lifestyle", label: "ไลฟ์สไตล์", source: "rewards-lifestyle" },
+        { key: "lucky", label: "ลุ้นโชค", source: "lucky-draw" },
+      ],
+    },
+    fields: [
+      { key: "limit", label: "จำนวนรางวัลที่ดึง", type: "number" },
+      { key: "default_tab", label: "แท็บเริ่มต้น (key)", type: "text" },
+      { key: "show_flash_badge", label: "แสดง FLASH badge", type: "boolean" },
+      {
+        key: "tabs",
+        label: "รายการแท็บ",
+        type: "items",
+        itemFields: [
+          { key: "key", label: "Key (ภาษาอังกฤษ ไม่ซ้ำ)", type: "text" },
+          { key: "label", label: "ชื่อแท็บ", type: "text" },
+          {
+            key: "source",
+            label: "แหล่งข้อมูล",
+            type: "select",
+            options: [
+              { value: "rewards-product", label: "รางวัล: สินค้าจุฬาเฮิร์บ" },
+              { value: "rewards-premium", label: "รางวัล: สินค้าพรีเมียม" },
+              { value: "rewards-lifestyle", label: "รางวัล: ไลฟ์สไตล์" },
+              { value: "lucky-draw", label: "ลุ้นโชค" },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  home_lucky_draw_list: {
+    label: "Home — ลุ้นโชค",
+    icon: "🏆",
+    description: "รายการกิจกรรมลุ้นโชค ดึงจาก API",
+    defaultProps: {
+      limit: 20,
+      show_end_date: false,
+    },
+    fields: [
+      { key: "limit", label: "จำนวนรายการ", type: "number" },
+      { key: "show_end_date", label: "แสดงวันสิ้นสุด", type: "boolean" },
+    ],
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -739,7 +833,7 @@ function SectionEditor({
 /* ------------------------------------------------------------------ */
 
 const CONSUMER_URL =
-  process.env.NEXT_PUBLIC_CONSUMER_URL || "http://localhost:30300";
+  process.env.NEXT_PUBLIC_CONSUMER_URL || "http://localhost:30403";
 
 function LivePreviewPanel({
   pageSlug,
@@ -775,7 +869,7 @@ function LivePreviewPanel({
 
   return (
     <div className="xl:w-[420px] flex-shrink-0">
-      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-4 sticky top-8">
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-4 sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[13px] font-medium text-[var(--md-on-surface)]">
             Live Preview
@@ -833,7 +927,7 @@ function LivePreviewPanel({
         </div>
 
         <p className="text-[10px] text-[var(--md-on-surface-variant)] mt-2 text-center">
-          Preview reload อัตโนมัติหลังกด Save
+          Preview reload อัตโนมัติหลัง auto-save (≈1.5s)
         </p>
       </div>
     </div>
@@ -918,6 +1012,9 @@ export default function PageBuilderPage() {
   const [newSlug, setNewSlug] = useState("");
   const [newLabel, setNewLabel] = useState("");
   const [previewKey, setPreviewKey] = useState(0);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSaveRef = useRef<(silent?: boolean) => Promise<void>>(async () => {});
 
   const allPages = [...BUILT_IN_PAGES, ...customPages];
 
@@ -1037,8 +1134,12 @@ export default function PageBuilderPage() {
     }
   };
 
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSave = async (silent = false) => {
+    if (silent) {
+      setAutoSaving(true);
+    } else {
+      setSaving(true);
+    }
     setSaved(false);
     try {
       const ordered = sections.map((s, i) => ({ ...s, order: i + 1 }));
@@ -1053,11 +1154,45 @@ export default function PageBuilderPage() {
       setPreviewKey((k) => k + 1);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed");
+      if (!silent) {
+        toast.error(err instanceof Error ? err.message : "Save failed");
+      }
     } finally {
-      setSaving(false);
+      if (silent) {
+        setAutoSaving(false);
+      } else {
+        setSaving(false);
+      }
     }
   };
+
+  // keep latest handleSave in ref so auto-save effect can call it without re-running
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  });
+
+  // Debounced auto-save: ทุกครั้งที่ dirty รอ 1.5s แล้ว save อัตโนมัติ
+  useEffect(() => {
+    if (!dirty || saving || autoSaving || loading) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      handleSaveRef.current(true);
+    }, 1500);
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [dirty, saving, autoSaving, loading, sections, status, pageSlug]);
+
+  // Cancel pending auto-save when switching pages
+  useEffect(() => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+  }, [pageSlug]);
 
   const updateSections = (fn: (prev: Section[]) => Section[]) => {
     setSections((prev) => {
@@ -1123,16 +1258,23 @@ export default function PageBuilderPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {dirty && (
+          {autoSaving ? (
+            <span className="text-[12px] text-[var(--md-primary)] font-medium flex items-center gap-1">
+              <svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              กำลังบันทึกอัตโนมัติ...
+            </span>
+          ) : dirty ? (
             <span className="text-[12px] text-[var(--md-warning)] font-medium">
-              ● มีการเปลี่ยนแปลง
+              ● กำลังบันทึกอัตโนมัติ...
             </span>
-          )}
-          {saved && (
+          ) : saved ? (
             <span className="text-[12px] text-[var(--md-success)] font-medium">
-              ✓ บันทึกแล้ว
+              ✓ บันทึกอัตโนมัติแล้ว
             </span>
-          )}
+          ) : null}
           <select
             value={status}
             onChange={(e) => {
@@ -1145,7 +1287,7 @@ export default function PageBuilderPage() {
             <option value="draft">Draft</option>
           </select>
           <button
-            onClick={handleSave}
+            onClick={() => handleSave(false)}
             disabled={saving}
             className="h-[40px] px-5 bg-[var(--md-primary)] text-white rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-primary-dark)] transition-all disabled:opacity-50 flex items-center gap-2"
           >
@@ -1412,7 +1554,7 @@ export default function PageBuilderPage() {
 
           {/* Middle: Section Editor */}
           <div className="flex-1 min-w-0">
-            <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-5 sticky top-8">
+            <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-5 sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
               {activeSection ? (
                 <SectionEditor
                   section={activeSection}
