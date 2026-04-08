@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn, logout } from "@/lib/auth";
 import { api } from "@/lib/api";
-import { type MultiBalance, getPrimaryBalance, getDiamondBalance } from "@/lib/currency";
+import { useCurrencies } from "@/lib/currency-context";
 import { useTenant } from "./TenantProvider";
 
 interface DrawerMenuItem {
@@ -94,13 +94,11 @@ interface TierResponse {
 export default function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
-  const [balances, setBalances] = useState<MultiBalance[]>([]);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [tier, setTier] = useState<Tier | null>(null);
   const [menuItems, setMenuItems] = useState<DrawerMenuItem[]>(DEFAULT_DRAWER_ITEMS);
   const { brandName, branding } = useTenant();
-  const primaryBalance = getPrimaryBalance(balances);
-  const diamondBalance = getDiamondBalance(balances);
+  const { balances: currencyBalances, refresh: refreshCurrencies } = useCurrencies();
 
   // Fetch menu config once on mount (independent of open/close)
   useEffect(() => {
@@ -119,9 +117,9 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
     const li = isLoggedIn();
     setLoggedIn(li);
     if (li) {
-      api.get<{ data: MultiBalance[] }>("/api/v1/my/balances")
-        .then((d) => setBalances(d.data ?? []))
-        .catch(() => {});
+      // Refresh currency balances each time drawer opens so stay in sync
+      // with scans/redeems performed while drawer was closed.
+      refreshCurrencies();
       api.get<ProfileData>("/api/v1/profile")
         .then((d) => setProfile(d))
         .catch(() => {});
@@ -129,6 +127,8 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
         .then((d) => setTier(d.tier))
         .catch(() => {});
     }
+    // refreshCurrencies is stable via useCallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Group menu items by `group` field, preserving original order
@@ -216,13 +216,20 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
                   </div>
                   
                   {loggedIn && (
-                    <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
                       <span className="text-black text-xs font-black px-2.5 py-1 rounded shadow-sm border border-black/10" style={{ background: tier?.color || "#FFC600" }}>
                         {tier?.name || "Bronze"}
                       </span>
-                      <span className="bg-gray-100 text-gray-600 font-bold text-xs px-2.5 py-1 rounded">
-                        แต้ม {(primaryBalance?.balance ?? 0).toLocaleString()} 🪙 | เพชร {(diamondBalance?.balance ?? 0).toLocaleString()} 💎
-                      </span>
+                      {currencyBalances.map((b) => (
+                        <span
+                          key={b.currency}
+                          className="bg-gray-100 text-gray-600 font-bold text-xs px-2.5 py-1 rounded inline-flex items-center gap-1"
+                        >
+                          <span>{b.icon}</span>
+                          <span>{b.name}</span>
+                          <span>{b.balance.toLocaleString()}</span>
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>

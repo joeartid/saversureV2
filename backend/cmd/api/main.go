@@ -912,6 +912,13 @@ func main() {
 		publicPageConfigRoutes.GET("/:slug", pageConfigHandler.GetPublic)
 	}
 
+	// Currencies API (public - consumer needs currency master for balances display)
+	publicCurrencyRoutes := api.Group("/public/currencies")
+	publicCurrencyRoutes.Use(mw.TenantFromHeader())
+	{
+		publicCurrencyRoutes.GET("", currencyHandler.ListPublic)
+	}
+
 	// Tiers API (public - consumer tier badges/progress)
 	publicTierRoutes := api.Group("/public/tiers")
 	publicTierRoutes.Use(mw.TenantFromHeader())

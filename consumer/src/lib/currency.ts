@@ -23,15 +23,22 @@ export function getCurrencyIcon(code?: string, icon?: string | null) {
   return currencyFallbackIcons[code.toLowerCase()] || "⭐";
 }
 
+/**
+ * Legacy helpers for screens that still fetch `/api/v1/my/balances` directly.
+ * Prefer `useCurrencies()` from `@/lib/currency-context` which merges with the
+ * `point_currencies` master list and uses `is_default` + `sort_order` instead
+ * of hard-coding "point".
+ *
+ * These kept for backward compatibility; falls back to first entry when no
+ * "point" row exists so they still work on tenants without a literal "point"
+ * currency code.
+ */
 export function getPrimaryBalance(balances: MultiBalance[]) {
   if (!balances.length) return null;
-  return balances.find((item) => item.currency.toLowerCase() === "point") || balances[0];
-}
-
-export function getDiamondBalance(balances: MultiBalance[]) {
-  if (!balances.length) return null;
-  return balances.find((item) => item.currency.toLowerCase() === "diamond") || 
-         balances.find((item) => item.currency.toLowerCase() === "gem") || null;
+  return (
+    balances.find((item) => item.currency.toLowerCase() === "point") ||
+    balances[0]
+  );
 }
 
 export function getSecondaryBalances(balances: MultiBalance[]) {
