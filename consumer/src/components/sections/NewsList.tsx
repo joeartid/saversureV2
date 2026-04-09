@@ -31,7 +31,6 @@ interface NewsListProps {
   error_text?: string;
   retry_label?: string;
   read_more_label?: string;
-  collapse_label?: string;
   show_banner_badge?: boolean;
 }
 
@@ -65,13 +64,11 @@ export default function NewsList({
   error_text = "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
   retry_label = "ลองใหม่",
   read_more_label = "อ่านเพิ่มเติม",
-  collapse_label = "ย่อ",
   show_banner_badge = true,
 }: NewsListProps) {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchNews = () => {
     setError(false);
@@ -87,10 +84,6 @@ export default function NewsList({
     fetchNews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit]);
-
-  const toggleExpand = (id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id));
-  };
 
   return (
     <div className="px-4 -mt-6 relative z-10">
@@ -168,139 +161,81 @@ export default function NewsList({
         <div className="space-y-3 stagger-children">
           {news.map((item) => {
             const imgSrc = mediaUrl(item.image_url);
-            const isExpanded = expandedId === item.id;
             const dateStr = formatDate(item.published_at || item.created_at);
             const hasContent = item.content && item.content.trim().length > 0;
 
             return (
-              <Card
+              <Link
                 key={item.id}
-                className="border-0 shadow-sm overflow-hidden card-playful cursor-pointer"
-                onClick={() => hasContent && toggleExpand(item.id)}
+                href={`/news/${item.id}`}
+                className="block"
               >
-                {/* Compact card view */}
-                <div className="flex gap-3 p-3">
-                  {/* Thumbnail */}
-                  <div className="w-24 h-24 rounded-lg bg-secondary relative overflow-hidden flex-shrink-0">
-                    {imgSrc ? (
-                      <Image
-                        src={imgSrc}
-                        alt={item.title}
-                        fill
-                        className="object-cover"
-                        sizes="96px"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary to-[var(--jh-green-light)]/10">
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1"
-                          className="w-8 h-8 text-muted-foreground/30"
-                        >
-                          <path d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5M6 7.5h3v3H6v-3z" />
-                        </svg>
-                      </div>
-                    )}
-                    {show_banner_badge && item.type === "banner" && (
-                      <span className="absolute top-1 left-1 bg-[var(--jh-orange)] text-white text-[9px] px-1.5 py-0.5 rounded font-bold">
-                        BANNER
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Text content */}
-                  <div className="flex-1 min-w-0 py-0.5 flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-[14px] font-semibold text-foreground line-clamp-2 leading-tight">
-                        {item.title}
-                      </h3>
-                      {!isExpanded && hasContent && (
-                        <p className="text-[12px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
-                          {truncateText(item.content, 80)}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between mt-1.5">
-                      <span className="text-[11px] text-muted-foreground">
-                        {dateStr}
-                      </span>
-                      {hasContent && (
-                        <span className="text-[11px] text-[var(--jh-green)] font-medium">
-                          {isExpanded ? collapse_label : read_more_label}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Expanded content */}
-                {isExpanded && hasContent && (
-                  <div className="border-t border-border/50">
-                    {imgSrc && (
-                      <div className="relative w-full aspect-[2/1] bg-secondary">
+                <Card className="border-0 shadow-sm overflow-hidden card-playful cursor-pointer hover:shadow-md transition-shadow">
+                  {/* Compact card view */}
+                  <div className="flex gap-3 p-3">
+                    {/* Thumbnail */}
+                    <div className="w-24 h-24 rounded-lg bg-secondary relative overflow-hidden flex-shrink-0">
+                      {imgSrc ? (
                         <Image
                           src={imgSrc}
                           alt={item.title}
                           fill
                           className="object-cover"
-                          sizes="100vw"
+                          sizes="96px"
                         />
-                      </div>
-                    )}
-                    <div className="px-4 py-4">
-                      <p className="text-[13px] text-foreground leading-relaxed whitespace-pre-wrap">
-                        {item.content}
-                      </p>
-                      {item.link_url && (
-                        <a
-                          href={item.link_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1.5 mt-4 text-[13px] font-medium text-[var(--jh-green)] active:opacity-70"
-                        >
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary to-[var(--jh-green-light)]/10">
                           <svg
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
-                            strokeWidth="2"
-                            className="w-4 h-4"
+                            strokeWidth="1"
+                            className="w-8 h-8 text-muted-foreground/30"
                           >
-                            <path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                            <path d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5M6 7.5h3v3H6v-3z" />
                           </svg>
-                          ดูรายละเอียดเพิ่มเติม
-                        </a>
+                        </div>
+                      )}
+                      {show_banner_badge && item.type === "banner" && (
+                        <span className="absolute top-1 left-1 bg-[var(--jh-orange)] text-white text-[9px] px-1.5 py-0.5 rounded font-bold">
+                          BANNER
+                        </span>
                       )}
                     </div>
-                  </div>
-                )}
 
-                {/* Link-only items (no content, but has link) */}
-                {!hasContent && item.link_url && (
-                  <div className="px-3 pb-3 -mt-1">
-                    <a
-                      href={item.link_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--jh-green)]"
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        className="w-3.5 h-3.5"
-                      >
-                        <path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                      </svg>
-                      ดูรายละเอียด
-                    </a>
+                    {/* Text content */}
+                    <div className="flex-1 min-w-0 py-0.5 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-[14px] font-semibold text-foreground line-clamp-2 leading-tight">
+                          {item.title}
+                        </h3>
+                        {hasContent && (
+                          <p className="text-[12px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                            {truncateText(item.content, 80)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          {dateStr}
+                        </span>
+                        <span className="text-[11px] text-[var(--jh-green)] font-medium inline-flex items-center gap-0.5">
+                          {read_more_label}
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            className="w-3 h-3"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </Card>
+                </Card>
+              </Link>
             );
           })}
         </div>

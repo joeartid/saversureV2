@@ -864,7 +864,7 @@ func main() {
 	publicMissionRoutes := api.Group("/public/missions")
 	publicMissionRoutes.Use(mw.TenantFromHeader())
 	{
-		publicMissionRoutes.GET("", gamifyHandler.ListMissions)
+		publicMissionRoutes.GET("", gamifyHandler.ListActiveMissions)
 		publicMissionRoutes.GET("/:id", gamifyHandler.GetMission)
 	}
 

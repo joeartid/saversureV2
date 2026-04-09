@@ -413,8 +413,10 @@ const sectionTypes: Record<string, SectionTypeDef> = {
     label: "History Tabs Nav",
     icon: "🗂️",
     description: "แถบแท็บ (สะสม/แลก/คูปอง/ลุ้นโชค)",
-    defaultProps: {},
-    fields: [],
+    defaultProps: { overlap: true },
+    fields: [
+      { key: "overlap", label: "ซ้อนขอบ bg สีเขียว (-mt-7)", type: "boolean" },
+    ],
   },
   history_scan_list: {
     label: "Scans",

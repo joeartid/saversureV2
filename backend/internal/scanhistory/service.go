@@ -121,7 +121,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Sc
 
 	// rolls → products takes priority over batch-level product
 	query := fmt.Sprintf(
-		`SELECT sh.id, COALESCE(sh.code_id::text, ''), sh.tenant_id, sh.batch_id,
+		`SELECT sh.id, COALESCE(sh.code_id::text, ''), sh.tenant_id, COALESCE(sh.batch_id::text, ''),
 		        COALESCE(c.serial_number, 0), COALESCE(c.ref1, ''), COALESCE(c.ref2, ''),
 		        COALESCE(c.status, ''),
 		        sh.user_id::text,
@@ -192,7 +192,7 @@ func (s *Service) ListByUser(ctx context.Context, tenantID, userID string, limit
 	).Scan(&total)
 
 	rows, err := s.db.Query(ctx,
-		`SELECT sh.id, COALESCE(sh.code_id::text, ''), sh.tenant_id, sh.batch_id,
+		`SELECT sh.id, COALESCE(sh.code_id::text, ''), sh.tenant_id, COALESCE(sh.batch_id::text, ''),
 		        COALESCE(c.serial_number, 0), COALESCE(c.ref1, ''), COALESCE(c.ref2, ''),
 		        COALESCE(c.status, ''),
 		        sh.user_id::text,
