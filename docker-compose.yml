@@ -48,6 +48,25 @@ services:
       timeout: 3s
       retries: 3
 
+  minio:
+    image: minio/minio:latest
+    container_name: saversure-minio
+    ports:
+      - "59300:9000"
+      - "59301:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-change_me_minio_access_key}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-change_me_minio_secret_key}
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./minio-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   api:
     build:
       context: ./backend
@@ -59,8 +78,8 @@ services:
       APP_ENV: development
       APP_HOST: 0.0.0.0
       APP_PORT: "30400"
-      DB_HOST: host.docker.internal
-      DB_PORT: "15433"
+      DB_HOST: postgres
+      DB_PORT: "5432"
       DB_NAME: saversure
       DB_USER: saversure_app
       DB_PASSWORD: ${DB_PASSWORD:-change_me_db_password}
@@ -70,17 +89,21 @@ services:
       NATS_URL: nats://nats:4222
       JWT_SECRET: ${JWT_SECRET:-change_me_jwt_secret}
       HMAC_SECRET: ${HMAC_SECRET:-change_me_hmac_secret}
-      # Remote MinIO Server
-      MINIO_ENDPOINT: "192.168.0.60:59300"
+      # Local MinIO on this machine
+      MINIO_ENDPOINT: "minio:9000"
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-change_me_minio_access_key}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-change_me_minio_secret_key}
       MINIO_BUCKET: "saversure-dev"
       MINIO_USE_SSL: "false"
-      MINIO_PUBLIC_URL: "http://192.168.0.60:59300"
+      MINIO_PUBLIC_URL: "https://api.svsu.me/media"
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       nats:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     restart: unless-stopped
 

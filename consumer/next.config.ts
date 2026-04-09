@@ -4,6 +4,8 @@ import path from "path";
 const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(__dirname),
+  allowedDevOrigins: ["julaherb.svsu.me", "julasherb.svsu.me"],
+  devIndicators: false,
   images: {
     unoptimized: true,
     remotePatterns: [

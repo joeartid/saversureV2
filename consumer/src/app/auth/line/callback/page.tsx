@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { setToken } from "@/lib/auth";
+import { clearPostLoginRedirect, getPostLoginRedirect, setToken } from "@/lib/auth";
 import { getTenantId } from "@/lib/tenant";
 import {
   clearPendingScan,
@@ -43,17 +43,22 @@ function LineCallbackInner() {
         setToken(data.access_token);
         const redirectCodeFromState = stateParam?.includes("|") ? stateParam.split("|").slice(1).join("|") : "";
         const redirectCode = redirectCodeFromState || "";
+        const nextPath = getPostLoginRedirect();
         if (redirectCode) {
           setPendingScan(redirectCode, "line");
         }
         if (data.profile_completed === false) {
-          sessionStorage.setItem("return_after_register", getPendingScanTarget("/scan"));
+          sessionStorage.setItem("return_after_register", nextPath || getPendingScanTarget("/scan"));
           router.push("/register/complete");
           return;
         }
-        if (redirectCode) {
+        if (nextPath) {
+          clearPostLoginRedirect();
+          router.push(nextPath);
+        } else if (redirectCode) {
           router.push(getPendingScanTarget("/scan"));
         } else {
+          clearPostLoginRedirect();
           clearPendingScan();
           router.push("/scan");
         }

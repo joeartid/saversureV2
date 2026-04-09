@@ -164,17 +164,28 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-y-0 w-full max-w-[480px] left-1/2 -translate-x-1/2 z-[9990] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`fixed inset-0 z-[9990] bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
           open ? "opacity-100 cursor-pointer" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
       />
 
       {/* Drawer Container */}
-      <div className="fixed inset-y-0 w-full max-w-[480px] left-1/2 -translate-x-1/2 pointer-events-none z-[9999] p-4 sm:p-5">
+      <div
+        className="fixed inset-y-0 left-0 right-0 pointer-events-none z-[9999]"
+        style={{
+          paddingTop: "max(8px, env(safe-area-inset-top))",
+          paddingRight: "max(8px, env(safe-area-inset-right))",
+          paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+          paddingLeft: "max(8px, env(safe-area-inset-left))",
+        }}
+      >
         <div
-          className="relative w-full max-w-[340px] h-full flex flex-col pointer-events-auto transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
-          style={{ transform: open ? "translateX(0)" : "translateX(-120%)" }}
+          className="relative h-full flex flex-col pointer-events-auto transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+          style={{
+            width: "min(380px, calc(100vw - 16px))",
+            transform: open ? "translateX(0)" : "translateX(-120%)",
+          }}
         >
           {/* Main Floating Card */}
           <div className="flex-1 bg-[#F6F8F9] rounded-[32px] overflow-hidden shadow-2xl flex flex-col relative w-full h-full max-h-full">

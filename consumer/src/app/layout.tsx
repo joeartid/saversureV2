@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import TenantProvider from "@/components/TenantProvider";
+import AuthGate from "@/components/AuthGate";
 import PopupRenderer from "@/components/PopupRenderer";
 import { CurrencyProvider } from "@/lib/currency-context";
 import { Toaster } from "react-hot-toast";
@@ -27,11 +28,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <TenantProvider>
-          <CurrencyProvider>
-            {children}
-            <PopupRenderer />
-            <Toaster position="top-center" reverseOrder={false} />
-          </CurrencyProvider>
+          <AuthGate>
+            <CurrencyProvider>
+              {children}
+              <PopupRenderer />
+              <Toaster position="top-center" reverseOrder={false} />
+            </CurrencyProvider>
+          </AuthGate>
         </TenantProvider>
       </body>
     </html>

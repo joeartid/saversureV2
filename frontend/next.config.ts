@@ -7,9 +7,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
     remotePatterns: [
-      // MinIO / CDN ที่ใช้งานจริง
-      { protocol: "https", hostname: "cdn.julaherb.saversure.com" },
-      { protocol: "https", hostname: "*.saversure.com" },
+      // svsu.me media proxy
+      { protocol: "https", hostname: "*.svsu.me" },
+      { protocol: "https", hostname: "api.svsu.me" },
       // dev: MinIO โดยตรง
       { protocol: "http", hostname: "192.168.0.41", port: "9010" },
       { protocol: "http", hostname: "localhost", port: "9010" },

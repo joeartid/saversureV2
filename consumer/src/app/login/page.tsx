@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { isLoggedIn, setToken } from "@/lib/auth";
+import { clearPostLoginRedirect, getPostLoginRedirect, isLoggedIn, setToken } from "@/lib/auth";
 import { useTenant } from "@/components/TenantProvider";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -49,14 +49,25 @@ function LoginPageInner() {
     () => resolvePendingCodeFromSearch(searchParams),
     [searchParams]
   );
+  const nextPath = useMemo(() => {
+    const requested = (searchParams.get("next") || getPostLoginRedirect() || "").trim();
+    return requested.startsWith("/") && !requested.startsWith("//") ? requested : "";
+  }, [searchParams]);
+
+  const postLoginTarget = useMemo(() => {
+    if (nextPath) return nextPath;
+    return pendingCode ? getPendingScanTarget("/scan") : "/scan";
+  }, [nextPath, pendingCode]);
 
   useEffect(() => {
     if (pendingCode) setPendingScan(pendingCode, "qr");
   }, [pendingCode]);
 
   useEffect(() => {
-    if (isLoggedIn()) router.replace(getPendingScanTarget("/scan"));
-  }, [router]);
+    if (!isLoggedIn()) return;
+    clearPostLoginRedirect();
+    router.replace(postLoginTarget);
+  }, [postLoginTarget, router]);
 
   useEffect(() => {
     if (!ready || !tenantId) return;
@@ -68,12 +79,13 @@ function LoginPageInner() {
   const finishAuth = (tokens: AuthResponse) => {
     setToken(tokens.access_token);
     if (tokens.profile_completed === false) {
-      sessionStorage.setItem("return_after_register", getPendingScanTarget("/scan"));
+      sessionStorage.setItem("return_after_register", postLoginTarget);
       router.replace("/register/complete");
       return;
     }
-    if (!pendingCode) clearPendingScan();
-    router.replace(pendingCode ? getPendingScanTarget("/scan") : "/scan");
+    if (!pendingCode && !nextPath) clearPendingScan();
+    clearPostLoginRedirect();
+    router.replace(postLoginTarget);
   };
 
   const handleLineLogin = async () => {
