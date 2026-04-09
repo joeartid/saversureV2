@@ -40,7 +40,13 @@ interface PageConfig {
   version: number;
 }
 
-const BUILT_IN_PAGES = [
+interface BuiltInPage {
+  value: string;
+  label: string;
+  parent?: string;
+}
+
+const BUILT_IN_PAGES: BuiltInPage[] = [
   { value: "home", label: "หน้าแรก (Home)" },
   { value: "scan", label: "หน้าสแกน (Scan)" },
   { value: "rewards", label: "หน้ารางวัล (Rewards)" },
@@ -48,6 +54,9 @@ const BUILT_IN_PAGES = [
   { value: "shop", label: "หน้าช้อปออนไลน์ (Shop)" },
   { value: "wallet", label: "หน้ากระเป๋าเงิน (Wallet)" },
   { value: "history", label: "หน้าประวัติ (History)" },
+  { value: "history_redeems", label: "แลกแต้ม", parent: "history" },
+  { value: "history_coupons", label: "คูปอง", parent: "history" },
+  { value: "history_lucky_draw", label: "ลุ้นโชค", parent: "history" },
   { value: "profile", label: "หน้าโปรไฟล์ (Profile)" },
   { value: "news", label: "หน้าข่าวสาร (News)" },
   { value: "notifications", label: "หน้าแจ้งเตือน (Notifications)" },
@@ -969,6 +978,89 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       },
     ],
   },
+  history_redeems_list: {
+    label: "History — Redeems",
+    icon: "📦",
+    description: "รายการแลกของรางวัลประเภทจัดส่ง/รับหน้าร้าน — ดึง API",
+    defaultProps: {
+      empty_title: "ยังไม่มีประวัติการแลกรางวัล",
+      empty_text: "สะสมแต้มเพื่อนำมาแลกของรางวัลและสิทธิพิเศษ",
+      empty_cta_label: "ดูของรางวัล",
+      empty_cta_link: "/rewards",
+      error_title: "ไม่สามารถโหลดข้อมูลได้",
+      error_text: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+      retry_label: "ลองใหม่",
+    },
+    fields: [
+      { key: "empty_title", label: "หัวข้อ empty state", type: "text" },
+      { key: "empty_text", label: "ข้อความ empty state", type: "textarea" },
+      { key: "empty_cta_label", label: "ข้อความปุ่ม CTA", type: "text" },
+      { key: "empty_cta_link", label: "ลิงก์ปุ่ม CTA", type: "text" },
+      { key: "error_title", label: "หัวข้อ error state", type: "text" },
+      { key: "error_text", label: "ข้อความ error state", type: "text" },
+      { key: "retry_label", label: "ข้อความปุ่มลองใหม่", type: "text" },
+    ],
+  },
+  history_coupons_list: {
+    label: "History — Coupons",
+    icon: "🎫",
+    description: "รายการคูปอง/ดิจิทัล/ตั๋ว พร้อมปุ่มใช้คูปอง (QR/Barcode) — ดึง API",
+    defaultProps: {
+      empty_title: "ยังไม่มีคูปองหรือสิทธิ์ดิจิทัล",
+      empty_text: "แลกแต้มเพื่อรับคูปอง ตั๋ว หรือของรางวัลดิจิทัลที่หน้ารางวัล",
+      empty_cta_label: "ไปที่หน้ารางวัล",
+      empty_cta_link: "/rewards",
+      error_title: "ไม่สามารถโหลดข้อมูลได้",
+      error_text: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+      retry_label: "ลองใหม่",
+      active_section_label: "ใช้ได้",
+      used_section_label: "ใช้แล้ว / หมดอายุ",
+    },
+    fields: [
+      { key: "empty_title", label: "หัวข้อ empty state", type: "text" },
+      { key: "empty_text", label: "ข้อความ empty state", type: "textarea" },
+      { key: "empty_cta_label", label: "ข้อความปุ่ม CTA", type: "text" },
+      { key: "empty_cta_link", label: "ลิงก์ปุ่ม CTA", type: "text" },
+      { key: "error_title", label: "หัวข้อ error state", type: "text" },
+      { key: "error_text", label: "ข้อความ error state", type: "text" },
+      { key: "retry_label", label: "ข้อความปุ่มลองใหม่", type: "text" },
+      { key: "active_section_label", label: "หัวข้อกลุ่ม \"ใช้ได้\"", type: "text" },
+      { key: "used_section_label", label: "หัวข้อกลุ่ม \"ใช้แล้ว/หมดอายุ\"", type: "text" },
+    ],
+  },
+  history_lucky_draw_list: {
+    label: "History — Lucky Draw",
+    icon: "🎟️",
+    description: "รายการตั๋วลุ้นโชคของผู้ใช้ — ดึง API",
+    defaultProps: {
+      empty_title: "ยังไม่มีสิทธิ์ลุ้นโชค",
+      empty_text: "ร่วมกิจกรรมลุ้นโชคเพื่อรับสิทธิ์",
+      empty_cta_label: "ดูกิจกรรม",
+      empty_cta_link: "/missions",
+      error_title: "ไม่สามารถโหลดข้อมูลได้",
+      error_text: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+      retry_label: "ลองใหม่",
+      count_label: "พบ {n} สิทธิ์ลุ้นโชค",
+      status_label_active: "รอการจับรางวัล",
+      status_label_won: "ได้รับรางวัล",
+      ticket_number_label: "หมายเลขตั๋ว",
+      ticket_type_label: "ตั๋ว",
+    },
+    fields: [
+      { key: "empty_title", label: "หัวข้อ empty state", type: "text" },
+      { key: "empty_text", label: "ข้อความ empty state", type: "textarea" },
+      { key: "empty_cta_label", label: "ข้อความปุ่ม CTA", type: "text" },
+      { key: "empty_cta_link", label: "ลิงก์ปุ่ม CTA", type: "text" },
+      { key: "error_title", label: "หัวข้อ error state", type: "text" },
+      { key: "error_text", label: "ข้อความ error state", type: "text" },
+      { key: "retry_label", label: "ข้อความปุ่มลองใหม่", type: "text" },
+      { key: "count_label", label: "ข้อความนับจำนวน (ใช้ {n} แทนจำนวน)", type: "text" },
+      { key: "status_label_active", label: "ข้อความสถานะ active", type: "text" },
+      { key: "status_label_won", label: "ข้อความสถานะ won", type: "text" },
+      { key: "ticket_number_label", label: "ข้อความ \"หมายเลขตั๋ว\"", type: "text" },
+      { key: "ticket_type_label", label: "Badge ประเภทตั๋ว", type: "text" },
+    ],
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -1053,6 +1145,9 @@ const sectionCategories: SectionCategory[] = [
     types: [
       "history_stat_summary",
       "history_scan_list",
+      "history_redeems_list",
+      "history_coupons_list",
+      "history_lucky_draw_list",
       "recent_news",
       "news_list",
       "notifications_list",
@@ -1996,31 +2091,45 @@ export default function PageBuilderPage() {
         </div>
       </div>
 
-      {/* Page Selector */}
-      <div className="flex gap-2 mb-6 flex-wrap items-center">
-        {allPages.map((p) => (
-          <div key={p.value} className="relative group">
-            <button
-              onClick={() => setPageSlug(p.value)}
-              className={`h-[36px] px-4 rounded-[var(--md-radius-sm)] text-[13px] font-medium transition-all ${
-                pageSlug === p.value
-                  ? "bg-[var(--md-primary)] text-white"
-                  : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
-              }`}
-            >
-              {p.label}
-            </button>
-            {!BUILT_IN_SLUGS.has(p.value) && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleDeletePage(p.value); }}
-                className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[var(--md-error)] text-white text-[10px] leading-none"
-                title="ลบหน้านี้"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        ))}
+      {/* Page Selector — top-level (hides nested sub-pages) */}
+      <div className="flex gap-2 mb-3 flex-wrap items-center">
+        {allPages
+          .filter((p) => !("parent" in p) || !p.parent)
+          .map((p) => {
+            // Highlight parent when a child of it is currently selected
+            const currentChild = BUILT_IN_PAGES.find(
+              (bp) => bp.value === pageSlug && bp.parent,
+            );
+            const isActive =
+              pageSlug === p.value ||
+              (currentChild && currentChild.parent === p.value);
+            return (
+              <div key={p.value} className="relative group">
+                <button
+                  onClick={() => setPageSlug(p.value)}
+                  className={`h-[36px] px-4 rounded-[var(--md-radius-sm)] text-[13px] font-medium transition-all ${
+                    isActive
+                      ? "bg-[var(--md-primary)] text-white"
+                      : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
+                  }`}
+                >
+                  {p.label}
+                </button>
+                {!BUILT_IN_SLUGS.has(p.value) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeletePage(p.value);
+                    }}
+                    className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[var(--md-error)] text-white text-[10px] leading-none"
+                    title="ลบหน้านี้"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            );
+          })}
 
         <button
           onClick={() => setShowNewPage(true)}
@@ -2029,6 +2138,47 @@ export default function PageBuilderPage() {
           + สร้างหน้าใหม่
         </button>
       </div>
+
+      {/* Sub-page tabs — shown only when a parent page (with children) is active */}
+      {(() => {
+        // Figure out the parent slug for the current context
+        const currentChild = BUILT_IN_PAGES.find(
+          (p) => p.value === pageSlug && p.parent,
+        );
+        const parentSlug = currentChild ? currentChild.parent! : pageSlug;
+        const children = BUILT_IN_PAGES.filter((p) => p.parent === parentSlug);
+        if (children.length === 0) return null;
+        return (
+          <div className="flex gap-2 mb-6 flex-wrap items-center pl-4 border-l-2 border-[var(--md-outline-variant)]">
+            <span className="text-[11px] text-[var(--md-on-surface-variant)] mr-1">
+              หน้าย่อย:
+            </span>
+            <button
+              onClick={() => setPageSlug(parentSlug)}
+              className={`h-[30px] px-3 rounded-full text-[12px] font-medium transition-all ${
+                pageSlug === parentSlug
+                  ? "bg-[var(--md-primary)] text-white"
+                  : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
+              }`}
+            >
+              หลัก
+            </button>
+            {children.map((c) => (
+              <button
+                key={c.value}
+                onClick={() => setPageSlug(c.value)}
+                className={`h-[30px] px-3 rounded-full text-[12px] font-medium transition-all ${
+                  pageSlug === c.value
+                    ? "bg-[var(--md-primary)] text-white"
+                    : "bg-[var(--md-surface-container)] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container-high)]"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* New Page Modal */}
       {showNewPage && (

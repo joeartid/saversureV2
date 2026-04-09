@@ -19,6 +19,9 @@ const ProfileLogoutButton = dynamic(() => import("./ProfileLogoutButton"));
 const HistoryStatSummary = dynamic(() => import("./HistoryStatSummary"));
 const HistoryTabsNav = dynamic(() => import("./HistoryTabsNav"));
 const HistoryScanList = dynamic(() => import("./HistoryScanList"));
+const HistoryRedeemsList = dynamic(() => import("./HistoryRedeemsList"));
+const HistoryCouponsList = dynamic(() => import("./HistoryCouponsList"));
+const HistoryLuckyDrawList = dynamic(() => import("./HistoryLuckyDrawList"));
 const HomeNewsBannerCarousel = dynamic(() => import("./HomeNewsBannerCarousel"));
 const HomeSectionHeading = dynamic(() => import("./HomeSectionHeading"));
 const HomeRewardsTabs = dynamic(() => import("./HomeRewardsTabs"));
@@ -92,6 +95,9 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   history_stat_summary: HistoryStatSummary,
   history_tabs_nav: HistoryTabsNav,
   history_scan_list: HistoryScanList,
+  history_redeems_list: HistoryRedeemsList,
+  history_coupons_list: HistoryCouponsList,
+  history_lucky_draw_list: HistoryLuckyDrawList,
   home_news_banner_carousel: HomeNewsBannerCarousel,
   home_section_heading: HomeSectionHeading,
   home_rewards_tabs: HomeRewardsTabs,
@@ -232,6 +238,21 @@ export const sectionMeta: Record<
     label: "Scans",
     icon: "📋",
     description: "รายการสแกน group by date + infinite scroll (ออกแบบสำหรับ History)",
+  },
+  history_redeems_list: {
+    label: "History — Redeems (สินค้า/จัดส่ง)",
+    icon: "📦",
+    description: "รายการแลกของรางวัลประเภทจัดส่ง/รับหน้าร้าน — ดึง API /api/v1/my/redeem-transactions",
+  },
+  history_coupons_list: {
+    label: "History — Coupons (คูปอง/ดิจิทัล/ตั๋ว)",
+    icon: "🎫",
+    description: "รายการคูปอง/สิทธิ์ดิจิทัล พร้อมปุ่มใช้คูปอง (QR/Barcode) — ดึง API /api/v1/my/redeem-transactions",
+  },
+  history_lucky_draw_list: {
+    label: "History — Lucky Draw (ตั๋วลุ้นโชค)",
+    icon: "🎟️",
+    description: "รายการสิทธิ์ลุ้นโชคของผู้ใช้ — ดึง API /api/v1/my/lucky-draw/tickets",
   },
   home_news_banner_carousel: {
     label: "News Banner Carousel",
