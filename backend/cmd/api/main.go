@@ -739,6 +739,7 @@ func main() {
 		fulfillmentRoutes.GET("", fulfillmentHandler.List)
 		fulfillmentRoutes.PATCH("/:id", fulfillmentHandler.UpdateStatus)
 		fulfillmentRoutes.POST("/bulk-update", fulfillmentHandler.BulkUpdate)
+		fulfillmentRoutes.POST("/export-pdf", fulfillmentHandler.ExportPDF)
 	}
 
 	// API Keys (Admin)

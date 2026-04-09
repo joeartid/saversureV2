@@ -2,6 +2,9 @@
 
 # dependencies
 node_modules/
+frontend/node_modules/
+consumer/node_modules/
+factory-portal/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,21 +15,28 @@ node_modules/
 
 # testing
 /coverage
+coverage/
 
 # next.js (any app under monorepo)
 **/.next/
 /out/
+frontend/out/
 
 # production
 /build
+backend/dist/
+backend/bin/
+frontend/dist/
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
 
 # Go binaries
 *.exe
 *.exe~
+backend/api.exe
 
 # Go debug scripts (must be in cmd/<toolname>/ subdir, not backend root)
 backend/check_*.go
@@ -44,11 +54,17 @@ yarn-error.log*
 backend/out.log
 backend/*.log
 *.log
+backend/api_err.txt
+backend/api_out.txt
+frontend/dev_err.txt
+frontend/dev_out.txt
 
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
 !**/.env.example
+.env.local
+.env.*.local
 
 # vercel
 .vercel
@@ -56,6 +72,22 @@ backend/*.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+.claude/settings.local.json
+
+# Docker volumes
+redis-data/
+nats-data/
+
+# temp / extracted
+.docx_extract/
+charter-extracted.txt
+saversure-charter-v2.zip
+0
+_commit_msg.txt
 
 # DB backups (kept local only — GitHub 50MB limit)
 backup/*.dump

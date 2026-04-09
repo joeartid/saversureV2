@@ -9,6 +9,34 @@
 
 ---
 
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
+
+---
+
 ## สถานะปัจจุบันของ V2
 
 ### สิ่งที่ทำเสร็จแล้ว
@@ -202,6 +230,34 @@
 
 ---
 
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
+
+---
+
 ## สิ่งที่ยังเหลือ (Requires External Dependencies)
 
 ### LINE Login / LIFF
@@ -247,6 +303,34 @@
 **ยังไม่ได้ทำ:**
 - [ ] LIFF per tenant (ต้อง LINE OA per brand)
 - [ ] Rich menu per brand
+
+---
+
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
 
 ---
 
@@ -352,6 +436,34 @@ saversure.com (Legacy V1 — Jula'sHerb only)
 
 ---
 
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
+
+---
+
 ## สิ่งที่ยังเหลือ (Nice-to-have / Future)
 
 ### Admin Enhancements
@@ -425,6 +537,34 @@ saversure.com (Legacy V1 — Jula'sHerb only)
 - [ ] Prometheus metrics endpoint
 - [ ] Sentry error tracking
 - [ ] Uptime monitoring
+
+---
+
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
 
 ---
 
@@ -556,6 +696,62 @@ CRUD   /api/v1/support/my-cases
 
 ---
 
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
+
+---
+
+---
+
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
+
 ---
 
 ## Roll Lifecycle Management (Done: 2026-03-05)
@@ -576,6 +772,34 @@ CRUD   /api/v1/support/my-cases
 - Backend: `internal/roll/service.go`, `handler.go`
 - Frontend: `app/(admin)/rolls/page.tsx`
 - แก้ไข: `batch/service.go` (auto-create rolls), `code/service.go` (roll status check), `qc/service.go` (roll info)
+
+---
+
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
 
 ---
 
@@ -650,6 +874,34 @@ CRUD   /api/v1/support/my-cases
 
 ---
 
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
+
+---
+
 ## WeOrder × SaversureV2 Integration (Future Roadmap)
 
 ### Business Goal
@@ -700,6 +952,34 @@ CRUD   /api/v1/support/my-cases
 
 ---
 
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
+
+---
+
 ## Database Migrations Summary
 
 | # | File | Description |
@@ -727,6 +1007,34 @@ CRUD   /api/v1/support/my-cases
 | 021 | factory_user_link | factory-user link (staff → factory assignment) |
 | 022 | redemption_coupon_code | redemption coupon code fields |
 | 023 | line_login_nullable_email | email/password_hash nullable for LINE-only users |
+
+---
+
+## Status Refresh (2026-03-23)
+
+This section is the latest checkpoint after code review in the current workspace.
+
+### Confirmed Implemented Since Earlier Backlog Notes
+
+- Reward redemption flow is already connected in backend + consumer, including coupon return and shipping address handling.
+- Web QR camera fallback is already implemented in consumer via `html5-qrcode`, alongside existing LIFF hooks.
+- Ops digest and admin alerts are already implemented in backend and exposed in admin `Ops Center`.
+- Admin fulfillment flow is now implemented with:
+  - fulfillment list page
+  - status updates (`pending -> preparing -> shipped -> delivered`)
+  - bulk updates
+  - printable shipping labels
+  - downloadable PDF delivery notes
+
+### Recommended Next Priorities
+
+1. Production safety baseline
+   - add unit tests for redemption, ledger, codegen, and fulfillment PDF generation
+   - add CI for backend/frontend type and test checks
+2. Fulfillment hardening
+   - add courier/provider metadata, delivery note numbering, and audit trail for PDF exports
+3. Backlog cleanup
+   - merge older recommendation sections with the real implementation status to avoid duplicate or outdated priorities
 
 ---
 

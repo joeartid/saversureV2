@@ -3,6 +3,7 @@ package fulfillment
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"saversure/internal/apperror"
 
@@ -13,8 +14,19 @@ type Handler struct {
 	svc *Service
 }
 
+var validFulfillmentStatuses = map[string]bool{
+	"pending":   true,
+	"preparing": true,
+	"shipped":   true,
+	"delivered": true,
+}
+
 func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
+}
+
+func isValidFulfillmentStatus(status string) bool {
+	return validFulfillmentStatuses[status]
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -46,8 +58,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	valid := map[string]bool{"pending": true, "preparing": true, "shipped": true, "delivered": true}
-	if !valid[input.FulfillmentStatus] {
+	if !isValidFulfillmentStatus(input.FulfillmentStatus) {
 		apperror.RespondValidation(c, "status must be: pending, preparing, shipped, delivered")
 		return
 	}
@@ -74,6 +85,14 @@ func (h *Handler) BulkUpdate(c *gin.Context) {
 		apperror.RespondValidation(c, err.Error())
 		return
 	}
+	if len(input.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "ids must not be empty"})
+		return
+	}
+	if !isValidFulfillmentStatus(input.FulfillmentStatus) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": "status must be: pending, preparing, shipped, delivered"})
+		return
+	}
 
 	updated, err := h.svc.BulkUpdateStatus(c.Request.Context(), tenantID, input.IDs, UpdateStatusInput{
 		FulfillmentStatus: input.FulfillmentStatus,
@@ -85,4 +104,47 @@ func (h *Handler) BulkUpdate(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "updated", "count": updated})
+}
+
+type ExportPDFInput struct {
+	IDs []string `json:"ids" binding:"required"`
+}
+
+func (h *Handler) ExportPDF(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+
+	var input ExportPDFInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	if len(input.IDs) == 0 {
+		apperror.RespondValidation(c, "ids must not be empty")
+		return
+	}
+
+	items, err := h.svc.ListByIDs(c.Request.Context(), tenantID, input.IDs)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	if len(items) == 0 {
+		apperror.RespondNotFound(c, "not_found")
+		return
+	}
+	if len(items) != len(input.IDs) {
+		apperror.RespondValidation(c, "some selected items were not found or are not confirmed")
+		return
+	}
+
+	pdfBytes, err := BuildDeliveryNotesPDF(items)
+	if err != nil {
+		apperror.Respond(c, apperror.Internal("pdf_error"))
+		return
+	}
+
+	filename := "delivery-notes-" + time.Now().Format("20060102-150405") + ".pdf"
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
