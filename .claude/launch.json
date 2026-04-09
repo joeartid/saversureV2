@@ -17,8 +17,8 @@
     },
     {
       "name": "backend",
-      "runtimeExecutable": "go",
-      "runtimeArgs": ["run", "./cmd/api"],
+      "runtimeExecutable": "./api.exe",
+      "runtimeArgs": [],
       "port": 30400,
       "cwd": "backend"
     }

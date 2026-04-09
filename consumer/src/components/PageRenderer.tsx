@@ -14,7 +14,25 @@ interface PageConfigResponse {
 
 interface PageRendererProps {
   pageSlug: string;
+  /** Optional override for empty state. Defaults to a brand-agnostic placeholder. */
   fallback?: React.ReactNode;
+}
+
+function DefaultEmptyState({ pageSlug }: { pageSlug: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+      <div className="text-5xl mb-4 opacity-40">📄</div>
+      <h2 className="text-lg font-bold text-foreground">
+        หน้านี้ยังไม่ได้ตั้งค่า
+      </h2>
+      <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+        กรุณาสร้าง layout ของหน้านี้ผ่าน Page Builder
+      </p>
+      <code className="mt-3 text-[11px] text-muted-foreground/70 bg-muted/40 px-2 py-1 rounded">
+        slug: {pageSlug}
+      </code>
+    </div>
+  );
 }
 
 export default function PageRenderer({
@@ -50,13 +68,14 @@ export default function PageRenderer({
     );
   }
 
-  if (error || !sections || sections.length === 0) {
-    return <>{fallback}</>;
-  }
+  const visibleSections =
+    sections
+      ?.filter((s) => s.visible !== false)
+      .sort((a, b) => a.order - b.order) ?? [];
 
-  const visibleSections = sections
-    .filter((s) => s.visible !== false)
-    .sort((a, b) => a.order - b.order);
+  if (error || visibleSections.length === 0) {
+    return <>{fallback ?? <DefaultEmptyState pageSlug={pageSlug} />}</>;
+  }
 
   return (
     <>
