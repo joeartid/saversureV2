@@ -944,7 +944,7 @@ func main() {
 	{
 		myRoutes.POST("/lucky-draw/:id/register", luckyDrawHandler.Register)
 		myRoutes.GET("/lucky-draw/:id/tickets", luckyDrawHandler.GetUserTickets)
-		myRoutes.GET("/lucky-draw/tickets", luckyDrawHandler.GetUserTickets)
+		myRoutes.GET("/lucky-draw/tickets", luckyDrawHandler.GetAllUserTickets)
 		myRoutes.POST("/donations/:id/donate", donationHandler.Donate)
 		myRoutes.GET("/donations", donationHandler.GetMyDonations)
 		myRoutes.GET("/balances", currencyHandler.GetMultiBalance)

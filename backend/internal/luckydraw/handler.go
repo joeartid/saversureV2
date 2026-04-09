@@ -143,6 +143,17 @@ func (h *Handler) GetUserTickets(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": tickets})
 }
 
+func (h *Handler) GetAllUserTickets(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	tickets, err := h.svc.GetAllUserTickets(c.Request.Context(), userID)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": tickets})
+}
+
 func (h *Handler) DrawWinners(c *gin.Context) {
 	tenantID := c.GetString("tenant_id")
 	campaignID := c.Param("id")

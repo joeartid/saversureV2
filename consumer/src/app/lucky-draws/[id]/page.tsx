@@ -43,15 +43,28 @@ interface LuckyDraw {
   title: string;
   description: string | null;
   image_url: string | null;
-  point_cost: number;
+  cost_points: number;
+  max_tickets_per_user: number;
+  total_tickets: number;
   status: string;
   end_date: string | null;
+  prize_count?: number;
+  ticket_count?: number;
+}
+
+interface Prize {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  quantity: number;
 }
 
 export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [campaign, setCampaign] = useState<LuckyDraw | null>(null);
+  const [prizes, setPrizes] = useState<Prize[]>([]);
   const [loading, setLoading] = useState(true);
   const [points, setPoints] = useState(0);
   const [registering, setRegistering] = useState(false);
@@ -62,8 +75,9 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await api.get<{ campaign: LuckyDraw }>(`/api/v1/public/lucky-draw/${id}`);
+        const res = await api.get<{ campaign: LuckyDraw; prizes: Prize[] }>(`/api/v1/public/lucky-draw/${id}`);
         setCampaign(res.campaign);
+        setPrizes(res.prizes || []);
         if (isLoggedIn()) {
           const balRes = await api.get<{ data: { currency: string; balance: number }[] }>("/api/v1/my/balances");
           const pointBal = balRes.data?.find((b) => b.currency.toLowerCase() === "point");
@@ -84,7 +98,7 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
       router.push("/login");
       return;
     }
-    if (points < (campaign.point_cost || 0)) {
+    if (points < (campaign.cost_points || 0)) {
       alert("ขออภัย แต้มของคุณไม่เพียงพอสำหรับการลุ้นโชคนี้");
       return;
     }
@@ -97,7 +111,7 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
     setRegistering(true);
     try {
       const res = await api.post<{ ticket_number: string }>(`/api/v1/my/lucky-draw/${campaign.id}/register`, {});
-      setPoints((p) => p - (campaign.point_cost || 0));
+      setPoints((p) => p - (campaign.cost_points || 0));
       if (res?.ticket_number) {
         setTicketNumber(res.ticket_number);
       }
@@ -166,7 +180,7 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
             <h1 className="text-base font-extrabold leading-tight text-gray-900">{campaign.title}</h1>
             <div className="flex items-center gap-1.5 mt-2">
               <span className="text-lg font-bold text-[var(--jh-green)] relative group cursor-default flex items-center gap-1">
-                <span className="text-xl">{'⭐'}</span> {(campaign.point_cost || 0).toLocaleString()}
+                <span className="text-xl">{'⭐'}</span> {(campaign.cost_points || 0).toLocaleString()}
                 <span className="absolute -top-7 left-0 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
                   Point
                 </span>
@@ -174,6 +188,25 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
               <span className="text-xs text-muted-foreground ml-1">
                 แต้ม / สิทธิ์
               </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[12px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <span>🎫</span>
+                <span>สูงสุด</span>
+                <span className="font-bold text-gray-700">
+                  {(campaign.max_tickets_per_user ?? 0).toLocaleString()}
+                </span>
+                <span>สิทธิ์/คน</span>
+              </span>
+              {prizes.length > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <span>🎁</span>
+                  <span className="font-bold text-gray-700">
+                    {prizes.reduce((sum, p) => sum + (p.quantity ?? 0), 0).toLocaleString()}
+                  </span>
+                  <span>รางวัล</span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -210,7 +243,7 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
             </div>
             <h2 className="text-[20px] font-black text-gray-800 mb-2">ยืนยันการแลกสิทธิ์</h2>
             <p className="text-[14px] text-gray-600 mb-6 flex flex-col items-center">
-              <span>คุณต้องการใช้ <span className="text-[var(--primary)] font-bold text-lg">{(campaign.point_cost || 0).toLocaleString()}</span> แต้ม</span>
+              <span>คุณต้องการใช้ <span className="font-bold text-lg" style={{ color: "var(--primary)" }}>{(campaign.cost_points || 0).toLocaleString()}</span> แต้ม</span>
               <span>เพื่อแลกสิทธิ์ลุ้นโชคใช่หรือไม่?</span>
             </p>
             <div className="flex gap-3 relative z-10 w-full">
@@ -243,12 +276,13 @@ export default function LuckyDrawDetailPage({ params }: { params: Promise<{ id: 
               </div>
             )}
             <p className="text-[14px] text-gray-600 mb-6 px-1 leading-relaxed">
-              คุณใช้ <span className="font-bold text-gray-800">{(campaign.point_cost || 0).toLocaleString()}</span> แต้ม เพื่อแลก <span className="font-bold text-gray-800">1</span> สิทธิ์ลุ้นโชคเรียบร้อย ขอให้โชคดีนะครับ!
+              คุณใช้ <span className="font-bold text-gray-800">{(campaign.cost_points || 0).toLocaleString()}</span> แต้ม เพื่อแลก <span className="font-bold text-gray-800">1</span> สิทธิ์ลุ้นโชคเรียบร้อย ขอให้โชคดีนะครับ!
             </p>
             <div className="flex flex-col gap-3 relative z-10">
               <Link
                 href="/history/lucky-draw"
-                className="w-full bg-[var(--primary)] text-white font-bold text-[16px] rounded-xl py-3.5 shadow-md flex items-center justify-center gap-2"
+                className="w-full text-white font-bold text-[16px] rounded-xl py-3.5 shadow-md flex items-center justify-center gap-2"
+                style={{ backgroundColor: "var(--primary)" }}
               >
                 ดูประวัติสิทธิ์ลุ้นโชค
               </Link>

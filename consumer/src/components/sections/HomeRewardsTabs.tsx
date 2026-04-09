@@ -30,6 +30,7 @@ interface LuckyDraw {
   description: string | null;
   image_url: string | null;
   cost_points: number;
+  max_tickets_per_user: number;
   status: string;
   end_date: string | null;
   prize_count?: number;
@@ -193,13 +194,17 @@ function LuckyDrawCard({ lucky }: { lucky: LuckyDraw }) {
             </div>
 
             <div className="jh-card-detail-bottom mt-2">
-              <div className="w-full text-[13px] text-[var(--on-surface-variant)] mb-2 flex items-center justify-between">
+              <div className="w-full text-[13px] mb-2" style={{ color: "var(--on-surface-variant)" }}>
                 <div>
                   ใช้{" "}
-                  <span className="text-[var(--primary)] font-bold text-[14px]">
-                    {(lucky.cost_points || 0).toLocaleString()}
-                  </span>{" "}
-                  แต้ม/สิทธิ์
+                  <span className="font-bold text-[15px]" style={{ color: "var(--primary)" }}>
+                    {(lucky.cost_points ?? 0).toLocaleString()}
+                  </span>
+                  {" แต้ม / "}
+                  <span className="font-bold text-[15px]" style={{ color: "var(--warning)" }}>
+                    {(lucky.max_tickets_per_user ?? 0).toLocaleString()}
+                  </span>
+                  {" สิทธิ์"}
                 </div>
               </div>
 

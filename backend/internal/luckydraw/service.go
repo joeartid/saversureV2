@@ -383,6 +383,48 @@ func (s *Service) Register(ctx context.Context, tenantID, campaignID, userID str
 	return &t, nil
 }
 
+type UserTicket struct {
+	ID            string `json:"id"`
+	CampaignID    string `json:"campaign_id"`
+	CampaignTitle string `json:"campaign_title"`
+	TicketNumber  string `json:"ticket_number"`
+	PointsSpent   int    `json:"points_spent"`
+	CreatedAt     string `json:"created_at"`
+	Status        string `json:"status"`
+}
+
+func (s *Service) GetAllUserTickets(ctx context.Context, userID string) ([]UserTicket, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT t.id, t.campaign_id, COALESCE(c.title, '') AS campaign_title,
+		        t.ticket_number, t.points_spent, t.created_at::text,
+		        CASE
+		          WHEN w.id IS NOT NULL THEN 'won'
+		          WHEN c.status = 'active' THEN 'active'
+		          ELSE COALESCE(c.status, 'active')
+		        END AS status
+		 FROM lucky_draw_tickets t
+		 LEFT JOIN lucky_draw_campaigns c ON c.id = t.campaign_id
+		 LEFT JOIN lucky_draw_winners w ON w.ticket_id = t.id
+		 WHERE t.user_id = $1
+		 ORDER BY t.created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list user tickets: %w", err)
+	}
+	defer rows.Close()
+
+	tickets := make([]UserTicket, 0)
+	for rows.Next() {
+		var t UserTicket
+		if err := rows.Scan(&t.ID, &t.CampaignID, &t.CampaignTitle, &t.TicketNumber, &t.PointsSpent, &t.CreatedAt, &t.Status); err != nil {
+			return nil, fmt.Errorf("scan user ticket: %w", err)
+		}
+		tickets = append(tickets, t)
+	}
+	return tickets, nil
+}
+
 func (s *Service) GetUserTickets(ctx context.Context, campaignID, userID string) ([]Ticket, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT id, campaign_id, user_id, ticket_number, points_spent, created_at::text
