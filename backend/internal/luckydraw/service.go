@@ -33,8 +33,8 @@ type Campaign struct {
 	RegistrationEnd   *string `json:"registration_end"`
 	DrawDate          *string `json:"draw_date"`
 	CreatedAt         string  `json:"created_at"`
-	PrizeCount        int     `json:"prize_count,omitempty"`
-	TicketCount       int     `json:"ticket_count,omitempty"`
+	PrizeCount        int     `json:"prize_count"`
+	TicketCount       int     `json:"ticket_count"`
 }
 
 type Prize struct {

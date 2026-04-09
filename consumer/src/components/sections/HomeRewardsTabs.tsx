@@ -29,7 +29,7 @@ interface LuckyDraw {
   title: string;
   description: string | null;
   image_url: string | null;
-  point_cost: number;
+  cost_points: number;
   status: string;
   end_date: string | null;
 }
@@ -195,7 +195,7 @@ function LuckyDrawCard({ lucky }: { lucky: LuckyDraw }) {
                 <div>
                   ใช้{" "}
                   <span className="text-[var(--primary)] font-bold text-[14px]">
-                    {(lucky.point_cost || 0).toLocaleString()}
+                    {(lucky.cost_points || 0).toLocaleString()}
                   </span>{" "}
                   แต้ม/สิทธิ์
                 </div>
