@@ -56,3 +56,8 @@ backend/*.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# DB backups (kept local only — GitHub 50MB limit)
+backup/*.dump
+backup/*.sql
+!backup/README.md

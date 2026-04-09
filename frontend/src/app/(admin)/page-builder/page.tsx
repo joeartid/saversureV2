@@ -1480,7 +1480,7 @@ function LivePreviewPanel({
 
   if (!visible) {
     return (
-      <div className="xl:w-[60px] flex-shrink-0">
+      <div className="lg:w-[60px] flex-shrink-0">
         <button
           onClick={() => setVisible(true)}
           className="w-full h-[40px] bg-[var(--md-surface)] md-elevation-1 rounded-[var(--md-radius-sm)] text-[11px] text-[var(--md-on-surface-variant)] hover:bg-[var(--md-surface-container)]"
@@ -1496,7 +1496,7 @@ function LivePreviewPanel({
   const frameHeight = "h-[780px]";
 
   return (
-    <div className="xl:w-[420px] flex-shrink-0">
+    <div className="lg:w-[420px] flex-shrink-0">
       <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-4 sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[13px] font-medium text-[var(--md-on-surface)]">
@@ -2246,9 +2246,9 @@ export default function PageBuilderPage() {
           </svg>
         </div>
       ) : (
-        <div className="flex flex-col xl:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Left: Section List */}
-          <div className="xl:w-[360px] flex-shrink-0">
+          <div className="lg:w-[320px] flex-shrink-0">
             <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-[15px] font-medium text-[var(--md-on-surface)]">

@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_point_ledger_v1_migration_unique;

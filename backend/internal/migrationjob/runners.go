@@ -266,12 +266,21 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 		if err != nil {
 			return nil, err
 		}
+		// ON CONFLICT DO NOTHING — defends against:
+		//   1. Concurrent migration jobs (in-memory existingPointRefs map is
+		//      not thread-safe across jobs running in parallel)
+		//   2. Manual re-runs of the migrator after partial completion
+		// The matching unique index is created in migration 043
+		// (idx_point_ledger_v1_migration_unique).
 		_, err = tx.Exec(ctx,
 			`INSERT INTO point_ledger (
 				id, tenant_id, user_id, entry_type, amount, balance_after, reference_type, reference_id, description, currency, created_at
 			) VALUES (
 				$1, $2, $3, 'credit', $4, $4, 'v1_migration', $5, $6, 'point', COALESCE($7, NOW())
-			)`,
+			)
+			ON CONFLICT (tenant_id, user_id, reference_id)
+			WHERE reference_type = 'v1_migration'
+			DO NOTHING`,
 			newUUID(), mc.TenantID, targetUserID, int(points), refID,
 			fmt.Sprintf("V1 migrated balance (%d pts)", points), createdAt,
 		)
