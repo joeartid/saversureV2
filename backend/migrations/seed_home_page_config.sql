@@ -54,7 +54,7 @@ SELECT
         "order": 4,
         "visible": true,
         "props": {
-          "limit": 20,
+          "limit": 100,
           "default_tab": "julaherb",
           "show_flash_badge": true,
           "tabs": [
