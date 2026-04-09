@@ -4,19 +4,18 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import PageHeader from "@/components/PageHeader";
+import PageRenderer from "@/components/PageRenderer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 
-export default function SettingsPage() {
+function SettingsFallback() {
   const [notifyPromo, setNotifyPromo] = useState(true);
   const [notifySystem, setNotifySystem] = useState(true);
   const [notifyPoints, setNotifyPoints] = useState(true);
 
   return (
-    <div className="min-h-screen pb-24 bg-background">
-      <Navbar />
-      <div className="pt-24">
-        <PageHeader title="การตั้งค่าแอปพลิเคชัน" subtitle="จัดการการแจ้งเตือนและความเป็นส่วนตัว" backHref="/profile" />
+    <>
+      <PageHeader title="การตั้งค่าแอปพลิเคชัน" subtitle="จัดการการแจ้งเตือนและความเป็นส่วนตัว" backHref="/profile" />
 
       <div className="px-4 mt-6 space-y-4">
         <div>
@@ -65,11 +64,21 @@ export default function SettingsPage() {
           </Card>
           <p className="text-[11px] text-gray-400 mt-2 ml-2 px-1">หากลบบัญชี แต้มและข้อมูลทั้งหมดจะหายไปและไม่สามารถกู้คืนได้</p>
         </div>
-        
+
         <div className="text-center pt-8">
           <p className="text-[10px] text-gray-300 font-mono">APP VERSION 2.0.1 (Build 491)</p>
         </div>
       </div>
+    </>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <div className="min-h-screen pb-24 bg-background">
+      <Navbar />
+      <div className="pt-24">
+        <PageRenderer pageSlug="settings" fallback={<SettingsFallback />} />
       </div>
       <BottomNav />
     </div>

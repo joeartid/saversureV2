@@ -55,6 +55,7 @@ const BUILT_IN_PAGES = [
   { value: "leaderboard", label: "หน้าอันดับ (Leaderboard)" },
   { value: "donations", label: "หน้าประวัติบริจาค (Donations)" },
   { value: "support", label: "หน้าช่วยเหลือ (Support)" },
+  { value: "settings", label: "หน้าตั้งค่า (Settings)" },
 ];
 
 const BUILT_IN_SLUGS = new Set(BUILT_IN_PAGES.map((p) => p.value));
@@ -1085,6 +1086,72 @@ const sectionTypes: Record<string, SectionTypeDef> = {
       { key: "text", label: "ข้อความ", type: "text" },
       { key: "cta_label", label: "ข้อความปุ่ม", type: "text" },
       { key: "cta_href", label: "ลิงก์ปุ่ม", type: "text" },
+    ],
+  },
+  settings_page_header: {
+    label: "Settings — Header",
+    icon: "⚙️",
+    description: "Header หน้าตั้งค่า",
+    defaultProps: {
+      title: "การตั้งค่าแอปพลิเคชัน",
+      subtitle: "จัดการการแจ้งเตือนและความเป็นส่วนตัว",
+      back_href: "/profile",
+    },
+    fields: [
+      { key: "title", label: "หัวข้อ", type: "text" },
+      { key: "subtitle", label: "คำอธิบาย", type: "text" },
+      { key: "back_href", label: "ลิงก์ปุ่มย้อนกลับ", type: "text" },
+    ],
+  },
+  settings_notifications_group: {
+    label: "Settings — Notifications Group",
+    icon: "🔔",
+    description: "กลุ่ม toggle การแจ้งเตือน (state local)",
+    defaultProps: {
+      group_title: "การแจ้งเตือน (Push Notifications)",
+      items: [],
+    },
+    fields: [
+      { key: "group_title", label: "หัวข้อกลุ่ม", type: "text" },
+      {
+        key: "items",
+        label: "รายการ Toggle",
+        type: "items",
+        itemFields: [
+          { key: "label", label: "ป้ายชื่อ", type: "text" },
+          { key: "description", label: "คำอธิบาย", type: "textarea" },
+          { key: "default_on", label: "เปิดเป็นค่าเริ่มต้น", type: "boolean" },
+          { key: "locked", label: "ล็อก (ปิดไม่ได้)", type: "boolean" },
+        ],
+      },
+    ],
+  },
+  settings_delete_account_card: {
+    label: "Settings — Delete Account",
+    icon: "🗑️",
+    description: "การ์ดปุ่มลบบัญชี + warning",
+    defaultProps: {
+      group_title: "ลบบัญชีผู้ใช้",
+      button_label: "แจ้งขอลบบัญชีผู้ใช้",
+      warning_text: "หากลบบัญชี แต้มและข้อมูลทั้งหมดจะหายไปและไม่สามารถกู้คืนได้",
+      cta_href: "",
+    },
+    fields: [
+      { key: "group_title", label: "หัวข้อกลุ่ม", type: "text" },
+      { key: "button_label", label: "ข้อความปุ่ม", type: "text" },
+      { key: "warning_text", label: "ข้อความเตือน", type: "textarea" },
+      { key: "cta_href", label: "ลิงก์ปุ่ม (เว้นว่าง = ไม่มี)", type: "text" },
+    ],
+  },
+  settings_app_version_footer: {
+    label: "Settings — App Version",
+    icon: "🏷️",
+    description: "ข้อความ version ล่างสุด",
+    defaultProps: {
+      text: "APP VERSION 2.0.1 (Build 491)",
+    },
+    fields: [
+      { key: "text", label: "ข้อความ version", type: "text" },
     ],
   },
 };

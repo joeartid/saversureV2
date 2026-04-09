@@ -47,6 +47,10 @@ const DonationsHistoryList = dynamic(() => import("./DonationsHistoryList"));
 const SupportPageHeader = dynamic(() => import("./SupportPageHeader"));
 const SupportFaqList = dynamic(() => import("./SupportFaqList"));
 const SupportContactCta = dynamic(() => import("./SupportContactCta"));
+const SettingsPageHeader = dynamic(() => import("./SettingsPageHeader"));
+const SettingsNotificationsGroup = dynamic(() => import("./SettingsNotificationsGroup"));
+const SettingsDeleteAccountCard = dynamic(() => import("./SettingsDeleteAccountCard"));
+const SettingsAppVersionFooter = dynamic(() => import("./SettingsAppVersionFooter"));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const sectionRegistry: Record<string, ComponentType<any>> = {
@@ -96,6 +100,10 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   support_page_header: SupportPageHeader,
   support_faq_list: SupportFaqList,
   support_contact_cta: SupportContactCta,
+  settings_page_header: SettingsPageHeader,
+  settings_notifications_group: SettingsNotificationsGroup,
+  settings_delete_account_card: SettingsDeleteAccountCard,
+  settings_app_version_footer: SettingsAppVersionFooter,
 };
 
 export interface SectionDefinition {
@@ -339,5 +347,25 @@ export const sectionMeta: Record<
     label: "Support — Contact CTA",
     icon: "✉️",
     description: "การ์ด CTA ลิงก์ไปหน้าแจ้งปัญหา",
+  },
+  settings_page_header: {
+    label: "Settings — Header",
+    icon: "⚙️",
+    description: "Header หน้าตั้งค่า (title + subtitle + back link)",
+  },
+  settings_notifications_group: {
+    label: "Settings — Notifications Group",
+    icon: "🔔",
+    description: "กลุ่ม toggle การแจ้งเตือน (admin แก้ items ได้, state local)",
+  },
+  settings_delete_account_card: {
+    label: "Settings — Delete Account",
+    icon: "🗑️",
+    description: "การ์ดปุ่มลบบัญชี + warning text",
+  },
+  settings_app_version_footer: {
+    label: "Settings — App Version",
+    icon: "🏷️",
+    description: "ข้อความ version ล่างสุด (admin แก้ได้)",
   },
 };
