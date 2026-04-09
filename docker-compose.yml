@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: saversure
       POSTGRES_USER: saversure_app
-      POSTGRES_PASSWORD: julaherb789
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_db_password}
     volumes:
       - pg-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -63,17 +63,17 @@ services:
       DB_PORT: "15433"
       DB_NAME: saversure
       DB_USER: saversure_app
-      DB_PASSWORD: julaherb789
+      DB_PASSWORD: ${DB_PASSWORD:-change_me_db_password}
       DB_SSLMODE: disable
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       NATS_URL: nats://nats:4222
-      JWT_SECRET: saversure-dev-jwt-secret-change-in-prod-2026
-      HMAC_SECRET: saversure-dev-hmac-2026
+      JWT_SECRET: ${JWT_SECRET:-change_me_jwt_secret}
+      HMAC_SECRET: ${HMAC_SECRET:-change_me_hmac_secret}
       # Remote MinIO Server
       MINIO_ENDPOINT: "192.168.0.60:59300"
-      MINIO_ACCESS_KEY: "saversure-admin"
-      MINIO_SECRET_KEY: "julaherb789minio"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-change_me_minio_access_key}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-change_me_minio_secret_key}
       MINIO_BUCKET: "saversure-dev"
       MINIO_USE_SSL: "false"
       MINIO_PUBLIC_URL: "http://192.168.0.60:59300"
