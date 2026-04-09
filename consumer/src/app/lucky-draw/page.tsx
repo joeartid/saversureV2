@@ -19,6 +19,7 @@ interface Campaign {
   registration_end: string | null;
   draw_date: string | null;
   prize_count: number;
+  ticket_count: number;
 }
 
 interface Prize {
@@ -137,7 +138,10 @@ export default function LuckyDrawPage() {
               <p className="text-[11px] text-[var(--on-surface-variant)]">pts/ticket</p>
             </div>
             <div className="bg-white rounded-[var(--radius-lg)] elevation-1 p-3 text-center">
-              <p className="text-[20px] font-bold text-[var(--on-surface)]">{selected.total_tickets}</p>
+              <p className="text-[20px] font-bold text-[var(--on-surface)]">
+                {selected.ticket_count ?? 0}
+                {selected.total_tickets > 0 ? `/${selected.total_tickets}` : ""}
+              </p>
               <p className="text-[11px] text-[var(--on-surface-variant)]">tickets</p>
             </div>
             <div className="bg-white rounded-[var(--radius-lg)] elevation-1 p-3 text-center">
@@ -279,7 +283,10 @@ export default function LuckyDrawPage() {
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-[12px] text-[var(--on-surface-variant)]">
                   <span>{c.cost_points} pts/ticket</span>
-                  <span>{c.total_tickets} joined</span>
+                  <span>
+                    {c.ticket_count ?? 0}
+                    {c.total_tickets > 0 ? `/${c.total_tickets}` : ""} joined
+                  </span>
                   <span>{c.prize_count} prizes</span>
                 </div>
                 {c.draw_date && (

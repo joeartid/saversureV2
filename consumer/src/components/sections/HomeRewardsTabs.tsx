@@ -32,6 +32,8 @@ interface LuckyDraw {
   cost_points: number;
   status: string;
   end_date: string | null;
+  prize_count?: number;
+  ticket_count?: number;
 }
 
 type TabSource =
@@ -199,6 +201,19 @@ function LuckyDrawCard({ lucky }: { lucky: LuckyDraw }) {
                   </span>{" "}
                   แต้ม/สิทธิ์
                 </div>
+              </div>
+
+              <div className="w-full flex items-center gap-3 text-[12px] text-[var(--on-surface-variant)] mb-2">
+                <span className="inline-flex items-center gap-1">
+                  <span>🎁</span>
+                  <span className="font-medium">{(lucky.prize_count ?? 0).toLocaleString()}</span>
+                  <span>รางวัล</span>
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span>🎫</span>
+                  <span className="font-medium">{(lucky.ticket_count ?? 0).toLocaleString()}</span>
+                  <span>คนร่วม</span>
+                </span>
               </div>
 
               <div className="jh-card-point-btn !bg-orange-500 hover:!bg-orange-600 shadow-sm border-0 text-white">
