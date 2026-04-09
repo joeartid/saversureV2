@@ -61,6 +61,7 @@ const BUILT_IN_PAGES: BuiltInPage[] = [
   { value: "news", label: "หน้าข่าวสาร (News)" },
   { value: "notifications", label: "หน้าแจ้งเตือน (Notifications)" },
   { value: "support", label: "หน้าช่วยเหลือ (Support)" },
+  { value: "support_faq", label: "FAQ", parent: "support" },
   { value: "settings", label: "หน้าตั้งค่า (Settings)" },
   { value: "privacy", label: "หน้านโยบายความเป็นส่วนตัว (Privacy)" },
   { value: "terms", label: "หน้าข้อกำหนดและเงื่อนไข (Terms)" },
