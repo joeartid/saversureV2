@@ -38,12 +38,6 @@ const NewsPageHeader = dynamic(() => import("./NewsPageHeader"));
 const NewsList = dynamic(() => import("./NewsList"));
 const NotificationsPageHeader = dynamic(() => import("./NotificationsPageHeader"));
 const NotificationsList = dynamic(() => import("./NotificationsList"));
-const BadgesPageHeader = dynamic(() => import("./BadgesPageHeader"));
-const BadgesGrid = dynamic(() => import("./BadgesGrid"));
-const LeaderboardPageHeader = dynamic(() => import("./LeaderboardPageHeader"));
-const LeaderboardList = dynamic(() => import("./LeaderboardList"));
-const DonationsPageHeader = dynamic(() => import("./DonationsPageHeader"));
-const DonationsHistoryList = dynamic(() => import("./DonationsHistoryList"));
 const SupportPageHeader = dynamic(() => import("./SupportPageHeader"));
 const SupportFaqList = dynamic(() => import("./SupportFaqList"));
 const SupportContactCta = dynamic(() => import("./SupportContactCta"));
@@ -92,12 +86,6 @@ export const sectionRegistry: Record<string, ComponentType<any>> = {
   news_list: NewsList,
   notifications_page_header: NotificationsPageHeader,
   notifications_list: NotificationsList,
-  badges_page_header: BadgesPageHeader,
-  badges_grid: BadgesGrid,
-  leaderboard_page_header: LeaderboardPageHeader,
-  leaderboard_list: LeaderboardList,
-  donations_page_header: DonationsPageHeader,
-  donations_history_list: DonationsHistoryList,
   support_page_header: SupportPageHeader,
   support_faq_list: SupportFaqList,
   support_contact_cta: SupportContactCta,
@@ -304,36 +292,6 @@ export const sectionMeta: Record<
     label: "Notifications — List",
     icon: "🔔",
     description: "รายการแจ้งเตือน + mark-all + login CTA + empty/loading states",
-  },
-  badges_page_header: {
-    label: "Badges — Header",
-    icon: "🏅",
-    description: "Header gradient หน้า badges (title + subtitle)",
-  },
-  badges_grid: {
-    label: "Badges — Grid",
-    icon: "🏅",
-    description: "Grid 3 คอลัมน์ badges + earned state + login CTA + rarity border",
-  },
-  leaderboard_page_header: {
-    label: "Leaderboard — Header",
-    icon: "🏆",
-    description: "Header gradient หน้า leaderboard (title + subtitle)",
-  },
-  leaderboard_list: {
-    label: "Leaderboard — List",
-    icon: "🏆",
-    description: "Period tabs + Top 3 podium + rank list + highlight current user",
-  },
-  donations_page_header: {
-    label: "Donations — Header",
-    icon: "💚",
-    description: "Header gradient ประวัติการบริจาค + floating decorations",
-  },
-  donations_history_list: {
-    label: "Donations — History List",
-    icon: "💚",
-    description: "Stat card + browse link + grouped-by-date list + login/empty states",
   },
   support_page_header: {
     label: "Support — Header",
