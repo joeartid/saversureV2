@@ -569,6 +569,8 @@ func main() {
 		crmRoutes.GET("/segment-exports", crmHandler.ListSegmentExports)
 		crmRoutes.POST("/segment-exports", crmHandler.CreateSegmentExport)
 		crmRoutes.POST("/segment-exports/process", crmHandler.RunSegmentExportsNow)
+		crmRoutes.GET("/survey-insights", crmHandler.GetSurveyInsights)
+		crmRoutes.GET("/referral-overview", crmHandler.GetReferralOverview)
 	}
 
 	// Dashboard
@@ -1033,6 +1035,7 @@ func main() {
 		myRoutes.POST("/surveys/:id/respond", crmHandler.SubmitMySurveyResponse)
 		myRoutes.GET("/referral-code", crmHandler.GetMyReferralCode)
 		myRoutes.POST("/referrals/apply", crmHandler.ApplyMyReferralCode)
+		myRoutes.GET("/referrals/overview", crmHandler.GetMyReferralOverview)
 	}
 
 	// --- V1 Sync Scheduler ---

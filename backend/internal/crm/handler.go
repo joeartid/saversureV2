@@ -508,3 +508,37 @@ func (h *Handler) RunSegmentExportsNow(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "segment exports processed"})
 }
+
+func (h *Handler) GetSurveyInsights(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	item, err := h.svc.GetSurveyInsights(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+func (h *Handler) GetReferralOverview(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	item, err := h.svc.GetReferralOverview(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+func (h *Handler) GetMyReferralOverview(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	userID := c.GetString("user_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	item, err := h.svc.GetMyReferralOverview(c.Request.Context(), tenantID, userID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}

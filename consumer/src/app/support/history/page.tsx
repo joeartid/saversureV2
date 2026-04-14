@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { api } from "@/lib/api";
@@ -250,10 +249,7 @@ function SkeletonCard() {
 /* ---------- Main Page Content ---------- */
 
 function SupportHistoryContent() {
-  const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "ticket" ? "ticket" : "history";
-
-  const [activeTab, setActiveTab] = useState<"ticket" | "history">(initialTab);
+  const [activeTab, setActiveTab] = useState<"ticket" | "history">("history");
   const [loggedIn, setLoggedIn] = useState(false);
   const [cases, setCases] = useState<SupportCase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,6 +261,15 @@ function SupportHistoryContent() {
       setCases(d.data ?? []);
     } catch {
       setError("ไม่สามารถโหลดข้อมูลได้");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "ticket") {
+        setActiveTab("ticket");
+      }
     }
   }, []);
 
@@ -500,9 +505,5 @@ function SupportHistoryContent() {
 }
 
 export default function SupportHistoryPage() {
-  return (
-    <Suspense>
-      <SupportHistoryContent />
-    </Suspense>
-  );
+  return <SupportHistoryContent />;
 }

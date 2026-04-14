@@ -66,6 +66,8 @@ const DEFAULT_DRAWER_ITEMS: DrawerMenuItem[] = [
   { icon: "user", label: "บัญชีของฉัน", link: "/profile", visible: true, group: "บริการส่วนตัว" },
   { icon: "history", label: "ประวัติกิจกรรมทั้งหมด", link: "/history", visible: true, group: "บริการส่วนตัว" },
   { icon: "tag", label: "คูปองของฉัน", link: "/history/coupons", visible: true, group: "บริการส่วนตัว" },
+  { icon: "gift", label: "ชวนเพื่อนรับแต้ม", link: "/referrals", visible: true, group: "บริการส่วนตัว" },
+  { icon: "mail", label: "แบบสอบถาม", link: "/surveys", visible: true, group: "บริการส่วนตัว" },
   { icon: "support", label: "ศูนย์ช่วยเหลือและคำถาม (FAQ)", link: "/support", visible: true, group: "ช่วยเหลือและการตั้งค่า" },
   { icon: "settings", label: "ตั้งค่าระบบ", link: "/settings", visible: true, group: "ช่วยเหลือและการตั้งค่า" },
   { icon: "mail", label: "ติดต่อแอดมิน", link: "/support/ticket", visible: true, group: "ช่วยเหลือและการตั้งค่า" },
@@ -105,7 +107,13 @@ export default function Drawer({ open, onClose }: { open: boolean; onClose: () =
     api.get<{ items: DrawerMenuItem[] }>("/api/v1/public/nav-menu/drawer")
       .then((d) => {
         if (d.items && d.items.length > 0) {
-          setMenuItems(d.items);
+          const merged = [...d.items];
+          for (const fallback of DEFAULT_DRAWER_ITEMS) {
+            if (!merged.some((item) => item.link === fallback.link)) {
+              merged.push(fallback);
+            }
+          }
+          setMenuItems(merged);
         }
       })
       .catch(() => {

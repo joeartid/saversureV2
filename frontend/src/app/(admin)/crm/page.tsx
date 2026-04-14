@@ -189,6 +189,37 @@ interface SegmentExportJob {
   updated_at: string;
 }
 
+interface SurveyInsights {
+  total_surveys: number;
+  total_responses: number;
+  average_rating: number;
+  promoters: number;
+  passives: number;
+  detractors: number;
+  nps_score: number;
+  recent_responses: Array<{
+    id: string;
+    survey_id: string;
+    user_id: string;
+    user_name?: string | null;
+    rating?: number | null;
+    created_at: string;
+  }>;
+}
+
+interface ReferralOverview {
+  total_codes: number;
+  total_uses: number;
+  total_referrals: number;
+  total_points_awarded: number;
+  top_referrers: Array<{
+    user_id: string;
+    user_name?: string | null;
+    referral_count: number;
+    points_earned: number;
+  }>;
+}
+
 const defaultSegmentRules = JSON.stringify(
   {
     operator: "AND",
@@ -212,6 +243,8 @@ export default function CRMPage() {
   const [referralCodes, setReferralCodes] = useState<ReferralCode[]>([]);
   const [referralHistory, setReferralHistory] = useState<ReferralHistoryItem[]>([]);
   const [segmentExports, setSegmentExports] = useState<SegmentExportJob[]>([]);
+  const [surveyInsights, setSurveyInsights] = useState<SurveyInsights | null>(null);
+  const [referralOverview, setReferralOverview] = useState<ReferralOverview | null>(null);
   const [selectedRisk, setSelectedRisk] = useState("");
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>("");
   const [previewRows, setPreviewRows] = useState<SegmentPreviewCustomer[]>([]);
@@ -273,15 +306,17 @@ export default function CRMPage() {
   const loadAll = async (riskLevel = selectedRisk) => {
     setLoading(true);
     try {
-      const [tagsRes, segmentsRes, distRes, broadcastsRes, triggersRes, surveysRes, referralCodesRes, referralHistoryRes, segmentExportsRes, customersRes] = await Promise.all([
+      const [tagsRes, segmentsRes, distRes, broadcastsRes, triggersRes, surveysRes, surveyInsightsRes, referralCodesRes, referralHistoryRes, referralOverviewRes, segmentExportsRes, customersRes] = await Promise.all([
         api.get<{ data: Tag[] }>("/api/v1/crm/tags"),
         api.get<{ data: Segment[] }>("/api/v1/crm/segments"),
         api.get<{ data: RFMDistributionItem[] }>("/api/v1/crm/rfm/distribution"),
         api.get<{ data: BroadcastCampaign[] }>("/api/v1/crm/broadcasts?limit=20"),
         api.get<{ data: CRMTrigger[] }>("/api/v1/crm/triggers"),
         api.get<{ data: Survey[] }>("/api/v1/crm/surveys"),
+        api.get<SurveyInsights>("/api/v1/crm/survey-insights?limit=5"),
         api.get<{ data: ReferralCode[] }>("/api/v1/crm/referral-codes?limit=20"),
         api.get<{ data: ReferralHistoryItem[] }>("/api/v1/crm/referral-history?limit=20"),
+        api.get<ReferralOverview>("/api/v1/crm/referral-overview?limit=5"),
         api.get<{ data: SegmentExportJob[] }>("/api/v1/crm/segment-exports?limit=20"),
         api.get<{ data: RFMSnapshot[] }>(
           `/api/v1/crm/rfm/customers?limit=20${riskLevel ? `&risk_level=${encodeURIComponent(riskLevel)}` : ""}`,
@@ -293,8 +328,10 @@ export default function CRMPage() {
       setBroadcasts(broadcastsRes.data || []);
       setTriggers(triggersRes.data || []);
       setSurveys(surveysRes.data || []);
+      setSurveyInsights(surveyInsightsRes);
       setReferralCodes(referralCodesRes.data || []);
       setReferralHistory(referralHistoryRes.data || []);
+      setReferralOverview(referralOverviewRes);
       setSegmentExports(segmentExportsRes.data || []);
       setRfmCustomers(customersRes.data || []);
     } catch (err) {
@@ -1533,6 +1570,27 @@ export default function CRMPage() {
             </div>
           </form>
 
+          {surveyInsights && (
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
+                <p className="text-[11px] text-[var(--md-on-surface-variant)]">responses</p>
+                <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{surveyInsights.total_responses.toLocaleString()}</p>
+              </div>
+              <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
+                <p className="text-[11px] text-[var(--md-on-surface-variant)]">avg rating</p>
+                <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{surveyInsights.average_rating.toFixed(1)}</p>
+              </div>
+              <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
+                <p className="text-[11px] text-[var(--md-on-surface-variant)]">NPS</p>
+                <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{surveyInsights.nps_score.toFixed(0)}</p>
+              </div>
+              <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
+                <p className="text-[11px] text-[var(--md-on-surface-variant)]">promoters</p>
+                <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{surveyInsights.promoters.toLocaleString()}</p>
+              </div>
+            </div>
+          )}
+
           <div className="mt-5 space-y-3">
             {surveys.length === 0 ? (
               <p className="text-[13px] text-[var(--md-on-surface-variant)]">ยังไม่มี survey</p>
@@ -1621,6 +1679,27 @@ export default function CRMPage() {
                 </button>
               </div>
             </form>
+
+            {referralOverview && (
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
+                  <p className="text-[11px] text-[var(--md-on-surface-variant)]">codes</p>
+                  <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{referralOverview.total_codes.toLocaleString()}</p>
+                </div>
+                <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
+                  <p className="text-[11px] text-[var(--md-on-surface-variant)]">uses</p>
+                  <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{referralOverview.total_uses.toLocaleString()}</p>
+                </div>
+                <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
+                  <p className="text-[11px] text-[var(--md-on-surface-variant)]">referrals</p>
+                  <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{referralOverview.total_referrals.toLocaleString()}</p>
+                </div>
+                <div className="rounded-[14px] bg-[var(--md-surface-container)] p-3">
+                  <p className="text-[11px] text-[var(--md-on-surface-variant)]">points awarded</p>
+                  <p className="mt-1 text-[20px] font-bold text-[var(--md-primary)]">{referralOverview.total_points_awarded.toLocaleString()}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">

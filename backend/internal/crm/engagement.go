@@ -91,6 +91,40 @@ type ReferralHistoryItem struct {
 	CreatedAt    string  `json:"created_at"`
 }
 
+type SurveyInsights struct {
+	TotalSurveys   int64            `json:"total_surveys"`
+	TotalResponses int64            `json:"total_responses"`
+	AverageRating  float64          `json:"average_rating"`
+	Promoters      int64            `json:"promoters"`
+	Passives       int64            `json:"passives"`
+	Detractors     int64            `json:"detractors"`
+	NPSScore       float64          `json:"nps_score"`
+	RecentResponses []SurveyResponse `json:"recent_responses"`
+}
+
+type ReferrerLeaderboardItem struct {
+	UserID       string  `json:"user_id"`
+	UserName     *string `json:"user_name"`
+	ReferralCount int    `json:"referral_count"`
+	PointsEarned int     `json:"points_earned"`
+}
+
+type ReferralOverview struct {
+	TotalCodes        int64                    `json:"total_codes"`
+	TotalUses         int64                    `json:"total_uses"`
+	TotalReferrals    int64                    `json:"total_referrals"`
+	TotalPointsAwarded int64                   `json:"total_points_awarded"`
+	TopReferrers      []ReferrerLeaderboardItem `json:"top_referrers"`
+	TopCodes          []ReferralCode           `json:"top_codes"`
+}
+
+type MyReferralOverview struct {
+	Code          *ReferralCode          `json:"code"`
+	TotalReferrals int64                 `json:"total_referrals"`
+	PointsEarned  int64                  `json:"points_earned"`
+	RecentHistory []ReferralHistoryItem  `json:"recent_history"`
+}
+
 func normalizeSurveyInput(input SurveyInput) SurveyInput {
 	input.Title = strings.TrimSpace(input.Title)
 	input.TriggerEvent = strings.TrimSpace(input.TriggerEvent)
@@ -563,4 +597,174 @@ func (s *Service) ApplyReferralCode(ctx context.Context, tenantID, refereeUserID
 		return fmt.Errorf("commit referral tx: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) GetSurveyInsights(ctx context.Context, tenantID string, limit int) (*SurveyInsights, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	result := &SurveyInsights{}
+	if err := s.db.QueryRow(ctx, `
+		SELECT
+			(SELECT COUNT(*)::bigint FROM surveys WHERE tenant_id = $1),
+			COUNT(*)::bigint,
+			COALESCE(AVG(rating), 0)::float8,
+			COUNT(*) FILTER (WHERE rating >= 9)::bigint,
+			COUNT(*) FILTER (WHERE rating BETWEEN 7 AND 8)::bigint,
+			COUNT(*) FILTER (WHERE rating <= 6 AND rating IS NOT NULL)::bigint
+		FROM survey_responses
+		WHERE tenant_id = $1
+	`, tenantID).Scan(
+		&result.TotalSurveys, &result.TotalResponses, &result.AverageRating, &result.Promoters, &result.Passives, &result.Detractors,
+	); err != nil {
+		return nil, fmt.Errorf("survey insights: %w", err)
+	}
+	if result.TotalResponses > 0 {
+		result.NPSScore = ((float64(result.Promoters) - float64(result.Detractors)) / float64(result.TotalResponses)) * 100
+	}
+	recent, err := s.ListRecentSurveyResponses(ctx, tenantID, limit)
+	if err != nil {
+		return nil, err
+	}
+	result.RecentResponses = recent
+	return result, nil
+}
+
+func (s *Service) ListRecentSurveyResponses(ctx context.Context, tenantID string, limit int) ([]SurveyResponse, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT
+			sr.id::text,
+			sr.survey_id::text,
+			sr.user_id::text,
+			COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), NULLIF(u.display_name, ''), u.phone, u.email),
+			sr.answers,
+			sr.rating,
+			sr.created_at::text
+		FROM survey_responses sr
+		LEFT JOIN users u ON u.id = sr.user_id
+		WHERE sr.tenant_id = $1
+		ORDER BY sr.created_at DESC
+		LIMIT $2
+	`, tenantID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list recent survey responses: %w", err)
+	}
+	defer rows.Close()
+
+	var items []SurveyResponse
+	for rows.Next() {
+		var item SurveyResponse
+		var raw []byte
+		if err := rows.Scan(&item.ID, &item.SurveyID, &item.UserID, &item.UserName, &raw, &item.Rating, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan recent survey response: %w", err)
+		}
+		_ = json.Unmarshal(raw, &item.Answers)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *Service) GetReferralOverview(ctx context.Context, tenantID string, limit int) (*ReferralOverview, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	result := &ReferralOverview{}
+	if err := s.db.QueryRow(ctx, `
+		SELECT
+			(SELECT COUNT(*)::bigint FROM referral_codes WHERE tenant_id = $1),
+			(SELECT COALESCE(SUM(uses), 0)::bigint FROM referral_codes WHERE tenant_id = $1),
+			(SELECT COUNT(*)::bigint FROM referral_history WHERE tenant_id = $1),
+			(SELECT COALESCE(SUM(points_given), 0)::bigint FROM referral_history WHERE tenant_id = $1)
+	`, tenantID).Scan(&result.TotalCodes, &result.TotalUses, &result.TotalReferrals, &result.TotalPointsAwarded); err != nil {
+		return nil, fmt.Errorf("referral overview: %w", err)
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT
+			rh.referrer_id::text,
+			COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''), NULLIF(u.display_name, ''), u.phone, u.email),
+			COUNT(*)::int,
+			COALESCE(SUM(rh.points_given), 0)::int
+		FROM referral_history rh
+		LEFT JOIN users u ON u.id = rh.referrer_id
+		WHERE rh.tenant_id = $1
+		GROUP BY rh.referrer_id, u.first_name, u.last_name, u.display_name, u.phone, u.email
+		ORDER BY COUNT(*) DESC, COALESCE(SUM(rh.points_given), 0) DESC
+		LIMIT $2
+	`, tenantID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("top referrers: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item ReferrerLeaderboardItem
+		if err := rows.Scan(&item.UserID, &item.UserName, &item.ReferralCount, &item.PointsEarned); err != nil {
+			return nil, fmt.Errorf("scan top referrer: %w", err)
+		}
+		result.TopReferrers = append(result.TopReferrers, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	topCodes, err := s.ListReferralCodes(ctx, tenantID, limit)
+	if err != nil {
+		return nil, err
+	}
+	result.TopCodes = topCodes
+	return result, nil
+}
+
+func (s *Service) GetMyReferralOverview(ctx context.Context, tenantID, userID string, limit int) (*MyReferralOverview, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	code, err := s.GetMyReferralCode(ctx, tenantID, userID)
+	if err != nil {
+		return nil, err
+	}
+	result := &MyReferralOverview{Code: code}
+	if err := s.db.QueryRow(ctx, `
+		SELECT
+			COUNT(*)::bigint,
+			COALESCE(SUM(points_given), 0)::bigint
+		FROM referral_history
+		WHERE tenant_id = $1::uuid AND referrer_id = $2::uuid
+	`, tenantID, userID).Scan(&result.TotalReferrals, &result.PointsEarned); err != nil {
+		return nil, fmt.Errorf("my referral overview: %w", err)
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT
+			rh.id::text,
+			rh.tenant_id::text,
+			rh.referral_code,
+			rh.referrer_id::text,
+			COALESCE(NULLIF(TRIM(CONCAT(COALESCE(rf.first_name, ''), ' ', COALESCE(rf.last_name, ''))), ''), NULLIF(rf.display_name, ''), rf.phone, rf.email),
+			rh.referee_id::text,
+			COALESCE(NULLIF(TRIM(CONCAT(COALESCE(re.first_name, ''), ' ', COALESCE(re.last_name, ''))), ''), NULLIF(re.display_name, ''), re.phone, re.email),
+			rh.points_given,
+			rh.created_at::text
+		FROM referral_history rh
+		LEFT JOIN users rf ON rf.id = rh.referrer_id
+		LEFT JOIN users re ON re.id = rh.referee_id
+		WHERE rh.tenant_id = $1::uuid AND rh.referrer_id = $2::uuid
+		ORDER BY rh.created_at DESC
+		LIMIT $3
+	`, tenantID, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("my referral history: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item ReferralHistoryItem
+		if err := rows.Scan(&item.ID, &item.TenantID, &item.ReferralCode, &item.ReferrerID, &item.ReferrerName, &item.RefereeID, &item.RefereeName, &item.PointsGiven, &item.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan my referral history: %w", err)
+		}
+		result.RecentHistory = append(result.RecentHistory, item)
+	}
+	return result, rows.Err()
 }
