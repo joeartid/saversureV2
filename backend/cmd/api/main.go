@@ -159,7 +159,6 @@ func main() {
 	scanHistoryHandler := scanhistory.NewHandler(db)
 	transactionHandler := transaction.NewHandler(db)
 	customerHandler := customer.NewHandler(db)
-	crmHandler := crm.NewHandler(db)
 	mergeHandler := customer.NewMergeHandler(db)
 	profileHandler := profile.NewHandler(db)
 	staffHandler := staff.NewHandler(db)
@@ -200,12 +199,11 @@ func main() {
 
 	v1SyncSvc := v1sync.NewService(db, cfg)
 	v1SyncHandler := v1sync.NewHandler(v1SyncSvc)
-	crmSvc := crm.NewService(db)
-	analyticsWarmScheduler := analyticswarm.NewScheduler(db, dashboardSvc, opsDigestSvc, v1SyncSvc, crmSvc)
 
 	var uploadHandler *upload.Handler
 	var exportHandler *export.Handler
 	var mediaProxy *upload.ProxyHandler
+	var crmMinioClient *minio.Client
 	if cfg.MinIO.AccessKey != "" {
 		uh, err := upload.NewHandler(upload.Config{
 			Endpoint:     cfg.MinIO.Endpoint,
@@ -230,6 +228,7 @@ func main() {
 
 		mc, mcErr := minioClient(cfg)
 		if mcErr == nil {
+			crmMinioClient = mc
 			apiBase := fmt.Sprintf("http://localhost:%d", cfg.App.Port)
 			exportSvc := export.NewService(db, mc, cfg.MinIO.Bucket, cfg.MinIO.PublicURL, signer)
 			exportHandler = export.NewHandler(exportSvc, apiBase)
@@ -237,6 +236,9 @@ func main() {
 	} else {
 		slog.Warn("MinIO not configured (upload disabled)")
 	}
+	crmSvc := crm.NewService(db, crmMinioClient, cfg.MinIO.Bucket, cfg.MinIO.PublicURL)
+	crmHandler := crm.NewHandler(crmSvc)
+	analyticsWarmScheduler := analyticswarm.NewScheduler(db, dashboardSvc, opsDigestSvc, v1SyncSvc, crmSvc)
 
 	// --- Router ---
 	if cfg.App.Env == "production" {
@@ -564,6 +566,9 @@ func main() {
 		crmRoutes.GET("/referral-codes", crmHandler.ListReferralCodes)
 		crmRoutes.POST("/referral-codes", crmHandler.CreateReferralCode)
 		crmRoutes.GET("/referral-history", crmHandler.ListReferralHistory)
+		crmRoutes.GET("/segment-exports", crmHandler.ListSegmentExports)
+		crmRoutes.POST("/segment-exports", crmHandler.CreateSegmentExport)
+		crmRoutes.POST("/segment-exports/process", crmHandler.RunSegmentExportsNow)
 	}
 
 	// Dashboard
@@ -581,6 +586,10 @@ func main() {
 		dashboardRoutes.POST("/crm/customer-cohorts/refresh", dashboardHandler.RefreshCustomerCohorts)
 		dashboardRoutes.GET("/crm/top-products", dashboardHandler.CRMTopProducts)
 		dashboardRoutes.GET("/crm/top-rewards", dashboardHandler.TopRewards)
+		dashboardRoutes.GET("/crm/product-affinities", dashboardHandler.ProductAffinities)
+		dashboardRoutes.GET("/crm/clv-overview", dashboardHandler.CLVOverview)
+		dashboardRoutes.GET("/crm/campaign-roi", dashboardHandler.CampaignROI)
+		dashboardRoutes.POST("/crm/advanced/refresh", dashboardHandler.RefreshAdvancedCRM)
 	}
 
 	// Staff Management (Brand Admin+)

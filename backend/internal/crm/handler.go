@@ -7,15 +7,14 @@ import (
 	"saversure/internal/apperror"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct {
 	svc *Service
 }
 
-func NewHandler(db *pgxpool.Pool) *Handler {
-	return &Handler{svc: NewService(db)}
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc}
 }
 
 type replaceCustomerTagsInput struct {
@@ -473,4 +472,39 @@ func (h *Handler) ApplyMyReferralCode(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "applied"})
+}
+
+func (h *Handler) ListSegmentExports(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	items, err := h.svc.ListSegmentExports(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) CreateSegmentExport(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	actorID := c.GetString("user_id")
+	var input CreateSegmentExportInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	item, err := h.svc.CreateSegmentExport(c.Request.Context(), tenantID, actorID, input)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, item)
+}
+
+func (h *Handler) RunSegmentExportsNow(c *gin.Context) {
+	if err := h.svc.RunSegmentExportsNow(c.Request.Context()); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "segment exports processed"})
 }

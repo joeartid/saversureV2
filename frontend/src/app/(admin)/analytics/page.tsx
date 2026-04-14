@@ -44,6 +44,53 @@ interface TopReward {
   points_spent: number;
 }
 
+interface ProductAffinityItem {
+  left_product_id: string;
+  left_product_name: string;
+  right_product_id: string;
+  right_product_name: string;
+  shared_users: number;
+  support_score: number;
+  refreshed_at: string;
+}
+
+interface CLVCustomer {
+  user_id: string;
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  risk_level: string;
+  estimated_clv: number;
+  point_balance: number;
+  scan_count_all: number;
+  last_scan_at?: string | null;
+}
+
+interface CLVOverview {
+  tracked_customers: number;
+  total_estimated_clv: number;
+  average_estimated_clv: number;
+  high_value_customers: number;
+  top_customers: CLVCustomer[];
+}
+
+interface CampaignROIItem {
+  campaign_id: string;
+  campaign_name: string;
+  target_type?: string | null;
+  recipient_count: number;
+  scans_before: number;
+  scans_after: number;
+  redeems_before: number;
+  redeems_after: number;
+  scan_uplift_pct: number;
+  redeem_uplift_pct: number;
+  measured_at?: string | null;
+  refreshed_at: string;
+}
+
 const PERIOD_OPTIONS = [
   { value: "7d", label: "7 วัน" },
   { value: "30d", label: "30 วัน" },
@@ -65,23 +112,33 @@ export default function AnalyticsPage() {
   const [cohorts, setCohorts] = useState<CustomerCohortPoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [topRewards, setTopRewards] = useState<TopReward[]>([]);
+  const [affinities, setAffinities] = useState<ProductAffinityItem[]>([]);
+  const [clvOverview, setClvOverview] = useState<CLVOverview | null>(null);
+  const [campaignROI, setCampaignROI] = useState<CampaignROIItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshingCohorts, setRefreshingCohorts] = useState(false);
+  const [refreshingAdvanced, setRefreshingAdvanced] = useState(false);
 
   const loadAll = async (selectedPeriod = period) => {
     setLoading(true);
     try {
-      const [distRes, cohortRes, productRes, rewardRes] = await Promise.all([
+      const [distRes, cohortRes, productRes, rewardRes, affinityRes, clvRes, roiRes] = await Promise.all([
         api.get<{ data: RFMDistributionPoint[] }>("/api/v1/dashboard/crm/rfm-distribution"),
         api.get<{ data: CustomerCohortPoint[] }>("/api/v1/dashboard/crm/customer-cohorts"),
         api.get<{ data: TopProduct[] }>(`/api/v1/dashboard/crm/top-products?period=${encodeURIComponent(selectedPeriod)}&limit=10`),
         api.get<{ data: TopReward[] }>(`/api/v1/dashboard/crm/top-rewards?period=${encodeURIComponent(selectedPeriod)}&limit=10`),
+        api.get<{ data: ProductAffinityItem[] }>("/api/v1/dashboard/crm/product-affinities?limit=12"),
+        api.get<CLVOverview>("/api/v1/dashboard/crm/clv-overview?limit=10"),
+        api.get<{ data: CampaignROIItem[] }>("/api/v1/dashboard/crm/campaign-roi?limit=12"),
       ]);
 
       setDistribution(distRes.data || []);
       setCohorts(cohortRes.data || []);
       setTopProducts(productRes.data || []);
       setTopRewards(rewardRes.data || []);
+      setAffinities(affinityRes.data || []);
+      setClvOverview(clvRes);
+      setCampaignROI(roiRes.data || []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "โหลด analytics ไม่สำเร็จ");
     } finally {
@@ -133,6 +190,19 @@ export default function AnalyticsPage() {
     }
   };
 
+  const handleRefreshAdvanced = async () => {
+    setRefreshingAdvanced(true);
+    try {
+      await api.post("/api/v1/dashboard/crm/advanced/refresh", {});
+      await loadAll(period);
+      toast.success("refresh advanced analytics แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "refresh advanced analytics ไม่สำเร็จ");
+    } finally {
+      setRefreshingAdvanced(false);
+    }
+  };
+
   const heatColor = (rate: number) => {
     if (rate >= 60) return "bg-emerald-500/90 text-white";
     if (rate >= 40) return "bg-emerald-400/80 text-white";
@@ -170,6 +240,14 @@ export default function AnalyticsPage() {
           >
             {refreshingCohorts ? "Refreshing..." : "Refresh Cohorts"}
           </button>
+          <button
+            type="button"
+            onClick={handleRefreshAdvanced}
+            disabled={refreshingAdvanced}
+            className="h-[40px] px-4 rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] text-[13px] font-medium disabled:opacity-60"
+          >
+            {refreshingAdvanced ? "Refreshing..." : "Refresh Advanced"}
+          </button>
         </div>
       </div>
 
@@ -187,10 +265,8 @@ export default function AnalyticsPage() {
           <p className="mt-2 text-[28px] font-bold text-[var(--md-primary)]">{cohortMonths.length.toLocaleString()}</p>
         </div>
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
-          <p className="text-[12px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Period</p>
-          <p className="mt-2 text-[28px] font-bold text-[var(--md-primary)]">
-            {PERIOD_OPTIONS.find((item) => item.value === period)?.label || period}
-          </p>
+          <p className="text-[12px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">High Value CLV</p>
+          <p className="mt-2 text-[28px] font-bold text-[var(--md-primary)]">{(clvOverview?.high_value_customers || 0).toLocaleString()}</p>
         </div>
       </div>
 
@@ -367,6 +443,151 @@ export default function AnalyticsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-6">
+        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
+          <div className="mb-4">
+            <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Estimated CLV</h2>
+            <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+              ประมาณค่ามูลค่าลูกค้าจาก scan history, points earned และ retention probability จาก RFM risk
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-[16px] bg-[var(--md-surface-container)] p-4">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Tracked</p>
+              <p className="mt-2 text-[24px] font-bold text-[var(--md-primary)]">{(clvOverview?.tracked_customers || 0).toLocaleString()}</p>
+            </div>
+            <div className="rounded-[16px] bg-[var(--md-surface-container)] p-4">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Total CLV</p>
+              <p className="mt-2 text-[24px] font-bold text-[var(--md-primary)]">{Math.round(clvOverview?.total_estimated_clv || 0).toLocaleString()}</p>
+            </div>
+            <div className="rounded-[16px] bg-[var(--md-surface-container)] p-4">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Avg CLV</p>
+              <p className="mt-2 text-[24px] font-bold text-[var(--md-primary)]">{Math.round(clvOverview?.average_estimated_clv || 0).toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[720px]">
+              <thead>
+                <tr className="border-b border-[var(--md-outline-variant)]">
+                  <th className="px-3 py-2 text-left text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Customer</th>
+                  <th className="px-3 py-2 text-left text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Risk</th>
+                  <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">CLV</th>
+                  <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Balance</th>
+                  <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Scans</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(clvOverview?.top_customers || []).map((item) => {
+                  const name =
+                    [item.first_name, item.last_name].filter(Boolean).join(" ") ||
+                    item.display_name ||
+                    item.phone ||
+                    item.email ||
+                    item.user_id;
+                  return (
+                    <tr key={item.user_id} className="border-b border-[var(--md-outline-variant)] last:border-b-0">
+                      <td className="px-3 py-2">
+                        <div>
+                          <p className="text-[13px] font-medium text-[var(--md-on-surface)]">{name}</p>
+                          <p className="text-[11px] text-[var(--md-on-surface-variant)]">{item.phone || item.email || "—"}</p>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-[12px] text-[var(--md-on-surface)]">{item.risk_level}</td>
+                      <td className="px-3 py-2 text-right text-[12px] font-medium text-[var(--md-primary)]">{Math.round(item.estimated_clv).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-[12px] text-[var(--md-on-surface)]">{item.point_balance.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-[12px] text-[var(--md-on-surface)]">{item.scan_count_all.toLocaleString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1 overflow-x-auto">
+          <div className="mb-4">
+            <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Product Affinity</h2>
+            <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+              ดูว่าสินค้าไหนมักถูกสแกนโดยลูกค้ากลุ่มเดียวกันบ่อย เพื่อใช้ทำ cross-sell หรือ bundle campaign
+            </p>
+          </div>
+          <table className="w-full min-w-[620px]">
+            <thead>
+              <tr className="border-b border-[var(--md-outline-variant)]">
+                <th className="px-3 py-2 text-left text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Product Pair</th>
+                <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Shared Users</th>
+                <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Support</th>
+              </tr>
+            </thead>
+            <tbody>
+              {affinities.map((item) => (
+                <tr key={`${item.left_product_id}-${item.right_product_id}`} className="border-b border-[var(--md-outline-variant)] last:border-b-0">
+                  <td className="px-3 py-2 text-[13px] text-[var(--md-on-surface)]">
+                    {item.left_product_name} x {item.right_product_name}
+                  </td>
+                  <td className="px-3 py-2 text-right text-[12px] text-[var(--md-on-surface)]">{item.shared_users.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right text-[12px] font-medium text-[var(--md-primary)]">{(item.support_score * 100).toFixed(1)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1 overflow-x-auto">
+        <div className="mb-4">
+          <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Broadcast Campaign ROI</h2>
+          <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+            เปรียบเทียบ scan และ redeem ของผู้รับ broadcast ในช่วง 7 วันก่อนและหลัง campaign เพื่อดู uplift เบื้องต้น
+          </p>
+        </div>
+        <table className="w-full min-w-[920px]">
+          <thead>
+            <tr className="border-b border-[var(--md-outline-variant)]">
+              <th className="px-3 py-2 text-left text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Campaign</th>
+              <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Recipients</th>
+              <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Scan Before</th>
+              <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Scan After</th>
+              <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Scan Uplift</th>
+              <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Redeem Before</th>
+              <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Redeem After</th>
+              <th className="px-3 py-2 text-right text-[11px] uppercase tracking-wide text-[var(--md-on-surface-variant)]">Redeem Uplift</th>
+            </tr>
+          </thead>
+          <tbody>
+            {campaignROI.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-3 py-8 text-center text-[13px] text-[var(--md-on-surface-variant)]">
+                  ยังไม่มี campaign ROI data
+                </td>
+              </tr>
+            ) : (
+              campaignROI.map((item) => (
+                <tr key={item.campaign_id} className="border-b border-[var(--md-outline-variant)] last:border-b-0">
+                  <td className="px-3 py-2">
+                    <p className="text-[13px] font-medium text-[var(--md-on-surface)]">{item.campaign_name}</p>
+                    <p className="text-[11px] text-[var(--md-on-surface-variant)]">
+                      {item.target_type || "segment"} {item.measured_at ? `| ${new Date(item.measured_at).toLocaleString("th-TH")}` : ""}
+                    </p>
+                  </td>
+                  <td className="px-3 py-2 text-right text-[12px] text-[var(--md-on-surface)]">{item.recipient_count.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right text-[12px] text-[var(--md-on-surface)]">{item.scans_before.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right text-[12px] text-[var(--md-on-surface)]">{item.scans_after.toLocaleString()}</td>
+                  <td className={`px-3 py-2 text-right text-[12px] font-medium ${item.scan_uplift_pct >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                    {item.scan_uplift_pct.toFixed(1)}%
+                  </td>
+                  <td className="px-3 py-2 text-right text-[12px] text-[var(--md-on-surface)]">{item.redeems_before.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right text-[12px] text-[var(--md-on-surface)]">{item.redeems_after.toLocaleString()}</td>
+                  <td className={`px-3 py-2 text-right text-[12px] font-medium ${item.redeem_uplift_pct >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                    {item.redeem_uplift_pct.toFixed(1)}%
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

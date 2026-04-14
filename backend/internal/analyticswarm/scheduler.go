@@ -43,6 +43,7 @@ func (s *Scheduler) run(ctx context.Context) {
 	s.warmCRMAnalytics(ctx)
 	s.runCRMAutomation(ctx)
 	s.processBroadcasts(ctx)
+	s.processSegmentExports(ctx)
 
 	dashboardTicker := time.NewTicker(1 * time.Minute)
 	defer dashboardTicker.Stop()
@@ -62,6 +63,9 @@ func (s *Scheduler) run(ctx context.Context) {
 	automationTicker := time.NewTicker(1 * time.Hour)
 	defer automationTicker.Stop()
 
+	exportTicker := time.NewTicker(1 * time.Minute)
+	defer exportTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -79,6 +83,8 @@ func (s *Scheduler) run(ctx context.Context) {
 			s.runCRMAutomation(ctx)
 		case <-broadcastTicker.C:
 			s.processBroadcasts(ctx)
+		case <-exportTicker.C:
+			s.processSegmentExports(ctx)
 		}
 	}
 }
@@ -181,8 +187,11 @@ func (s *Scheduler) warmCRMAnalytics(parent context.Context) {
 	}
 	for _, tenantID := range tenantIDs {
 		start := time.Now()
-		s.runWarmStep(parent, 3*time.Minute, func(ctx context.Context) error {
-			return s.dashboard.RefreshCustomerCohorts(ctx, tenantID)
+		s.runWarmStep(parent, 4*time.Minute, func(ctx context.Context) error {
+			if err := s.dashboard.RefreshCustomerCohorts(ctx, tenantID); err != nil {
+				return err
+			}
+			return s.dashboard.RefreshAdvancedCRMAnalytics(ctx, tenantID)
 		}, "crm cohorts", tenantID)
 		slog.Info("analytics warm: crm analytics refreshed", "tenant_id", tenantID, "duration", time.Since(start).Round(time.Millisecond).String())
 	}
@@ -205,6 +214,15 @@ func (s *Scheduler) runCRMAutomation(parent context.Context) {
 		}, "crm automation", tenantID)
 		slog.Info("analytics warm: crm automation processed", "tenant_id", tenantID, "duration", time.Since(start).Round(time.Millisecond).String())
 	}
+}
+
+func (s *Scheduler) processSegmentExports(parent context.Context) {
+	if s.crm == nil {
+		return
+	}
+	s.runWarmStep(parent, 5*time.Minute, func(ctx context.Context) error {
+		return s.crm.ProcessPendingSegmentExports(ctx)
+	}, "crm segment exports", "all")
 }
 
 func (s *Scheduler) listTenantIDs(ctx context.Context) ([]string, error) {

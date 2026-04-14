@@ -145,3 +145,45 @@ func (h *Handler) RefreshCustomerCohorts(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "customer cohorts refreshed"})
 }
+
+func (h *Handler) ProductAffinities(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	items, err := h.svc.GetProductAffinities(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) CLVOverview(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	item, err := h.svc.GetCLVOverview(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+func (h *Handler) CampaignROI(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	items, err := h.svc.GetCampaignROI(c.Request.Context(), tenantID, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) RefreshAdvancedCRM(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if err := h.svc.RefreshAdvancedCRMAnalytics(c.Request.Context(), tenantID); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "advanced crm analytics refreshed"})
+}

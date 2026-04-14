@@ -10,17 +10,24 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/minio/minio-go/v7"
 )
 
 type Service struct {
 	db         *pgxpool.Pool
 	httpClient *http.Client
+	mc         *minio.Client
+	bucket     string
+	publicURL  string
 }
 
-func NewService(db *pgxpool.Pool) *Service {
+func NewService(db *pgxpool.Pool, mc *minio.Client, bucket, publicURL string) *Service {
 	return &Service{
 		db:         db,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
+		mc:         mc,
+		bucket:     bucket,
+		publicURL:  publicURL,
 	}
 }
 
@@ -92,6 +99,7 @@ type RFMSnapshot struct {
 	RedeemCount   int     `json:"redeem_count_all"`
 	RFMScore      *string `json:"rfm_score"`
 	RiskLevel     string  `json:"risk_level"`
+	EstimatedCLV  float64 `json:"estimated_clv"`
 	RefreshedAt   string  `json:"refreshed_at"`
 }
 
@@ -740,15 +748,43 @@ scored AS (
 			 AND p.last_scan_at < NOW() - INTERVAL '180 days'
 			  THEN 'lost'
 			ELSE 'normal'
-	       END AS risk_level
+	       END AS risk_level,
+	       CASE
+			WHEN p.last_scan_at IS NOT NULL
+			 AND p.last_scan_at >= NOW() - INTERVAL '30 days'
+			 AND p.scan_count_30d >= 8
+			 AND p.point_balance >= 100
+			  THEN 0.95
+			WHEN p.last_scan_at IS NOT NULL
+			 AND p.last_scan_at >= NOW() - INTERVAL '45 days'
+			 AND p.scan_count_30d >= 4
+			  THEN 0.80
+			WHEN p.last_scan_at IS NOT NULL
+			 AND p.last_scan_at >= NOW() - INTERVAL '30 days'
+			  THEN 0.60
+			WHEN p.last_scan_at IS NOT NULL
+			 AND p.last_scan_at < NOW() - INTERVAL '60 days'
+			 AND p.last_scan_at >= NOW() - INTERVAL '120 days'
+			  THEN 0.35
+			WHEN p.last_scan_at IS NOT NULL
+			 AND p.last_scan_at < NOW() - INTERVAL '120 days'
+			 AND p.last_scan_at >= NOW() - INTERVAL '180 days'
+			  THEN 0.15
+			WHEN p.last_scan_at IS NOT NULL
+			 AND p.last_scan_at < NOW() - INTERVAL '180 days'
+			  THEN 0.05
+			ELSE 0.25
+	       END AS retention_probability
 	FROM prepared p
 )
 INSERT INTO customer_rfm_snapshots (
 	tenant_id, user_id, last_scan_at, scan_count_30d, scan_count_all, points_earned_all,
-	points_spent_all, point_balance, redeem_count_all, last_redeem_at, rfm_score, risk_level, refreshed_at
+	points_spent_all, point_balance, redeem_count_all, last_redeem_at, rfm_score, risk_level, estimated_clv, refreshed_at
 )
 SELECT tenant_id, user_id, last_scan_at, scan_count_30d, scan_count_all, points_earned_all,
-	   points_spent_all, point_balance, redeem_count_all, last_redeem_at, rfm_score, risk_level, NOW()
+	   points_spent_all, point_balance, redeem_count_all, last_redeem_at, rfm_score, risk_level,
+	   ROUND((scan_count_all * COALESCE(points_earned_all::numeric / NULLIF(scan_count_all, 0), 0) * retention_probability)::numeric, 2),
+	   NOW()
 FROM scored
 ON CONFLICT (tenant_id, user_id)
 DO UPDATE SET
@@ -762,6 +798,7 @@ DO UPDATE SET
 	last_redeem_at = EXCLUDED.last_redeem_at,
 	rfm_score = EXCLUDED.rfm_score,
 	risk_level = EXCLUDED.risk_level,
+	estimated_clv = EXCLUDED.estimated_clv,
 	refreshed_at = NOW()
 `, tenantID)
 	if err != nil {
@@ -818,7 +855,7 @@ func (s *Service) ListRFMSnapshots(ctx context.Context, tenantID, riskLevel stri
 	query := fmt.Sprintf(
 		`SELECT r.user_id::text, u.display_name, u.first_name, u.last_name, u.email, u.phone, u.province, u.status,
 		        r.last_scan_at::text, r.scan_count_30d, r.scan_count_all, r.points_earned_all, r.points_spent_all,
-		        r.point_balance, r.redeem_count_all, r.rfm_score, r.risk_level, r.refreshed_at::text
+		        r.point_balance, r.redeem_count_all, r.rfm_score, r.risk_level, COALESCE(r.estimated_clv, 0), r.refreshed_at::text
 		 FROM customer_rfm_snapshots r
 		 JOIN users u ON u.id = r.user_id AND u.tenant_id = r.tenant_id
 		 WHERE %s
@@ -847,7 +884,7 @@ func (s *Service) ListRFMSnapshots(ctx context.Context, tenantID, riskLevel stri
 	var items []RFMSnapshot
 	for rows.Next() {
 		var item RFMSnapshot
-		if err := rows.Scan(&item.UserID, &item.DisplayName, &item.FirstName, &item.LastName, &item.Email, &item.Phone, &item.Province, &item.Status, &item.LastScanAt, &item.ScanCount30d, &item.ScanCountAll, &item.PointsEarned, &item.PointsSpent, &item.PointBalance, &item.RedeemCount, &item.RFMScore, &item.RiskLevel, &item.RefreshedAt); err != nil {
+		if err := rows.Scan(&item.UserID, &item.DisplayName, &item.FirstName, &item.LastName, &item.Email, &item.Phone, &item.Province, &item.Status, &item.LastScanAt, &item.ScanCount30d, &item.ScanCountAll, &item.PointsEarned, &item.PointsSpent, &item.PointBalance, &item.RedeemCount, &item.RFMScore, &item.RiskLevel, &item.EstimatedCLV, &item.RefreshedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan rfm snapshot: %w", err)
 		}
 		items = append(items, item)

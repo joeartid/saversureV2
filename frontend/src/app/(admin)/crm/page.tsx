@@ -173,6 +173,22 @@ interface ReferralHistoryItem {
   created_at: string;
 }
 
+interface SegmentExportJob {
+  id: string;
+  segment_id: string;
+  segment_name: string;
+  status: string;
+  total_rows: number;
+  object_key?: string | null;
+  file_url?: string | null;
+  requested_by?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const defaultSegmentRules = JSON.stringify(
   {
     operator: "AND",
@@ -195,6 +211,7 @@ export default function CRMPage() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [referralCodes, setReferralCodes] = useState<ReferralCode[]>([]);
   const [referralHistory, setReferralHistory] = useState<ReferralHistoryItem[]>([]);
+  const [segmentExports, setSegmentExports] = useState<SegmentExportJob[]>([]);
   const [selectedRisk, setSelectedRisk] = useState("");
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>("");
   const [previewRows, setPreviewRows] = useState<SegmentPreviewCustomer[]>([]);
@@ -212,6 +229,8 @@ export default function CRMPage() {
   const [lastAutomationRun, setLastAutomationRun] = useState<AutomationRunSummary | null>(null);
   const [surveySaving, setSurveySaving] = useState(false);
   const [referralSaving, setReferralSaving] = useState(false);
+  const [segmentExporting, setSegmentExporting] = useState(false);
+  const [segmentExportRunning, setSegmentExportRunning] = useState(false);
 
   const [tagName, setTagName] = useState("");
   const [tagColor, setTagColor] = useState("#6366f1");
@@ -254,7 +273,7 @@ export default function CRMPage() {
   const loadAll = async (riskLevel = selectedRisk) => {
     setLoading(true);
     try {
-      const [tagsRes, segmentsRes, distRes, broadcastsRes, triggersRes, surveysRes, referralCodesRes, referralHistoryRes, customersRes] = await Promise.all([
+      const [tagsRes, segmentsRes, distRes, broadcastsRes, triggersRes, surveysRes, referralCodesRes, referralHistoryRes, segmentExportsRes, customersRes] = await Promise.all([
         api.get<{ data: Tag[] }>("/api/v1/crm/tags"),
         api.get<{ data: Segment[] }>("/api/v1/crm/segments"),
         api.get<{ data: RFMDistributionItem[] }>("/api/v1/crm/rfm/distribution"),
@@ -263,6 +282,7 @@ export default function CRMPage() {
         api.get<{ data: Survey[] }>("/api/v1/crm/surveys"),
         api.get<{ data: ReferralCode[] }>("/api/v1/crm/referral-codes?limit=20"),
         api.get<{ data: ReferralHistoryItem[] }>("/api/v1/crm/referral-history?limit=20"),
+        api.get<{ data: SegmentExportJob[] }>("/api/v1/crm/segment-exports?limit=20"),
         api.get<{ data: RFMSnapshot[] }>(
           `/api/v1/crm/rfm/customers?limit=20${riskLevel ? `&risk_level=${encodeURIComponent(riskLevel)}` : ""}`,
         ),
@@ -275,6 +295,7 @@ export default function CRMPage() {
       setSurveys(surveysRes.data || []);
       setReferralCodes(referralCodesRes.data || []);
       setReferralHistory(referralHistoryRes.data || []);
+      setSegmentExports(segmentExportsRes.data || []);
       setRfmCustomers(customersRes.data || []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "โหลดข้อมูล CRM ไม่สำเร็จ");
@@ -648,6 +669,32 @@ export default function CRMPage() {
     }
   };
 
+  const handleCreateSegmentExport = async (segment: Segment) => {
+    setSegmentExporting(true);
+    try {
+      await api.post("/api/v1/crm/segment-exports", { segment_id: segment.id });
+      await loadAll(selectedRisk);
+      toast.success(`queue export สำหรับ segment "${segment.name}" แล้ว`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "สร้าง segment export ไม่สำเร็จ");
+    } finally {
+      setSegmentExporting(false);
+    }
+  };
+
+  const handleRunSegmentExportsNow = async () => {
+    setSegmentExportRunning(true);
+    try {
+      await api.post("/api/v1/crm/segment-exports/process", {});
+      await loadAll(selectedRisk);
+      toast.success("ประมวลผล segment exports แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ประมวลผล segment exports ไม่สำเร็จ");
+    } finally {
+      setSegmentExportRunning(false);
+    }
+  };
+
   const riskLevels = ["", "champion", "loyal", "potential", "at_risk", "hibernating", "lost", "normal"];
 
   return (
@@ -804,6 +851,9 @@ export default function CRMPage() {
                       <button type="button" onClick={() => handleRefreshSegment(segment.id)} className="text-[12px] text-[var(--md-primary)] hover:underline">
                         Refresh
                       </button>
+                      <button type="button" disabled={segmentExporting} onClick={() => handleCreateSegmentExport(segment)} className="text-[12px] text-[var(--md-primary)] hover:underline disabled:opacity-60">
+                        Export CSV
+                      </button>
                       <button type="button" onClick={() => handleDeleteSegment(segment)} className="text-[12px] text-red-500 hover:underline">
                         ลบ
                       </button>
@@ -860,6 +910,60 @@ export default function CRMPage() {
                 );
               })}
             </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Segment Exports</h2>
+            <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+              สร้างไฟล์ CSV จากสมาชิกใน segment แบบ async แล้วอัปโหลดขึ้น MinIO เพื่อใช้กับเครื่องมือภายนอก
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleRunSegmentExportsNow}
+            disabled={segmentExportRunning}
+            className="h-[40px] px-4 rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] text-[13px] font-medium disabled:opacity-60"
+          >
+            {segmentExportRunning ? "Processing..." : "Process Queue Now"}
+          </button>
+        </div>
+        <div className="space-y-3">
+          {segmentExports.length === 0 ? (
+            <p className="text-[13px] text-[var(--md-on-surface-variant)]">ยังไม่มี segment export job</p>
+          ) : (
+            segmentExports.map((item) => (
+              <div key={item.id} className="rounded-[14px] border border-[var(--md-outline-variant)] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-medium text-[var(--md-on-surface)]">{item.segment_name}</p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--md-on-surface-variant)]">
+                      <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">status {item.status}</span>
+                      <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">rows {item.total_rows.toLocaleString()}</span>
+                      <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">
+                        created {new Date(item.created_at).toLocaleString("th-TH")}
+                      </span>
+                    </div>
+                    {item.error_message && (
+                      <p className="mt-2 text-[12px] text-red-500">{item.error_message}</p>
+                    )}
+                  </div>
+                  {item.file_url ? (
+                    <a
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[12px] text-[var(--md-primary)] hover:underline"
+                    >
+                      Download
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>
