@@ -60,6 +60,33 @@ func (s *Service) IsRunning() bool {
 }
 
 func (s *Service) GetHealth(ctx context.Context) (*HealthReport, error) {
+	return s.getHealth(ctx, false)
+}
+
+func (s *Service) GetHealthFresh(ctx context.Context) (*HealthReport, error) {
+	return s.getHealth(ctx, true)
+}
+
+func (s *Service) getHealth(ctx context.Context, force bool) (*HealthReport, error) {
+	s.mu.Lock()
+	if !force && s.cachedHealth != nil && time.Since(s.cachedHealthAt) < 30*time.Second {
+		cached := s.cachedHealth
+		s.mu.Unlock()
+		return cached, nil
+	}
+	s.mu.Unlock()
+
+	if !force {
+		var cached HealthReport
+		if ok, err := s.cache.Get(ctx, s.tenantID, "ops:v1-sync-health", 90*time.Second, &cached); err == nil && ok {
+			s.mu.Lock()
+			s.cachedHealth = &cached
+			s.cachedHealthAt = time.Now()
+			s.mu.Unlock()
+			return &cached, nil
+		}
+	}
+
 	statuses, err := s.GetStatus(ctx)
 	if err != nil {
 		return nil, err
@@ -155,6 +182,12 @@ func (s *Service) GetHealth(ctx context.Context) (*HealthReport, error) {
 	if !report.Configured {
 		report.Overall = worstHealth(report.Overall, "warning")
 	}
+
+	s.mu.Lock()
+	s.cachedHealth = report
+	s.cachedHealthAt = time.Now()
+	s.mu.Unlock()
+	_ = s.cache.Put(ctx, s.tenantID, "ops:v1-sync-health", report)
 
 	return report, nil
 }

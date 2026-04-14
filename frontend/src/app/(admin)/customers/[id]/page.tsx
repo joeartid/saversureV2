@@ -24,7 +24,13 @@ interface CustomerDetail {
     status: string;
     created_at: string;
     last_login_at?: string;
+    admin_notes?: string;
   };
+  tags: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
   balance: number;
   scan_history: Array<{
     id: string;
@@ -76,6 +82,12 @@ interface CustomerDetail {
   }>;
 }
 
+interface CustomerTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface UserSearchResult {
   id: string;
   display_name: string;
@@ -124,6 +136,26 @@ function mediaUrl(url?: string | null): string | null {
   return `/media/${url}`;
 }
 
+function googleMapsUrl(opts: {
+  latitude?: number;
+  longitude?: number;
+  province?: string | null;
+  district?: string | null;
+  subDistrict?: string | null;
+}): string | null {
+  if (opts.latitude != null && opts.longitude != null) {
+    return `https://www.google.com/maps?q=${opts.latitude},${opts.longitude}`;
+  }
+
+  const query = [opts.subDistrict, opts.district, opts.province]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  if (!query) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
 type DetailTab = "ledger" | "scans" | "redemptions";
 type SortDir = "asc" | "desc";
 type LedgerSortKey = "type" | "amount" | "source" | "description" | "created_at";
@@ -164,6 +196,10 @@ export default function CustomerDetailPage() {
   const [searching, setSearching] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [actionSubmitting, setActionSubmitting] = useState(false);
+  const [allTags, setAllTags] = useState<CustomerTag[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [crmSaving, setCrmSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>("scans");
   const [ledgerSort, setLedgerSort] = useState<{ key: LedgerSortKey; dir: SortDir }>({ key: "created_at", dir: "desc" });
   const [scanSort, setScanSort] = useState<{ key: ScanSortKey; dir: SortDir }>({ key: "scanned_at", dir: "desc" });
@@ -172,8 +208,12 @@ export default function CustomerDetailPage() {
   useEffect(() => {
     const fetchDetail = async () => {
       try {
-        const res = await api.get<CustomerDetail>(`/api/v1/customers/${id}/detail`);
-        setData(res);
+        const [detailRes, tagRes] = await Promise.all([
+          api.get<CustomerDetail>(`/api/v1/customers/${id}/detail`),
+          api.get<{ data: CustomerTag[] }>("/api/v1/crm/tags"),
+        ]);
+        setData(detailRes);
+        setAllTags(tagRes.data || []);
       } catch {
         setData(null);
       } finally {
@@ -182,6 +222,11 @@ export default function CustomerDetailPage() {
     };
     if (id) fetchDetail();
   }, [id]);
+
+  useEffect(() => {
+    setSelectedTagIds((data?.tags || []).map((tag) => tag.id));
+    setNotesDraft(data?.profile.admin_notes || "");
+  }, [data]);
 
   const handleRefund = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,6 +305,27 @@ export default function CustomerDetailPage() {
       toast.error(err instanceof Error ? err.message : "Merge failed");
     } finally {
       setActionSubmitting(false);
+    }
+  };
+
+  const handleToggleTag = (tagID: string) => {
+    setSelectedTagIds((prev) => (prev.includes(tagID) ? prev.filter((id) => id !== tagID) : [...prev, tagID]));
+  };
+
+  const handleSaveCRM = async () => {
+    setCrmSaving(true);
+    try {
+      await Promise.all([
+        api.put(`/api/v1/crm/customers/${id}/tags`, { tag_ids: selectedTagIds }),
+        api.patch(`/api/v1/customers/${id}`, { admin_notes: notesDraft }),
+      ]);
+      const res = await api.get<CustomerDetail>(`/api/v1/customers/${id}/detail`);
+      setData(res);
+      toast.success("บันทึก CRM profile แล้ว");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "บันทึก CRM profile ไม่สำเร็จ");
+    } finally {
+      setCrmSaving(false);
     }
   };
 
@@ -436,6 +502,56 @@ export default function CustomerDetailPage() {
                 </div>
               );
             })()}
+            <div className="mt-4 rounded-[16px] border border-[var(--md-outline-variant)] bg-[var(--md-surface-container-low)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[14px] font-medium text-[var(--md-on-surface)]">CRM Profile</p>
+                  <p className="text-[12px] text-[var(--md-on-surface-variant)]">จัด tag และบันทึกหมายเหตุภายในสำหรับทีมงาน</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSaveCRM}
+                  disabled={crmSaving}
+                  className="h-[36px] px-4 rounded-[var(--md-radius-xl)] bg-[var(--md-primary)] text-white text-[12px] font-medium disabled:opacity-60"
+                >
+                  {crmSaving ? "Saving..." : "Save CRM"}
+                </button>
+              </div>
+              <div className="mt-3">
+                <p className="mb-2 text-[12px] font-medium text-[var(--md-on-surface-variant)]">Tags</p>
+                {allTags.length === 0 ? (
+                  <p className="text-[12px] text-[var(--md-on-surface-variant)]">ยังไม่มี tag ในระบบ</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.map((tag) => {
+                      const active = selectedTagIds.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => handleToggleTag(tag.id)}
+                          className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-all ${
+                            active ? "border-transparent text-white" : "border-[var(--md-outline-variant)] text-[var(--md-on-surface-variant)]"
+                          }`}
+                          style={active ? { backgroundColor: tag.color || "#6366f1" } : undefined}
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="mt-3">
+                <p className="mb-2 text-[12px] font-medium text-[var(--md-on-surface-variant)]">Admin Notes</p>
+                <textarea
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  placeholder="เช่น ลูกค้ารายนี้ชอบโปรสายสุขภาพ / มีประวัติสแกนถี่ / ต้องติดตามเป็นพิเศษ"
+                  className="min-h-[96px] w-full rounded-[16px] border border-[var(--md-outline-variant)] bg-transparent px-4 py-3 text-[13px] text-[var(--md-on-surface)] outline-none focus:border-[var(--md-primary)]"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -652,6 +768,13 @@ export default function CustomerDetailPage() {
                       : s.latitude != null && s.longitude != null
                         ? `${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}`
                         : "—";
+                    const mapUrl = googleMapsUrl({
+                      latitude: s.latitude,
+                      longitude: s.longitude,
+                      province: s.province,
+                      district: s.district,
+                      subDistrict: s.sub_district,
+                    });
 
                     return (
                       <tr key={s.id} className="border-b border-[var(--md-outline-variant)] last:border-b-0 hover:bg-[var(--md-surface-dim)] transition-colors">
@@ -710,7 +833,20 @@ export default function CustomerDetailPage() {
                           <span className="text-[11px] opacity-70">{new Date(s.scanned_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</span>
                         </td>
                         <td className="px-4 py-3 text-[12px] text-[var(--md-on-surface-variant)] max-w-[180px] truncate" title={locationText}>
-                          {locationText}
+                          {mapUrl ? (
+                            <a
+                              href={mapUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[var(--md-primary)] hover:underline"
+                              title="เปิดตำแหน่งใน Google Maps"
+                            >
+                              <span className="truncate">{locationText}</span>
+                              <span className="text-[11px]">↗</span>
+                            </a>
+                          ) : (
+                            locationText
+                          )}
                         </td>
                       </tr>
                     );

@@ -16,6 +16,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"saversure/internal/apikey"
+	"saversure/internal/analyticswarm"
 	"saversure/internal/audit"
 	"saversure/internal/auth"
 	"saversure/internal/batch"
@@ -24,6 +25,7 @@ import (
 	"saversure/internal/code"
 	"saversure/internal/config"
 	"saversure/internal/coupon"
+	"saversure/internal/crm"
 	"saversure/internal/currency"
 	"saversure/internal/customer"
 	"saversure/internal/dashboard"
@@ -153,9 +155,11 @@ func main() {
 	redemptionHandler := redemption.NewHandler(redemptionSvc)
 	rewardHandler := reward.NewHandler(db)
 	dashboardHandler := dashboard.NewHandler(db)
+	dashboardSvc := dashboard.NewService(db)
 	scanHistoryHandler := scanhistory.NewHandler(db)
 	transactionHandler := transaction.NewHandler(db)
 	customerHandler := customer.NewHandler(db)
+	crmHandler := crm.NewHandler(db)
 	mergeHandler := customer.NewMergeHandler(db)
 	profileHandler := profile.NewHandler(db)
 	staffHandler := staff.NewHandler(db)
@@ -196,6 +200,8 @@ func main() {
 
 	v1SyncSvc := v1sync.NewService(db, cfg)
 	v1SyncHandler := v1sync.NewHandler(v1SyncSvc)
+	crmSvc := crm.NewService(db)
+	analyticsWarmScheduler := analyticswarm.NewScheduler(db, dashboardSvc, opsDigestSvc, v1SyncSvc, crmSvc)
 
 	var uploadHandler *upload.Handler
 	var exportHandler *export.Handler
@@ -520,6 +526,33 @@ func main() {
 		customerRoutes.POST("/merge", mergeHandler.Merge)
 	}
 
+	crmRoutes := tenanted.Group("/crm")
+	crmRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
+	{
+		crmRoutes.GET("/tags", crmHandler.ListTags)
+		crmRoutes.POST("/tags", crmHandler.CreateTag)
+		crmRoutes.PATCH("/tags/:id", crmHandler.UpdateTag)
+		crmRoutes.DELETE("/tags/:id", crmHandler.DeleteTag)
+
+		crmRoutes.GET("/customers/:userId/tags", crmHandler.ListCustomerTags)
+		crmRoutes.PUT("/customers/:userId/tags", crmHandler.ReplaceCustomerTags)
+
+		crmRoutes.GET("/segments", crmHandler.ListSegments)
+		crmRoutes.POST("/segments", crmHandler.CreateSegment)
+		crmRoutes.PATCH("/segments/:id", crmHandler.UpdateSegment)
+		crmRoutes.DELETE("/segments/:id", crmHandler.DeleteSegment)
+		crmRoutes.GET("/segments/:id/preview", crmHandler.PreviewSegment)
+		crmRoutes.POST("/segments/:id/refresh", crmHandler.RefreshSegment)
+
+		crmRoutes.GET("/rfm/distribution", crmHandler.GetRFMDistribution)
+		crmRoutes.GET("/rfm/customers", crmHandler.ListRFMSnapshots)
+		crmRoutes.POST("/rfm/refresh", crmHandler.RefreshRFM)
+
+		crmRoutes.POST("/broadcasts/preview", crmHandler.PreviewBroadcast)
+		crmRoutes.GET("/broadcasts", crmHandler.ListBroadcasts)
+		crmRoutes.POST("/broadcasts", crmHandler.CreateBroadcast)
+	}
+
 	// Dashboard
 	dashboardRoutes := tenanted.Group("/dashboard")
 	dashboardRoutes.Use(mw.RequireRole("super_admin", "brand_admin"))
@@ -530,6 +563,11 @@ func main() {
 		dashboardRoutes.GET("/funnel", dashboardHandler.ConversionFunnel)
 		dashboardRoutes.GET("/geo-heatmap", dashboardHandler.GeoHeatmap)
 		dashboardRoutes.GET("/recent-activity", dashboardHandler.RecentActivity)
+		dashboardRoutes.GET("/crm/rfm-distribution", dashboardHandler.RFMDistribution)
+		dashboardRoutes.GET("/crm/customer-cohorts", dashboardHandler.CustomerCohorts)
+		dashboardRoutes.POST("/crm/customer-cohorts/refresh", dashboardHandler.RefreshCustomerCohorts)
+		dashboardRoutes.GET("/crm/top-products", dashboardHandler.CRMTopProducts)
+		dashboardRoutes.GET("/crm/top-rewards", dashboardHandler.TopRewards)
 	}
 
 	// Staff Management (Brand Admin+)
@@ -975,6 +1013,10 @@ func main() {
 	v1SyncSvc.StartScheduler(context.Background())
 	defer v1SyncSvc.StopScheduler()
 
+	analyticsWarmCtx, analyticsWarmCancel := context.WithCancel(context.Background())
+	defer analyticsWarmCancel()
+	analyticsWarmScheduler.Start(analyticsWarmCtx)
+
 	// --- Server ---
 	srv := &http.Server{
 		Addr:         cfg.ListenAddr(),
@@ -1003,6 +1045,7 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("server forced to shutdown", "error", err)
 	}
+	analyticsWarmCancel()
 
 	slog.Info("server stopped")
 }

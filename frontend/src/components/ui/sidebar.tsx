@@ -42,6 +42,16 @@ const navGroups: NavGroup[] = [
           </svg>
         ),
       },
+      {
+        href: "/analytics",
+        label: "Analytics",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14H7v-5h3v5zm4 0h-3V7h3v10zm4 0h-3v-8h3v8z" />
+          </svg>
+        ),
+      },
     ],
   },
   {
@@ -129,6 +139,16 @@ const navGroups: NavGroup[] = [
         icon: (
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
             <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+          </svg>
+        ),
+      },
+      {
+        href: "/crm",
+        label: "CRM",
+        roles: ["super_admin", "brand_admin"],
+        icon: (
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-[20px] h-[20px]">
+            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.67 0-8 1.34-8 4v2h10v-2c0-1.54.78-2.84 2-3.73C10.77 13.09 9.2 13 8 13zm8 0c-1.2 0-2.77.09-4 .27 1.22.89 2 2.19 2 3.73v2h10v-2c0-2.66-5.33-4-8-4z" />
           </svg>
         ),
       },

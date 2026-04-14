@@ -92,3 +92,56 @@ func (h *Handler) RecentActivity(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": activities})
 }
+
+func (h *Handler) RFMDistribution(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	items, err := h.svc.GetRFMDistribution(c.Request.Context(), tenantID)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) CustomerCohorts(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	items, err := h.svc.GetCustomerCohorts(c.Request.Context(), tenantID)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) CRMTopProducts(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	period := c.DefaultQuery("period", "30d")
+	items, err := h.svc.GetTopProductsByPeriod(c.Request.Context(), tenantID, period, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items, "period": period})
+}
+
+func (h *Handler) TopRewards(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	period := c.DefaultQuery("period", "30d")
+	items, err := h.svc.GetTopRewards(c.Request.Context(), tenantID, period, limit)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items, "period": period})
+}
+
+func (h *Handler) RefreshCustomerCohorts(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	if err := h.svc.RefreshCustomerCohorts(c.Request.Context(), tenantID); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "customer cohorts refreshed"})
+}

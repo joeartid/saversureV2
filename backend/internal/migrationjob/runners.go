@@ -2,11 +2,13 @@ package migrationjob
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -54,79 +56,97 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 		return outcome, nil
 	}
 
-	// Fast skip: if V2 already has ≥95% of V1 users migrated, skip entire module
-	var v2UserCount int64
-	_ = s.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND v1_user_id IS NOT NULL`, mc.TenantID).Scan(&v2UserCount)
-	if v2UserCount > 0 && float64(v2UserCount)/float64(userCount) >= 0.95 {
-		outcome.Processed = outcome.Estimated
-		outcome.Summary["fast_skip"] = true
-		outcome.Summary["v2_users_exist"] = v2UserCount
-		outcome.Summary["v1_users_total"] = userCount
-		outcome.Summary["message"] = "Customer data already migrated (≥95%), skipping"
-		return outcome, nil
-	}
-
-	rows, err := mc.Source.pool.Query(ctx,
-		`SELECT id, name, surname, email, telephone, line_user_id, birth_date, gender, profile_image,
-		        province, occupation, flag, status, created_at, updated_at
-		 FROM users
-		 WHERE deleted_at IS NULL
-		 ORDER BY id`,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("query v1 users: %w", err)
-	}
-	defer rows.Close()
-
 	var usersInserted, usersSkipped, placeholderEmails int64
-	batchCounter := 0
-	for rows.Next() {
-		if err := s.ensureNotCancelled(ctx, mc.JobID); err != nil {
-			return nil, err
+	var migratedUserCount int64
+	_ = s.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND v1_user_id IS NOT NULL`,
+		mc.TenantID,
+	).Scan(&migratedUserCount)
+	if migratedUserCount >= userCount && userCount > 0 {
+		usersSkipped = userCount
+		outcome.Processed = userCount
+		outcome.Success = userCount
+		if err := s.updateModuleProgress(ctx, mc.JobID, mc.ModuleName, "migrating_users", *outcome); err != nil {
+			return nil, fmt.Errorf("progress users skip-fast-path: %w", err)
 		}
-		var (
-			v1ID                                       int64
-			name, surname, email, phone, lineUserID    *string
-			gender, profileImage, province, occupation *string
-			flag, status                               *int32
-			birthDate, createdAt, updatedAt            *time.Time
+	} else {
+		rows, err := mc.Source.pool.Query(ctx,
+			`SELECT id, textsend(name), textsend(surname), textsend(email), textsend(telephone), textsend(line_user_id), birth_date, textsend(gender), textsend(profile_image),
+			        textsend(province), textsend(occupation), flag, status, created_at, updated_at
+			 FROM users
+			 WHERE deleted_at IS NULL
+			 ORDER BY id`,
 		)
-		if err := rows.Scan(&v1ID, &name, &surname, &email, &phone, &lineUserID, &birthDate, &gender, &profileImage, &province, &occupation, &flag, &status, &createdAt, &updatedAt); err != nil {
-			s.appendError(ctx, mc.JobID, mc.ModuleName, "user", strconv.FormatInt(v1ID, 10), err.Error(), nil)
-			outcome.Failed++
-			outcome.Processed++
-			continue
-		}
-
-		created, err := s.upsertCustomerRow(ctx, mc, v1ID, name, surname, email, phone, lineUserID, birthDate, gender, profileImage, province, occupation, flag, status, createdAt, updatedAt, &placeholderEmails)
 		if err != nil {
-			s.appendError(ctx, mc.JobID, mc.ModuleName, "user", strconv.FormatInt(v1ID, 10), err.Error(), nil)
-			outcome.Failed++
-		} else {
-			if created {
-				usersInserted++
-			} else {
-				usersSkipped++
-			}
-			outcome.Success++
+			return nil, fmt.Errorf("query v1 users: %w", err)
 		}
-		outcome.Processed++
-		batchCounter++
-		if batchCounter%200 == 0 {
-			if err := s.updateModuleProgress(ctx, mc.JobID, mc.ModuleName, "migrating_users", *outcome); err != nil {
+		defer rows.Close()
+
+		var lastUserID int64
+		batchCounter := 0
+		for rows.Next() {
+			if err := s.ensureNotCancelled(ctx, mc.JobID); err != nil {
 				return nil, err
 			}
+			var (
+				v1ID                                       int64
+				nameRaw, surnameRaw, emailRaw              []byte
+				phoneRaw, lineUserIDRaw                    []byte
+				genderRaw, profileImageRaw                 []byte
+				provinceRaw, occupationRaw                 []byte
+				flag, status                               *int32
+				birthDate, createdAt, updatedAt            *time.Time
+			)
+			if err := rows.Scan(&v1ID, &nameRaw, &surnameRaw, &emailRaw, &phoneRaw, &lineUserIDRaw, &birthDate, &genderRaw, &profileImageRaw, &provinceRaw, &occupationRaw, &flag, &status, &createdAt, &updatedAt); err != nil {
+				s.appendError(ctx, mc.JobID, mc.ModuleName, "user", strconv.FormatInt(v1ID, 10), err.Error(), nil)
+				outcome.Failed++
+				outcome.Processed++
+				continue
+			}
+			lastUserID = v1ID
+			name := legacyBytesToString(nameRaw)
+			surname := legacyBytesToString(surnameRaw)
+			email := legacyBytesToString(emailRaw)
+			phone := legacyBytesToString(phoneRaw)
+			lineUserID := legacyBytesToString(lineUserIDRaw)
+			gender := legacyBytesToString(genderRaw)
+			profileImage := legacyBytesToString(profileImageRaw)
+			province := legacyBytesToString(provinceRaw)
+			occupation := legacyBytesToString(occupationRaw)
+
+			created, err := s.upsertCustomerRow(ctx, mc, v1ID, name, surname, email, phone, lineUserID, birthDate, gender, profileImage, province, occupation, flag, status, createdAt, updatedAt, &placeholderEmails)
+			if err != nil {
+				s.appendError(ctx, mc.JobID, mc.ModuleName, "user", strconv.FormatInt(v1ID, 10), err.Error(), nil)
+				outcome.Failed++
+			} else {
+				if created {
+					usersInserted++
+				} else {
+					usersSkipped++
+				}
+				outcome.Success++
+			}
+			outcome.Processed++
+			batchCounter++
+			if batchCounter%200 == 0 {
+				if err := s.updateModuleProgress(ctx, mc.JobID, mc.ModuleName, "migrating_users", *outcome); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate v1 users after source id %d: %w", lastUserID, err)
 		}
 	}
 
 	userMap, err := s.loadUserMap(ctx, mc.TenantID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load user map after users: %w", err)
 	}
 
 	addrRows, err := mc.Source.pool.Query(ctx,
-		`SELECT id, user_id, recipient_name, recipient_address, sub_district, district,
-		        province, postcode, telephone, is_default, created_at, updated_at
+		`SELECT id, user_id, textsend(recipient_name), textsend(recipient_address), textsend(sub_district), textsend(district),
+		        textsend(province), postcode, textsend(telephone), is_default, created_at, updated_at
 		 FROM user_address
 		 WHERE deleted_at IS NULL
 		 ORDER BY id`,
@@ -137,24 +157,33 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 	defer addrRows.Close()
 
 	var addressesInserted, addressesSkipped int64
+	var lastAddressID int64
 	for addrRows.Next() {
 		if err := s.ensureNotCancelled(ctx, mc.JobID); err != nil {
 			return nil, err
 		}
 		var (
-			v1AddressID, v1UserID                                 int64
-			recipientName, recipientAddress, subDistrict, district *string
-			province, phone                                        *string
+			v1AddressID, v1UserID                                  int64
+			recipientNameRaw, recipientAddressRaw                  []byte
+			subDistrictRaw, districtRaw                            []byte
+			provinceRaw, phoneRaw                                  []byte
 			postalCode                                             *int64
 			isDefault                                              *bool
 			createdAt, updatedAt                                   *time.Time
 		)
-		if err := addrRows.Scan(&v1AddressID, &v1UserID, &recipientName, &recipientAddress, &subDistrict, &district, &province, &postalCode, &phone, &isDefault, &createdAt, &updatedAt); err != nil {
+		if err := addrRows.Scan(&v1AddressID, &v1UserID, &recipientNameRaw, &recipientAddressRaw, &subDistrictRaw, &districtRaw, &provinceRaw, &postalCode, &phoneRaw, &isDefault, &createdAt, &updatedAt); err != nil {
 			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeAddress, strconv.FormatInt(v1AddressID, 10), err.Error(), nil)
 			outcome.Failed++
 			outcome.Processed++
 			continue
 		}
+		lastAddressID = v1AddressID
+		recipientName := legacyBytesToString(recipientNameRaw)
+		recipientAddress := legacyBytesToString(recipientAddressRaw)
+		subDistrict := legacyBytesToString(subDistrictRaw)
+		district := legacyBytesToString(districtRaw)
+		province := legacyBytesToString(provinceRaw)
+		phone := legacyBytesToString(phoneRaw)
 		targetUserID, ok := userMap[v1UserID]
 		if !ok {
 			addressesSkipped++
@@ -168,11 +197,34 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 			outcome.Processed++
 			continue
 		}
+		if existingAddressID, found, err := s.findMatchingAddress(ctx, mc.TenantID, targetUserID, recipientName, recipientAddress, district, subDistrict, province, postalCode, phone); err == nil && found {
+			tx, err := s.db.Begin(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("begin tx for matched address %d: %w", v1AddressID, err)
+			}
+			err = s.upsertEntityMap(ctx, tx, mc.TenantID, EntityTypeAddress, strconv.FormatInt(v1AddressID, 10), existingAddressID, mc.JobID, map[string]any{
+				"v1_user_id": v1UserID,
+				"matched":    "existing_address",
+			})
+			if err != nil {
+				tx.Rollback(ctx)
+				return nil, fmt.Errorf("upsert entity map for matched address %d: %w", v1AddressID, err)
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return nil, fmt.Errorf("commit matched address %d: %w", v1AddressID, err)
+			}
+			addressesSkipped++
+			outcome.Success++
+			outcome.Processed++
+			continue
+		} else if err != nil {
+			return nil, fmt.Errorf("find matching address %d: %w", v1AddressID, err)
+		}
 
 		addressID := newUUID()
 		tx, err := s.db.Begin(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("begin tx for address %d: %w", v1AddressID, err)
 		}
 		_, err = tx.Exec(ctx,
 			`INSERT INTO user_addresses (
@@ -199,7 +251,7 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 			continue
 		}
 		if err := tx.Commit(ctx); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("commit address %d: %w", v1AddressID, err)
 		}
 		addressesInserted++
 		outcome.Success++
@@ -210,6 +262,9 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 			}
 		}
 	}
+	if err := addrRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate v1 addresses after source id %d: %w", lastAddressID, err)
+	}
 
 	existingPointRefs := map[string]bool{}
 	pointRows, err := s.db.Query(ctx,
@@ -219,7 +274,7 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 		mc.TenantID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query existing point refs: %w", err)
 	}
 	for pointRows.Next() {
 		var ref *string
@@ -241,6 +296,7 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 	defer srcPointRows.Close()
 
 	var pointsCreated, pointsSkipped int64
+	var lastPointUserID int64
 	for srcPointRows.Next() {
 		if err := s.ensureNotCancelled(ctx, mc.JobID); err != nil {
 			return nil, err
@@ -254,6 +310,7 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 			outcome.Processed++
 			continue
 		}
+		lastPointUserID = v1UserID
 		targetUserID, ok := userMap[v1UserID]
 		refID := strconv.FormatInt(v1UserID, 10)
 		if !ok || existingPointRefs[refID] {
@@ -264,7 +321,7 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 
 		tx, err := s.db.Begin(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("begin tx for point balance %d: %w", v1UserID, err)
 		}
 		// ON CONFLICT DO NOTHING — defends against:
 		//   1. Concurrent migration jobs (in-memory existingPointRefs map is
@@ -292,7 +349,7 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 			continue
 		}
 		if err := tx.Commit(ctx); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("commit point balance %d: %w", v1UserID, err)
 		}
 		existingPointRefs[refID] = true
 		pointsCreated++
@@ -303,6 +360,9 @@ func (s *Service) runCustomer(ctx context.Context, mc moduleContext) (*moduleOut
 				return nil, err
 			}
 		}
+	}
+	if err := srcPointRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate v1 point balances after source user id %d: %w", lastPointUserID, err)
 	}
 
 	outcome.Summary["users_total"] = userCount
@@ -333,7 +393,7 @@ func (s *Service) runProducts(ctx context.Context, mc moduleContext) (*moduleOut
 	}
 
 	rows, err := mc.Source.pool.Query(ctx,
-		`SELECT id, name_th, name_en, name_sku, sku, points, extra_points, diamond_point, price, detail, created_at, updated_at
+		`SELECT id, name_th, name_en, name_sku, sku, points, extra_points, diamond_point, price, detail, images::text, created_at, updated_at
 		 FROM products
 		 WHERE deleted_at IS NULL
 		 ORDER BY id`,
@@ -349,21 +409,16 @@ func (s *Service) runProducts(ctx context.Context, mc moduleContext) (*moduleOut
 			return nil, err
 		}
 		var (
-			v1ID                                    int64
-			nameTH, nameEN, nameSKU, sku, detail   *string
+			v1ID                                     int64
+			nameTH, nameEN, nameSKU, sku, detail     *string
+			imagesRaw                                *string
 			points, extraPoints, diamondPoint, price *int32
-			createdAt, updatedAt                   *time.Time
+			createdAt, updatedAt                     *time.Time
 		)
-		if err := rows.Scan(&v1ID, &nameTH, &nameEN, &nameSKU, &sku, &points, &extraPoints, &diamondPoint, &price, &detail, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&v1ID, &nameTH, &nameEN, &nameSKU, &sku, &points, &extraPoints, &diamondPoint, &price, &detail, &imagesRaw, &createdAt, &updatedAt); err != nil {
 			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeProduct, strconv.FormatInt(v1ID, 10), err.Error(), nil)
 			outcome.Failed++
 			outcome.Processed++
-			continue
-		}
-		if excludeLegacyProduct(v1ID, sku, nameTH) {
-			skipped++
-			outcome.Processed++
-			outcome.Warnings = appendLimited(outcome.Warnings, fmt.Sprintf("product %d skipped due to migration rules", v1ID))
 			continue
 		}
 
@@ -387,14 +442,16 @@ func (s *Service) runProducts(ctx context.Context, mc moduleContext) (*moduleOut
 		description := buildProductDescription(nameEN, nameSKU, detail, price, extraPoints, diamondPoint)
 		pointsPerScan := maxInt(1, intOrDefault(points, 1))
 		skuClean := cleanSKU(sku)
+		imageURL := firstNonEmpty(parseLegacyTextArray(imagesRaw))
 
 		if exists {
 			_, err = tx.Exec(ctx,
 				`UPDATE products
 				 SET name = $3, sku = $4, description = $5, points_per_scan = $6, point_currency = 'point',
-				     status = 'active', updated_at = COALESCE($7, NOW())
+				     image_url = COALESCE(NULLIF($7, ''), image_url),
+				     status = 'active', updated_at = COALESCE($8, NOW())
 				 WHERE id = $1 AND tenant_id = $2`,
-				productID, mc.TenantID, name, skuClean, nullableStringValue(description), pointsPerScan, updatedAt,
+				productID, mc.TenantID, name, skuClean, nullableStringValue(description), pointsPerScan, stringOrEmpty(imageURL), updatedAt,
 			)
 			if err == nil {
 				err = s.upsertEntityMap(ctx, tx, mc.TenantID, EntityTypeProduct, strconv.FormatInt(v1ID, 10), productID, mc.JobID, map[string]any{
@@ -407,9 +464,9 @@ func (s *Service) runProducts(ctx context.Context, mc moduleContext) (*moduleOut
 				`INSERT INTO products (
 					id, tenant_id, name, sku, description, image_url, points_per_scan, point_currency, status, created_at, updated_at
 				) VALUES (
-					$1, $2, $3, $4, $5, NULL, $6, 'point', 'active', COALESCE($7, NOW()), $8
+					$1, $2, $3, $4, $5, $6, $7, 'point', 'active', COALESCE($8, NOW()), $9
 				)`,
-				productID, mc.TenantID, name, skuClean, nullableStringValue(description), pointsPerScan, createdAt, updatedAt,
+				productID, mc.TenantID, name, skuClean, nullableStringValue(description), imageURL, pointsPerScan, createdAt, updatedAt,
 			)
 			if err == nil {
 				err = s.upsertEntityMap(ctx, tx, mc.TenantID, EntityTypeProduct, strconv.FormatInt(v1ID, 10), productID, mc.JobID, map[string]any{
@@ -475,7 +532,7 @@ func (s *Service) runRewards(ctx context.Context, mc moduleContext) (*moduleOutc
 
 	rows, err := mc.Source.pool.Query(ctx,
 		`SELECT id, name, description, point, diamond_point, quota, quota_balance, status, expired_at,
-		        images, type, goods::text, coupon::text, partner_coupon::text, created_at, updated_at
+		        images::text, type, goods::text, coupon::text, partner_coupon::text, created_at, updated_at
 		 FROM rewards
 		 WHERE deleted_at IS NULL
 		 ORDER BY id`,
@@ -491,13 +548,13 @@ func (s *Service) runRewards(ctx context.Context, mc moduleContext) (*moduleOutc
 			return nil, err
 		}
 		var (
-			v1ID                                                  int64
-			name, description, statusText, goodsJSON, couponJSON  *string
-			partnerCouponJSON                                     *string
-			pointCost, diamondCost, quota, quotaBalance           *int32
-			expiresAt, createdAt, updatedAt                       *time.Time
-			imagesRaw                                             *string
-			rewardType                                            *int32
+			v1ID                                                 int64
+			name, description, statusText, goodsJSON, couponJSON *string
+			partnerCouponJSON                                    *string
+			pointCost, diamondCost, quota, quotaBalance          *int32
+			expiresAt, createdAt, updatedAt                      *time.Time
+			imagesRaw                                            *string
+			rewardType                                           *int32
 		)
 		if err := rows.Scan(&v1ID, &name, &description, &pointCost, &diamondCost, &quota, &quotaBalance, &statusText, &expiresAt, &imagesRaw, &rewardType, &goodsJSON, &couponJSON, &partnerCouponJSON, &createdAt, &updatedAt); err != nil {
 			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeReward, strconv.FormatInt(v1ID, 10), err.Error(), nil)
@@ -505,23 +562,19 @@ func (s *Service) runRewards(ctx context.Context, mc moduleContext) (*moduleOutc
 			outcome.Processed++
 			continue
 		}
-		// V1 stores images as text (PostgreSQL array literal), parse manually
-		var images []string
-		if imagesRaw != nil && *imagesRaw != "" {
-			raw := strings.Trim(*imagesRaw, "{}")
-			for _, part := range strings.Split(raw, ",") {
-				trimmed := strings.Trim(strings.TrimSpace(part), "\"")
-				if trimmed != "" {
-					images = append(images, trimmed)
-				}
-			}
-		}
+		images := parseLegacyTextArray(imagesRaw)
 
 		currencyCode, pointValue, rewardKind, deliveryType, rewardWarnings := mapRewardShape(pointCost, diamondCost, rewardType, goodsJSON, couponJSON, partnerCouponJSON)
 		outcome.Warnings = append(outcome.Warnings, rewardWarnings...)
 		rewardID, exists, err := s.getEntityMap(ctx, mc.TenantID, EntityTypeReward, strconv.FormatInt(v1ID, 10))
 		if err != nil {
 			return nil, err
+		}
+		if !exists {
+			rewardID, exists, err = s.findExistingRewardByName(ctx, mc.TenantID, name)
+			if err != nil {
+				return nil, err
+			}
 		}
 		totalQty, soldQty := calcRewardInventory(quota, quotaBalance)
 		imageURL := firstNonEmpty(images)
@@ -541,12 +594,7 @@ func (s *Service) runRewards(ctx context.Context, mc moduleContext) (*moduleOutc
 				deliveryType, mapRewardStatus(statusText), expiresAt, updatedAt,
 			)
 			if err == nil {
-				_, err = tx.Exec(ctx,
-					`UPDATE reward_inventory
-					 SET total_qty = $2, sold_qty = $3, reserved_qty = 0, version = version + 1
-					 WHERE reward_id = $1`,
-					rewardID, totalQty, soldQty,
-				)
+				err = s.ensureRewardInventory(ctx, tx, rewardID, totalQty, soldQty)
 			}
 		} else {
 			rewardID = newUUID()
@@ -563,11 +611,7 @@ func (s *Service) runRewards(ctx context.Context, mc moduleContext) (*moduleOutc
 				imageURL, deliveryType, mapRewardStatus(statusText), expiresAt, createdAt, updatedAt,
 			)
 			if err == nil {
-				_, err = tx.Exec(ctx,
-					`INSERT INTO reward_inventory (reward_id, total_qty, reserved_qty, sold_qty, version)
-					 VALUES ($1, $2, 0, $3, 1)`,
-					rewardID, totalQty, soldQty,
-				)
+				err = s.ensureRewardInventory(ctx, tx, rewardID, totalQty, soldQty)
 			}
 		}
 		if err == nil {
@@ -644,11 +688,44 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 	if err != nil {
 		return nil, fmt.Errorf("load existing scan map: %w", err)
 	}
+	existingScanSignatures, err := s.loadExistingHistoricalScanSignatures(ctx, mc.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("load existing scan signatures: %w", err)
+	}
 
 	rows, err := mc.Source.pool.Query(ctx,
-		`SELECT id, user_id, points, extra_points, province, created_at, status
-		 FROM qrcode_scan_history
-		 ORDER BY id`,
+		`SELECT
+			h.id,
+			h.qr_code_id,
+			COALESCE(NULLIF(h.qr_code_serial_number, ''), NULLIF(v.qr_code_serial_number, ''), NULLIF(hj.qr_code_serial_number, ''), NULLIF(qn.qrcode, '')),
+			h.product_id::bigint,
+			COALESCE(NULLIF(v.name_th, ''), NULLIF(p.name_th_marketing, ''), NULLIF(p.name_th, ''), NULLIF(p.name_sku, '')),
+			COALESCE(NULLIF(v.sku, ''), NULLIF(p.sku, ''), NULLIF(p.name_sku, '')),
+			p.images::text,
+			h.user_id,
+			h.points,
+			h.extra_points,
+			h.location::text,
+			h.province,
+			h.district,
+			h.sub_district,
+			h.post_code,
+			h.created_at,
+			h.status,
+			h.verify_method,
+			ROW_NUMBER() OVER (PARTITION BY h.qr_code_id ORDER BY h.created_at, h.id),
+			FIRST_VALUE(h.user_id) OVER (PARTITION BY h.qr_code_id ORDER BY h.created_at, h.id)
+		 FROM qrcode_scan_history h
+		 LEFT JOIN qrcode_scan_history_view v ON v.id = h.id
+		 LEFT JOIN (
+			SELECT DISTINCT ON (qr_code_id) qr_code_id, qr_code_serial_number
+			FROM qrcode_history_jdent
+			WHERE qr_code_id IS NOT NULL
+			ORDER BY qr_code_id, id DESC
+		 ) hj ON hj.qr_code_id = h.qr_code_id
+		 LEFT JOIN qrcodes_new_qrcodes qn ON qn.id = h.qr_code_id
+		 LEFT JOIN products p ON p.id = h.product_id
+		 ORDER BY h.id`,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query v1 scan history: %w", err)
@@ -657,17 +734,33 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 
 	const batchSize = 500
 	type scanRow struct {
-		targetID   string
-		userID     string
-		points     int32
-		province   *string
-		createdAt  *time.Time
-		scanType   string
-		v1ID       int64
-		v1UserID   int64
+		targetID     string
+		existing     bool
+		userID       string
+		points       int32
+		latitude     *float64
+		longitude    *float64
+		province     *string
+		district     *string
+		subDistrict  *string
+		postalCode   *string
+		locationJSON *string
+		createdAt    *time.Time
+		scanType     string
+		signature    string
+		qrCodeID     *int64
+		qrSerial     *string
+		productV1ID  *int64
+		productName  *string
+		productSKU   *string
+		productImage *string
+		rawStatus    *int32
+		verifyMethod *int32
+		v1ID         int64
+		v1UserID     int64
 	}
 
-	var inserted, skipped int64
+	var inserted, updated, skipped int64
 	batch := make([]scanRow, 0, batchSize)
 
 	flushBatch := func() error {
@@ -678,23 +771,63 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 		if err != nil {
 			return err
 		}
-		// Batch insert scan_history
 		for _, r := range batch {
-			_, err = tx.Exec(ctx,
-				`INSERT INTO scan_history (
-					id, tenant_id, user_id, code_id, campaign_id, batch_id, points_earned, province, scanned_at, scan_type
-				) VALUES (
-					$1, $2, $3, NULL, NULL, NULL, $4, $5, COALESCE($6, NOW()), $7
-				) ON CONFLICT DO NOTHING`,
-				r.targetID, mc.TenantID, r.userID, r.points, r.province, r.createdAt, r.scanType,
-			)
+			if r.existing {
+				_, err = tx.Exec(ctx,
+					`UPDATE scan_history
+					 SET user_id = $3,
+					     points_earned = $4,
+					     latitude = $5,
+					     longitude = $6,
+					     province = $7,
+					     district = $8,
+					     sub_district = $9,
+					     postal_code = $10,
+					     location_json = $11::jsonb,
+					     scanned_at = COALESCE($12, scanned_at),
+					     scan_type = $13,
+					     legacy_qr_code_id = $14,
+					     legacy_qr_code_serial = $15,
+					     legacy_product_v1_id = $16,
+					     legacy_product_name = $17,
+					     legacy_product_sku = $18,
+					     legacy_product_image_url = $19,
+					     legacy_status = $20,
+					     legacy_verify_method = $21
+					 WHERE id = $1 AND tenant_id = $2`,
+					r.targetID, mc.TenantID, r.userID, r.points,
+					r.latitude, r.longitude, r.province, r.district, r.subDistrict, r.postalCode, r.locationJSON,
+					r.createdAt, r.scanType, r.qrCodeID, r.qrSerial, r.productV1ID, r.productName, r.productSKU, r.productImage, r.rawStatus, r.verifyMethod,
+				)
+			} else {
+				_, err = tx.Exec(ctx,
+					`INSERT INTO scan_history (
+						id, tenant_id, user_id, code_id, campaign_id, batch_id, points_earned,
+						latitude, longitude, province, district, sub_district, postal_code, location_json,
+						scanned_at, scan_type,
+						legacy_qr_code_id, legacy_qr_code_serial, legacy_product_v1_id, legacy_product_name,
+						legacy_product_sku, legacy_product_image_url, legacy_status, legacy_verify_method
+					) VALUES (
+						$1, $2, $3, NULL, NULL, NULL, $4,
+						$5, $6, $7, $8, $9, $10, $11::jsonb,
+						COALESCE($12, NOW()), $13,
+						$14, $15, $16, $17,
+						$18, $19, $20, $21
+					) ON CONFLICT DO NOTHING`,
+					r.targetID, mc.TenantID, r.userID, r.points,
+					r.latitude, r.longitude, r.province, r.district, r.subDistrict, r.postalCode, r.locationJSON,
+					r.createdAt, r.scanType, r.qrCodeID, r.qrSerial, r.productV1ID, r.productName, r.productSKU, r.productImage, r.rawStatus, r.verifyMethod,
+				)
+			}
 			if err != nil {
 				tx.Rollback(ctx)
 				return fmt.Errorf("insert scan %d: %w", r.v1ID, err)
 			}
 		}
-		// Batch insert entity maps
 		for _, r := range batch {
+			if r.existing {
+				continue
+			}
 			var jobIDParam any = mc.JobID
 			raw := fmt.Sprintf(`{"v1_user_id":%d}`, r.v1UserID)
 			_, err = tx.Exec(ctx,
@@ -712,34 +845,48 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 		if err := tx.Commit(ctx); err != nil {
 			return err
 		}
-		inserted += int64(len(batch))
 		outcome.Success += int64(len(batch))
+		for _, r := range batch {
+			if r.existing {
+				updated++
+			} else {
+				inserted++
+			}
+		}
 		batch = batch[:0]
 		return nil
 	}
 
 	for rows.Next() {
 		var (
-			v1ID      int64
-			v1UserID  *int64
-			points    *int32
-			extra     *int32
-			province  *string
-			createdAt *time.Time
-			status    *int32
+			v1ID         int64
+			qrCodeID     *int64
+			qrSerial     *string
+			productV1ID  *int64
+			productName  *string
+			productSKU   *string
+			imagesRaw    *string
+			v1UserID     *int64
+			points       *int32
+			extra        *int32
+			locationRaw  *string
+			province     *string
+			district     *string
+			subDistrict  *string
+			postCode     *string
+			createdAt    *time.Time
+			status       *int32
+			verifyMethod *int32
+			scanOrdinal  int64
+			firstUserID  *int64
 		)
-		if err := rows.Scan(&v1ID, &v1UserID, &points, &extra, &province, &createdAt, &status); err != nil {
+		if err := rows.Scan(&v1ID, &qrCodeID, &qrSerial, &productV1ID, &productName, &productSKU, &imagesRaw, &v1UserID, &points, &extra, &locationRaw, &province, &district, &subDistrict, &postCode, &createdAt, &status, &verifyMethod, &scanOrdinal, &firstUserID); err != nil {
 			outcome.Failed++
 			outcome.Processed++
 			continue
 		}
 		outcome.Processed++
 
-		// Fast in-memory duplicate check
-		if existingScans[v1ID] {
-			skipped++
-			continue
-		}
 		if v1UserID == nil {
 			skipped++
 			continue
@@ -749,17 +896,49 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 			skipped++
 			continue
 		}
+		latitude, longitude := parseLegacyLocation(locationRaw)
+		scanType := deriveHistoricalScanType(status, qrCodeID, v1UserID, firstUserID, scanOrdinal)
+		signature := buildHistoricalScanSignature(targetUserID, createdAt, int32(intOrDefault(points, 0)+intOrDefault(extra, 0)), scanType, latitude, longitude, province, district, subDistrict, postCode)
+		existingTargetID, alreadyMigrated := existingScans[v1ID]
+		if !alreadyMigrated && existingScanSignatures[signature] {
+			skipped++
+			continue
+		}
+		productImage := firstNonEmpty(parseLegacyTextArray(imagesRaw))
+		targetScanID := newUUID()
+		if alreadyMigrated {
+			targetScanID = existingTargetID
+		}
 
 		batch = append(batch, scanRow{
-			targetID:  newUUID(),
-			userID:    targetUserID,
-			points:    int32(intOrDefault(points, 0) + intOrDefault(extra, 0)),
-			province:  nullableString(province),
-			createdAt: createdAt,
-			scanType:  mapScanStatus(status),
-			v1ID:      v1ID,
-			v1UserID:  *v1UserID,
+			targetID:     targetScanID,
+			existing:     alreadyMigrated,
+			userID:       targetUserID,
+			points:       int32(intOrDefault(points, 0) + intOrDefault(extra, 0)),
+			latitude:     latitude,
+			longitude:    longitude,
+			province:     nullableString(province),
+			district:     nullableString(district),
+			subDistrict:  nullableString(subDistrict),
+			postalCode:   nullableString(postCode),
+			locationJSON: nullableJSONText(locationRaw),
+			createdAt:    createdAt,
+			scanType:     scanType,
+			signature:    signature,
+			qrCodeID:     qrCodeID,
+			qrSerial:     nullableString(qrSerial),
+			productV1ID:  productV1ID,
+			productName:  nullableString(productName),
+			productSKU:   nullableString(productSKU),
+			productImage: productImage,
+			rawStatus:    status,
+			verifyMethod: verifyMethod,
+			v1ID:         v1ID,
+			v1UserID:     *v1UserID,
 		})
+		if !alreadyMigrated {
+			existingScanSignatures[signature] = true
+		}
 
 		if len(batch) >= batchSize {
 			if err := flushBatch(); err != nil {
@@ -793,6 +972,7 @@ func (s *Service) runScanHistory(ctx context.Context, mc moduleContext) (*module
 
 	outcome.Summary["scan_history_total"] = total
 	outcome.Summary["scan_history_inserted"] = inserted
+	outcome.Summary["scan_history_updated"] = updated
 	outcome.Summary["scan_history_skipped"] = skipped
 	outcome.Summary["mode"] = "historical_snapshot_batched"
 	return outcome, nil
@@ -830,12 +1010,12 @@ func (s *Service) runLuckyDraw(ctx context.Context, mc moduleContext) (*moduleOu
 	var campaignsInserted, campaignsSkipped int64
 	for rows.Next() {
 		var (
-			v1ID                              int64
-			name, description, imagesRaw      *string
-			bannerImage, statusText           *string
-			pointCost, ticketCount, totalTix   *int32
-			startDate, endDate                *time.Time
-			createdAt, updatedAt              *time.Time
+			v1ID                             int64
+			name, description, imagesRaw     *string
+			bannerImage, statusText          *string
+			pointCost, ticketCount, totalTix *int32
+			startDate, endDate               *time.Time
+			createdAt, updatedAt             *time.Time
 		)
 		if err := rows.Scan(&v1ID, &name, &description, &imagesRaw, &bannerImage,
 			&pointCost, &ticketCount, &totalTix,
@@ -982,13 +1162,13 @@ func (s *Service) runLuckyDraw(ctx context.Context, mc moduleContext) (*moduleOu
 
 	const batchSize = 500
 	type ticketRow struct {
-		targetID   string
-		campaignID string
-		userID     string
-		ticketNum  string
+		targetID    string
+		campaignID  string
+		userID      string
+		ticketNum   string
 		pointsSpent int32
-		createdAt  *time.Time
-		v1ID       int64
+		createdAt   *time.Time
+		v1ID        int64
 	}
 	batch := make([]ticketRow, 0, batchSize)
 	var ticketsInserted, ticketsSkipped int64
@@ -1116,10 +1296,10 @@ func (s *Service) runLuckyDraw(ctx context.Context, mc moduleContext) (*moduleOu
 	return outcome, nil
 }
 
-// loadExistingScanMap loads all existing scan entity maps into memory for fast duplicate check
-func (s *Service) loadExistingScanMap(ctx context.Context, tenantID string) (map[int64]bool, error) {
+// loadExistingScanMap loads all existing scan entity maps into memory for fast duplicate check/backfill.
+func (s *Service) loadExistingScanMap(ctx context.Context, tenantID string) (map[int64]string, error) {
 	rows, err := s.db.Query(ctx,
-		`SELECT source_id FROM migration_entity_maps
+		`SELECT source_id, target_id FROM migration_entity_maps
 		 WHERE tenant_id = $1 AND entity_type = $2 AND source_system = 'v1'`,
 		tenantID, EntityTypeScan,
 	)
@@ -1127,15 +1307,57 @@ func (s *Service) loadExistingScanMap(ctx context.Context, tenantID string) (map
 		return nil, err
 	}
 	defer rows.Close()
-	result := map[int64]bool{}
+	result := map[int64]string{}
 	for rows.Next() {
-		var sourceID string
-		if err := rows.Scan(&sourceID); err != nil {
+		var sourceID, targetID string
+		if err := rows.Scan(&sourceID, &targetID); err != nil {
 			return nil, err
 		}
 		if id, err := strconv.ParseInt(sourceID, 10, 64); err == nil {
-			result[id] = true
+			result[id] = targetID
 		}
+	}
+	return result, nil
+}
+
+func (s *Service) loadExistingHistoricalScanSignatures(ctx context.Context, tenantID string) (map[string]bool, error) {
+	var total int64
+	if err := s.db.QueryRow(ctx, `SELECT COUNT(*) FROM scan_history WHERE tenant_id = $1`, tenantID).Scan(&total); err != nil {
+		return nil, err
+	}
+	result := map[string]bool{}
+	if total == 0 || total > 100000 {
+		return result, nil
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT user_id, points_earned, latitude, longitude, province, district, sub_district, postal_code,
+		        scanned_at, COALESCE(scan_type, 'success')
+		 FROM scan_history
+		 WHERE tenant_id = $1`,
+		tenantID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			userID      string
+			points      int32
+			latitude    *float64
+			longitude   *float64
+			province    *string
+			district    *string
+			subDistrict *string
+			postalCode  *string
+			scannedAt   time.Time
+			scanType    string
+		)
+		if err := rows.Scan(&userID, &points, &latitude, &longitude, &province, &district, &subDistrict, &postalCode, &scannedAt, &scanType); err != nil {
+			return nil, err
+		}
+		scannedAtCopy := scannedAt
+		result[buildHistoricalScanSignature(userID, &scannedAtCopy, points, scanType, latitude, longitude, province, district, subDistrict, postalCode)] = true
 	}
 	return result, nil
 }
@@ -1185,10 +1407,10 @@ func (s *Service) runRedeemHistory(ctx context.Context, mc moduleContext) (*modu
 			return nil, err
 		}
 		var (
-			v1ID, v1RewardID, v1UserID int64
-			v1AddressID                *int64
+			v1ID, v1RewardID, v1UserID           int64
+			v1AddressID                          *int64
 			statusText, couponCode, trackingCode *string
-			createdAt, updatedAt       *time.Time
+			createdAt, updatedAt                 *time.Time
 		)
 		if err := rows.Scan(&v1ID, &v1RewardID, &v1UserID, &v1AddressID, &statusText, &couponCode, &trackingCode, &createdAt, &updatedAt); err != nil {
 			s.appendError(ctx, mc.JobID, mc.ModuleName, EntityTypeRedeem, strconv.FormatInt(v1ID, 10), err.Error(), nil)
@@ -1294,11 +1516,6 @@ func (s *Service) upsertCustomerRow(
 	if exists, err := s.customerExists(ctx, mc.TenantID, v1ID); err == nil && exists {
 		return false, nil
 	}
-	tx, err := s.db.Begin(ctx)
-	if err != nil {
-		return false, err
-	}
-	defer tx.Rollback(ctx)
 
 	firstName := truncString(strings.TrimSpace(stringOrEmpty(name)), 100)
 	lastName := truncString(strings.TrimSpace(stringOrEmpty(surname)), 100)
@@ -1312,9 +1529,15 @@ func (s *Service) upsertCustomerRow(
 		finalEmail = fmt.Sprintf("v1_%d@migrated.saversure.local", v1ID)
 	}
 
-	userID := newUUID()
-	insertUser := func(emailAddr string) error {
-		_, err := tx.Exec(ctx,
+	insertUserWithRole := func(emailAddr string) error {
+		tx, err := s.db.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
+
+		userID := newUUID()
+		_, err = tx.Exec(ctx,
 			`INSERT INTO users (
 				id, tenant_id, email, phone, password_hash, display_name, status,
 				created_at, updated_at, first_name, last_name, birth_date, gender,
@@ -1330,15 +1553,27 @@ func (s *Service) upsertCustomerRow(
 			nullableString(profileImage), nullableString(lineUserID), nullableString(province), nullableString(occupation),
 			mapCustomerFlag(flag), v1ID, firstName != "" && stringOrEmpty(phone) != "",
 		)
-		return err
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx,
+			`INSERT INTO user_roles (id, user_id, tenant_id, role, created_at)
+			 VALUES ($1, $2, $3, 'api_client', NOW())
+			 ON CONFLICT (user_id, tenant_id) DO NOTHING`,
+			newUUID(), userID, mc.TenantID,
+		)
+		if err != nil {
+			return err
+		}
+		return tx.Commit(ctx)
 	}
 
-	if err := insertUser(finalEmail); err != nil {
+	if err := insertUserWithRole(finalEmail); err != nil {
 		if !usePlaceholder {
-			finalEmail = fmt.Sprintf("v1_%d@migrated.saversure.local", v1ID)
+			placeholderEmail := fmt.Sprintf("v1_%d@migrated.saversure.local", v1ID)
 			*placeholderEmails = *placeholderEmails + 1
-			if retryErr := insertUser(finalEmail); retryErr != nil {
-				return false, retryErr
+			if retryErr := insertUserWithRole(placeholderEmail); retryErr != nil {
+				return false, fmt.Errorf("insert user failed: %w; placeholder retry failed: %v", err, retryErr)
 			}
 		} else {
 			return false, err
@@ -1346,17 +1581,7 @@ func (s *Service) upsertCustomerRow(
 	} else if usePlaceholder {
 		*placeholderEmails = *placeholderEmails + 1
 	}
-
-	_, err = tx.Exec(ctx,
-		`INSERT INTO user_roles (id, user_id, tenant_id, role, created_at)
-		 VALUES ($1, $2, $3, 'api_client', NOW())
-		 ON CONFLICT (user_id, tenant_id) DO NOTHING`,
-		newUUID(), userID, mc.TenantID,
-	)
-	if err != nil {
-		return false, err
-	}
-	return true, tx.Commit(ctx)
+	return true, nil
 }
 
 func (s *Service) customerExists(ctx context.Context, tenantID string, v1ID int64) (bool, error) {
@@ -1413,6 +1638,82 @@ func (s *Service) loadEntityMap(ctx context.Context, tenantID, entityType string
 	return items, nil
 }
 
+func (s *Service) findMatchingAddress(
+	ctx context.Context,
+	tenantID, userID string,
+	recipientName, recipientAddress, district, subDistrict, province *string,
+	postalCode *int64,
+	phone *string,
+) (string, bool, error) {
+	var id string
+	err := s.db.QueryRow(ctx,
+		`SELECT id
+		 FROM user_addresses
+		 WHERE tenant_id = $1
+		   AND user_id = $2
+		   AND COALESCE(recipient_name, '') = $3
+		   AND COALESCE(phone, '') = $4
+		   AND COALESCE(address_line1, '') = $5
+		   AND COALESCE(district, '') = $6
+		   AND COALESCE(sub_district, '') = $7
+		   AND COALESCE(province, '') = $8
+		   AND COALESCE(postal_code, '') = $9
+		 LIMIT 1`,
+		tenantID, userID,
+		truncOrDefault(recipientName, 200, "ไม่ระบุ"),
+		truncOrDefault(phone, 20, ""),
+		stringOrEmpty(recipientAddress),
+		stringOrEmpty(district),
+		stringOrEmpty(subDistrict),
+		stringOrEmpty(province),
+		stringOrEmpty(nullablePostal(postalCode)),
+	).Scan(&id)
+	if err == pgx.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return id, true, nil
+}
+
+func (s *Service) findExistingRewardByName(ctx context.Context, tenantID string, name *string) (string, bool, error) {
+	normalized := normalizeKey(name)
+	if normalized == "" {
+		return "", false, nil
+	}
+	var id string
+	err := s.db.QueryRow(ctx,
+		`SELECT id
+		 FROM rewards
+		 WHERE tenant_id = $1
+		   AND lower(trim(name)) = $2
+		 LIMIT 1`,
+		tenantID, normalized,
+	).Scan(&id)
+	if err == pgx.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return id, true, nil
+}
+
+func (s *Service) ensureRewardInventory(ctx context.Context, tx pgx.Tx, rewardID string, totalQty, soldQty int) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO reward_inventory (reward_id, total_qty, reserved_qty, sold_qty, version)
+		 VALUES ($1, $2, 0, $3, 1)
+		 ON CONFLICT (reward_id) DO UPDATE
+		 SET total_qty = EXCLUDED.total_qty,
+		     sold_qty = EXCLUDED.sold_qty,
+		     reserved_qty = 0,
+		     version = reward_inventory.version + 1`,
+		rewardID, totalQty, soldQty,
+	)
+	return err
+}
+
 func (s *Service) importCouponPoolForReward(ctx context.Context, tx pgx.Tx, mc moduleContext, v1RewardID int64, rewardID string) (int64, error) {
 	rows, err := mc.Source.pool.Query(ctx,
 		`SELECT code, COALESCE(is_used, false), COALESCE(is_collected, false)
@@ -1447,22 +1748,6 @@ func (s *Service) importCouponPoolForReward(ctx context.Context, tx pgx.Tx, mc m
 		imported++
 	}
 	return imported, nil
-}
-
-func excludeLegacyProduct(v1ID int64, sku, nameTH *string) bool {
-	if v1ID == 66 || v1ID == 67 || v1ID == 68 || v1ID == 69 || v1ID == 70 || v1ID == 150 {
-		return true
-	}
-	combined := strings.ToLower(stringOrEmpty(sku) + " " + stringOrEmpty(nameTH))
-	ticketKeywords := []string{
-		"บัตร", "ticket", "premiere", "vending machine", "booth", "one day trip", "final episode", "ดาเอ็นโดรฟิน",
-	}
-	for _, keyword := range ticketKeywords {
-		if strings.Contains(combined, strings.ToLower(keyword)) {
-			return true
-		}
-	}
-	return false
 }
 
 func resolveProductName(nameTH, nameEN, nameSKU *string, v1ID int64) string {
@@ -1560,9 +1845,24 @@ func mapRewardStatus(statusText *string) string {
 	}
 }
 
+func deriveHistoricalScanType(status *int32, qrCodeID *int64, userID *int64, firstUserID *int64, scanOrdinal int64) string {
+	if qrCodeID != nil && userID != nil && firstUserID != nil {
+		if scanOrdinal <= 1 {
+			return "success"
+		}
+		if *userID == *firstUserID {
+			return "duplicate_self"
+		}
+		return "duplicate_other"
+	}
+	return mapScanStatus(status)
+}
+
 func mapScanStatus(status *int32) string {
 	switch intOrDefault(status, 1) {
-	case 0:
+	case 4:
+		return "duplicate_self"
+	case -100, 5, 6:
 		return "duplicate_other"
 	default:
 		return "success"
@@ -1678,12 +1978,43 @@ func cleanSKU(sku *string) *string {
 
 func firstNonEmpty(items []string) *string {
 	for _, item := range items {
-		trimmed := strings.TrimSpace(item)
+		trimmed := strings.TrimSpace(sanitizeText(item))
 		if trimmed != "" {
 			return &trimmed
 		}
 	}
 	return nil
+}
+
+func nullableJSONText(raw *string) *string {
+	value := strings.TrimSpace(stringOrEmpty(raw))
+	if value == "" || value == "null" || value == "{}" {
+		return nil
+	}
+	if !json.Valid([]byte(value)) {
+		return nil
+	}
+	return &value
+}
+
+func parseLegacyTextArray(raw *string) []string {
+	value := strings.TrimSpace(stringOrEmpty(raw))
+	if value == "" || value == "{}" {
+		return nil
+	}
+	value = strings.Trim(value, "{}")
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.Trim(strings.TrimSpace(part), "\"")
+		if trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	return items
 }
 
 func looksLikeJSONPayload(raw *string) bool {
@@ -1695,14 +2026,18 @@ func stringOrEmpty(value *string) string {
 	if value == nil {
 		return ""
 	}
-	return *value
+	return sanitizeText(*value)
 }
 
 func stringOrDefault(value *string, def string) string {
-	if value == nil || *value == "" {
+	if value == nil {
 		return def
 	}
-	return *value
+	sanitized := sanitizeText(*value)
+	if sanitized == "" {
+		return def
+	}
+	return sanitized
 }
 
 func truncOrDefault(value *string, max int, fallback string) string {
@@ -1714,8 +2049,13 @@ func truncOrDefault(value *string, max int, fallback string) string {
 }
 
 func truncString(value string, max int) string {
-	if len(value) > max {
-		return value[:max]
+	value = sanitizeText(value)
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) > max {
+		return string(runes[:max])
 	}
 	return value
 }
@@ -1724,7 +2064,7 @@ func nullableString(value *string) *string {
 	if value == nil {
 		return nil
 	}
-	trimmed := strings.TrimSpace(*value)
+	trimmed := strings.TrimSpace(sanitizeText(*value))
 	if trimmed == "" {
 		return nil
 	}
@@ -1732,7 +2072,7 @@ func nullableString(value *string) *string {
 }
 
 func nullableStringValue(value string) *string {
-	value = strings.TrimSpace(value)
+	value = strings.TrimSpace(sanitizeText(value))
 	if value == "" {
 		return nil
 	}
@@ -1748,6 +2088,88 @@ func nullablePostal(value *int64) *string {
 		postal = postal[:10]
 	}
 	return &postal
+}
+
+func parseLegacyLocation(raw *string) (*float64, *float64) {
+	type locationPayload struct {
+		Latitude  string `json:"latitude"`
+		Longitude string `json:"longitude"`
+	}
+	value := strings.TrimSpace(stringOrEmpty(raw))
+	if value == "" || value == "null" || value == "{}" {
+		return nil, nil
+	}
+	var payload locationPayload
+	if err := json.Unmarshal([]byte(value), &payload); err != nil {
+		return nil, nil
+	}
+	return parseOptionalFloat(payload.Latitude), parseOptionalFloat(payload.Longitude)
+}
+
+func parseOptionalFloat(value string) *float64 {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return nil
+	}
+	return &parsed
+}
+
+func buildHistoricalScanSignature(userID string, createdAt *time.Time, points int32, scanType string, latitude, longitude *float64, province, district, subDistrict, postalCode *string) string {
+	created := ""
+	if createdAt != nil {
+		created = createdAt.UTC().Format(time.RFC3339Nano)
+	}
+	return strings.Join([]string{
+		userID,
+		created,
+		strconv.FormatInt(int64(points), 10),
+		scanType,
+		floatSignature(latitude),
+		floatSignature(longitude),
+		normalizeKey(province),
+		normalizeKey(district),
+		normalizeKey(subDistrict),
+		normalizeKey(postalCode),
+	}, "|")
+}
+
+func floatSignature(value *float64) string {
+	if value == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*value, 'f', 6, 64)
+}
+
+func normalizeKey(value *string) string {
+	return strings.ToLower(strings.TrimSpace(stringOrEmpty(value)))
+}
+
+func sanitizeText(value string) string {
+	value = strings.ReplaceAll(value, "\x00", "")
+	return strings.ToValidUTF8(value, "")
+}
+
+func legacyBytesToString(value []byte) *string {
+	if value == nil {
+		return nil
+	}
+	if !utf8.Valid(value) {
+		sanitized := strings.ToValidUTF8(string(value), "")
+		sanitized = sanitizeText(sanitized)
+		if sanitized == "" {
+			return nil
+		}
+		return &sanitized
+	}
+	text := sanitizeText(string(value))
+	if text == "" {
+		return nil
+	}
+	return &text
 }
 
 func boolOrDefault(value *bool, fallback bool) bool {

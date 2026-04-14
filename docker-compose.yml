@@ -72,6 +72,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: saversure-api
+    env_file:
+      - ./backend/.env
     ports:
       - "30400:30400"
     environment:

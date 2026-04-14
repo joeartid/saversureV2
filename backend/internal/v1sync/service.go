@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"saversure/internal/analyticscache"
 	"saversure/internal/config"
 )
 
@@ -24,6 +25,9 @@ type Service struct {
 	running  bool
 	stopCh   chan struct{}
 	tenantID string
+	cache    *analyticscache.Store
+	cachedHealth   *HealthReport
+	cachedHealthAt time.Time
 }
 
 var syncEntityOrder = []string{"user", "scan_history", "redeem_history"}
@@ -33,6 +37,7 @@ func NewService(db *pgxpool.Pool, cfg *config.Config) *Service {
 		db:       db,
 		cfg:      cfg,
 		tenantID: "00000000-0000-0000-0000-000000000001",
+		cache:    analyticscache.NewStore(db),
 	}
 }
 

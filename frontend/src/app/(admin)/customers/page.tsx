@@ -22,6 +22,11 @@ interface Customer {
   scan_count: number;
   redeem_count: number;
   created_at: string;
+  tags: Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>;
 }
 
 type CustomerSortKey = "customer" | "province" | "status" | "points" | "scans" | "redeems" | "joined";
@@ -229,6 +234,22 @@ export default function CustomersPage() {
                       <div>
                         <p className="text-[13px] font-medium text-[var(--md-primary)] hover:underline">{name || "—"}</p>
                         <p className="text-[11px] text-[var(--md-on-surface-variant)]">{c.email || "—"}</p>
+                        {c.tags?.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {c.tags.slice(0, 3).map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium text-white"
+                                style={{ backgroundColor: tag.color || "#6366f1" }}
+                              >
+                                {tag.name}
+                              </span>
+                            ))}
+                            {c.tags.length > 3 && (
+                              <span className="text-[10px] text-[var(--md-on-surface-variant)]">+{c.tags.length - 3}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>

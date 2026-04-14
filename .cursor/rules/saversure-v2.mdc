@@ -1,0 +1,136 @@
+# SaversureV2 — V1→V2 Transition Awareness
+
+## ภาพรวม
+
+SaversureV2 คือระบบ loyalty/QR-code สำหรับแบรนด์ JulasHerb ที่กำลังอยู่ระหว่าง **migration จาก V1 → V2**
+ข้อมูลในระบบมาจาก **2 แหล่ง** พร้อมกัน:
+
+| แหล่ง | คำอธิบาย |
+|-------|---------|
+| **V1** | ระบบเก่าบน AWS RDS — ข้อมูลถูก migrate/sync มา, มี `legacy_*` fields |
+| **V2** | ระบบใหม่ Docker-based — ข้อมูลที่สร้างตรงใน V2 |
+
+## Stack
+
+- **Backend**: Go 1.24, pgx/v5, PostgreSQL 17 (Docker)
+- **Frontend**: React 18, Next.js, Vite, Tailwind CSS
+- **Infrastructure**: Docker Compose, MinIO (file storage)
+- **V1 Live Sync**: Go service ที่ดึง users + scan_history + redeem_history จาก V1 AWS RDS แบบ incremental
+
+## กฎสำคัญเมื่อทำงานกับ SaversureV2
+
+### 1. Dual-Source Awareness (คิดเผื่อทั้ง V1 + V2 เสมอ)
+
+```
+ทุกครั้งที่ query ข้อมูลเพื่อแสดง / คำนวณ:
+- ข้อมูลอาจมาจาก V1 (migrated/synced) หรือ V2 (native)
+- ต้องรองรับกรณีที่ field บางตัว NULL เพราะ V1 ไม่มี concept นั้น
+- ใช้ COALESCE / fallback ให้ข้อมูลแสดงผลได้เสมอ
+```
+
+### 2. Legacy Fields Convention
+
+ตาราง `scan_history` มี fields เฉพาะ V1:
+- `legacy_qr_code_id` (bigint) — QR ID จาก V1
+- `legacy_qr_code_serial` (text) — Serial เช่น A4WUCWUY
+- `legacy_product_v1_id` (bigint) — Product ID ฝั่ง V1
+- `legacy_product_name` (text) — ชื่อสินค้า V1
+- `legacy_product_sku` (text) — SKU V1
+- `legacy_product_image_url` (text)
+- `legacy_status` (smallint) — 2=success ใน V1
+- `legacy_verify_method` (smallint)
+
+**กฎ**: เมื่อเพิ่ม field ใหม่ที่เกี่ยวกับ V1 ให้ prefix ด้วย `legacy_` เสมอ
+
+### 3. Data Source Indicator
+
+เมื่อแสดงข้อมูลใน UI ที่มีทั้ง V1 และ V2:
+- แสดง badge `V1` / `V2` ให้ admin เห็นชัดเจน
+- V1: `bg-amber-100 text-amber-700`
+- V2: `bg-emerald-100 text-emerald-700`
+- ตรวจ data_source ได้จาก `legacy_qr_code_id IS NOT NULL` → V1
+
+### 4. Point Balance Calculation
+
+```sql
+-- ลำดับ priority:
+-- 1. point_ledger (ถ้ามี) → balance_after ล่าสุด
+-- 2. Fallback: SUM(scan_history.points_earned WHERE success) - SUM(reward_reservations.point_cost WHERE CONFIRMED)
+-- ใช้ COALESCE ครอบทั้งสอง path
+```
+
+กรณี user V1 ที่ไม่มี point_ledger → ใช้ derived balance จาก scan_history
+
+### 5. Scan Type
+
+```
+'success'          → สแกนสำเร็จ ได้แต้ม
+'duplicate_self'   → สแกนซ้ำ (ตัวเอง) ไม่ได้แต้ม
+'duplicate_other'  → สแกนซ้ำ (คนอื่นสแกนไปแล้ว) ไม่ได้แต้ม
+```
+
+### 6. V1 Live Sync
+
+- Service: `backend/internal/v1sync/`
+- ใช้ watermark (`v1_sync_state` table) เพื่อ track `last_synced_id`
+- Sync entity: `users` + `scan_history` + `redeem_history`
+- เมื่อ sync user ใหม่ → สร้าง point_ledger snapshot ด้วย (`v1_live_sync_balance`)
+- เมื่อ sync scan ที่มี mapping แล้ว → patch legacy fields ถ้ายังว่าง
+
+### 7. Migration Entity Maps
+
+ตาราง `migration_entity_maps` เก็บ mapping V1 → V2:
+- `source_type`: 'user', 'scan_history', 'product', 'reward'
+- `source_id`: V1 ID (text)
+- `target_id`: V2 UUID (text)
+
+**กฎ**: ทุกการ insert ข้อมูลจาก V1 → V2 ต้อง insert mapping ด้วยใน transaction เดียวกัน
+
+### 8. Database
+
+- **V2 DB**: Docker container `saversure-postgres`, port ตาม `DB_PORT` ใน `.env`
+- **V1 DB**: AWS RDS, config ใน `.env` → `V1_LIVE_DB_*`
+- **Tenant ID**: `00000000-0000-0000-0000-000000000001` (JulasHerb)
+
+### 8.1 Deployment Exception
+
+- `saversureV2` เป็นข้อยกเว้นจากกฎ JLC ปกติเรื่อง deployment
+- โปรเจกต์นี้สามารถ `deploy จากเครื่อง dev นี้ได้โดยตรง` เมื่อผู้ใช้ร้องขอชัดเจน
+- ไม่ต้องบังคับผ่าน Server Monitor สำหรับ `saversureV2`
+- ก่อน deploy ให้เช็กว่า backend/frontend ที่จะปล่อยใช้โค้ดชุดล่าสุดและ service ที่เกี่ยวข้อง (`api`, `frontend`, scheduler) ถูก restart/build แล้ว
+
+### 9. UI Standards
+
+- ใช้ dark theme variables: `--md-surface`, `--md-on-surface`, etc.
+- วันที่แสดงแบบ Thai locale: `th-TH`
+- ตารางต้องมี `overflow-x-auto` เสมอ
+- Badge ใช้ rounded-full, text-[11px], font-medium
+
+### 10. Performance
+
+- List queries ใช้ CTE (`WITH base AS ...`) เพื่อ sort/limit ก่อน join
+- หลีกเลี่ยง `NULLS LAST` ใน ORDER BY ที่ต้องใช้ index
+- Frontend: defer ข้อมูลที่ไม่ critical ด้วย `setTimeout`
+- Pre-computed tables (`analytics_scan_rollups`, `customer_rfm_snapshots`) แทน real-time aggregate
+- Background scheduler (`analyticswarm`) สำหรับงาน heavy — ไม่ block API request
+- DB-backed cache (`analytics_snapshots`) สำหรับ API ที่ query หนัก — TTL-based
+
+### 11. CRM Conventions
+
+**Tables**
+- `customer_tags` / `customer_tag_assignments` — tag ที่ admin กำหนดเอง
+- `customer_segments` — segment ที่สร้างจากเงื่อนไข (rules JSONB)
+- `customer_rfm_snapshots` — RFM metrics ที่คำนวณล่วงหน้าทุก 6 ชม.
+
+**กฎ CRM**
+- Segment evaluation ใช้ query-based (ไม่ materialize member list)
+- RFM snapshot คำนวณจาก **V2 local DB เท่านั้น** — ห้าม query V1 AWS RDS
+- Tag assignment สามารถเป็น manual (`admin`) หรือ auto (`auto`) จาก trigger
+- `risk_level` ใน RFM: `champion`, `loyal`, `potential`, `at_risk`, `hibernating`, `lost`
+
+**AWS Cost Control**
+- Feature ใหม่ทุกตัวต้องใช้ข้อมูลจาก V2 local DB เป็นหลัก
+- ห้ามเพิ่ม query ใหม่ไปที่ V1 AWS RDS โดยไม่ได้รับอนุมัติ
+- V1 live sync ที่รันอยู่แล้วจะ feed ข้อมูลเข้า V2 — ไม่ต้องดึงซ้ำ
+
+**Roadmap Reference**: ดู `docs/crm-development-roadmap.md`

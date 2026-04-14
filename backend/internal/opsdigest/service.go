@@ -3,17 +3,28 @@ package opsdigest
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"saversure/internal/analyticscache"
 )
 
 type Service struct {
-	db *pgxpool.Pool
+	db    *pgxpool.Pool
+	cache *analyticscache.Store
+	mu    sync.RWMutex
+	cachedTenantID string
+	cachedAt time.Time
+	cachedDigest *DigestSummary
 }
 
 func NewService(db *pgxpool.Pool) *Service {
-	return &Service{db: db}
+	return &Service{
+		db:    db,
+		cache: analyticscache.NewStore(db),
+	}
 }
 
 type DigestSummary struct {
@@ -62,6 +73,34 @@ type RollOverview struct {
 }
 
 func (s *Service) GenerateDigest(ctx context.Context, tenantID string) (*DigestSummary, error) {
+	return s.generateDigest(ctx, tenantID, false)
+}
+
+func (s *Service) GenerateDigestFresh(ctx context.Context, tenantID string) (*DigestSummary, error) {
+	return s.generateDigest(ctx, tenantID, true)
+}
+
+func (s *Service) generateDigest(ctx context.Context, tenantID string, force bool) (*DigestSummary, error) {
+	s.mu.RLock()
+	if !force && s.cachedDigest != nil && s.cachedTenantID == tenantID && time.Since(s.cachedAt) < 30*time.Second {
+		cached := s.cachedDigest
+		s.mu.RUnlock()
+		return cached, nil
+	}
+	s.mu.RUnlock()
+
+	if !force {
+		var cached DigestSummary
+		if ok, err := s.cache.Get(ctx, tenantID, "ops:digest", 60*time.Second, &cached); err == nil && ok {
+			s.mu.Lock()
+			s.cachedTenantID = tenantID
+			s.cachedAt = time.Now()
+			s.cachedDigest = &cached
+			s.mu.Unlock()
+			return &cached, nil
+		}
+	}
+
 	d := &DigestSummary{
 		TenantID: tenantID,
 		Date:     time.Now().Format("2006-01-02"),
@@ -173,6 +212,13 @@ func (s *Service) GenerateDigest(ctx context.Context, tenantID string) (*DigestS
 	).Scan(&d.RedeemCountToday)
 
 	d.Alerts = s.buildAlerts(d)
+
+	s.mu.Lock()
+	s.cachedTenantID = tenantID
+	s.cachedAt = time.Now()
+	s.cachedDigest = d
+	s.mu.Unlock()
+	_ = s.cache.Put(ctx, tenantID, "ops:digest", d)
 
 	return d, nil
 }

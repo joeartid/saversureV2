@@ -2,6 +2,7 @@ package linebot
 
 import (
 	"net/http"
+	"strconv"
 
 	"saversure/internal/apperror"
 
@@ -46,7 +47,9 @@ func (h *Handler) SendMessage(c *gin.Context) {
 }
 
 type BroadcastInput struct {
-	Message string `json:"message" binding:"required"`
+	Message          string `json:"message" binding:"required"`
+	ConfirmationText string `json:"confirmation_text" binding:"required"`
+	HighRiskAck      bool   `json:"high_risk_ack"`
 }
 
 // Broadcast sends a LINE message to all LINE-connected users in the tenant
@@ -80,6 +83,25 @@ func (h *Handler) Broadcast(c *gin.Context) {
 
 	if len(lineIDs) == 0 {
 		c.JSON(http.StatusOK, gin.H{"status": "no_recipients", "count": 0})
+		return
+	}
+
+	expected := "SEND ALL LINE TO " + strconv.Itoa(len(lineIDs)) + " USERS"
+	if input.ConfirmationText != expected {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":                "confirmation_required",
+			"message":              "confirmation text mismatch",
+			"expected_confirmation": expected,
+			"count":                len(lineIDs),
+		})
+		return
+	}
+	if len(lineIDs) >= 1000 && !input.HighRiskAck {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "high_risk_ack_required",
+			"message": "high risk acknowledgement is required for large broadcast",
+			"count":   len(lineIDs),
+		})
 		return
 	}
 

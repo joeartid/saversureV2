@@ -211,41 +211,153 @@ dependency ในระบบ:
 - scan count
 - redeem history count
 
-## 7. ขอบเขต QR Phase ถัดไป
+## 7. V1 Live Sync (Incremental Sync จาก AWS RDS)
 
-รอบนี้:
+> **เพิ่มเมื่อ 2026-04-10** — หลัง Phase 1 migration เสร็จ เราเปลี่ยนแนวทางมาใช้ V1 Live Sync แทน dump-based migration
 
-- ออกแบบเผื่อ QR phase
-- ยังไม่ import full QR dataset
+### 7.1 แนวคิด
 
-สิ่งที่ต้องตัดสินใจก่อนทำ phase QR จริง:
+แทนที่จะ down V1 แล้ว dump → restore ใหม่ทุกรอบ ตอนนี้ V2 เชื่อมต่อไป V1 (AWS RDS) ตรงๆ แล้วดึงข้อมูลใหม่มาแบบ incremental ผ่าน watermark:
 
-- QR จะใช้เพื่อ audit/history อย่างเดียว หรือใช้ lookup/validation ด้วย
-- ถ้าใช้แค่อ้างอิงย้อนหลัง อาจเก็บเป็น archive/read-only source แยก
-- ถ้าต้องใช้คู่ขนานกับ legacy QR ช่วง cutover ต้องออกแบบ compatibility layer เพิ่ม
+```
+V1 (AWS RDS) ──── internet ────► V2 Live Sync Service ──► V2 DB (Docker)
+                                  ├── users (incremental by id)
+                                  └── scan_history (incremental by id)
+```
 
-ข้อเสนอสำหรับ phase QR:
+### 7.2 การทำงาน
 
-1. ใช้ไฟล์ `saversurejulaherb_qrcodes_2025H1_20260331.csv.gz` สำรวจ schema ก่อน
-2. สรุป use case ให้ชัดว่า V2 ต้อง query QR เก่าหรือไม่
-3. ถ้าจำเป็นต้องใช้ full QR จริง ค่อยแยกเป็น migration stream อิสระจาก customer/reward/scan/redeem
+- **Service**: `backend/internal/v1sync/`
+- **Config**: `.env` → `V1_LIVE_DB_HOST`, `V1_LIVE_DB_PORT`, `V1_LIVE_DB_USER`, `V1_LIVE_DB_PASSWORD`, `V1_LIVE_DB_NAME`
+- **Watermark table**: `v1_sync_state` เก็บ `entity_type`, `last_synced_id`
+- **Trigger**: ตั้งเวลา (scheduled) + กดมือ (manual via API)
+- **Batch size**: 500-2000 ต่อรอบ
 
-## 8. Checklist ก่อนกด Execute รอบจริง
+### 7.3 สิ่งที่ sync ได้แล้ว
 
-- baseline ถูก restore จาก dump ที่สะอาด
-- ไม่มี migrated V1 data ค้างอยู่ใน V2
-- ไม่มี demo tenant/CMS ที่จะชนกับข้อมูลจริง
-- source config ชี้ไป V1 ล่าสุด
-- dry run ผ่านและ counts สมเหตุผล
-- admin/operator account ยังเข้าใช้งานได้
-- ตกลงขอบเขต QR phase แล้วว่าไม่รวมในรอบ execute หลัก
+| Entity | สถานะ | Watermark ปัจจุบัน |
+|--------|:------:|---:|
+| users | ✅ | 849,526 |
+| scan_history | ✅ | 12,171,755 |
 
-## 9. ไฟล์อ้างอิง
+### 7.4 สิ่งที่ทำระหว่าง sync
 
-- `docs/dev-migration-reset.md`
-- `backup/MIGRATION_LOG_V1_TO_V2.md`
-- `backend/internal/migrationjob/types.go`
-- `backend/internal/migrationjob/service.go`
-- `backend/internal/migrationjob/runners.go`
+- **User ใหม่**: insert user + entity map + point_ledger snapshot (จาก V1 `users.point`)
+- **User ที่มีแล้ว**: อัปเดต point snapshot เท่านั้น
+- **Scan ใหม่**: insert scan_history + entity map (ใน transaction เดียว)
+- **Scan ที่มีแล้ว**: patch legacy fields ที่ยังว่าง (serial, product name, etc.)
+
+## 8. Legacy Fields Convention
+
+### 8.1 ทำไมต้องมี legacy fields
+
+V1 มี concept บางอย่างที่ V2 ไม่ได้เก็บตรงๆ (เช่น QR serial, V1 product ID) เราจึงเพิ่ม `legacy_*` columns ไว้ใน `scan_history` เพื่อเก็บข้อมูล V1 ดั้งเดิม:
+
+| Column | Type | คำอธิบาย |
+|--------|------|---------|
+| `legacy_qr_code_id` | bigint | QR ID จาก V1 |
+| `legacy_qr_code_serial` | text | Serial เช่น A4WUCWUY |
+| `legacy_product_v1_id` | bigint | Product ID ฝั่ง V1 |
+| `legacy_product_name` | text | ชื่อสินค้า V1 |
+| `legacy_product_sku` | text | SKU V1 |
+| `legacy_product_image_url` | text | URL รูปสินค้า V1 |
+| `legacy_status` | smallint | สถานะ V1 (2=success) |
+| `legacy_verify_method` | smallint | วิธีตรวจ V1 |
+
+### 8.2 กฎ
+
+- เมื่อจะเพิ่ม field ที่เกี่ยวกับ V1 → prefix ด้วย `legacy_` เสมอ
+- ใน UI → แสดง badge V1/V2 ด้วย (amber=V1, emerald=V2)
+- ใน API → ส่ง `data_source: "v1"|"v2"` ให้ frontend ตัดสินใจแสดงผล
+
+### 8.3 Backfill Tools
+
+| Tool | คำสั่ง | หน้าที่ |
+|------|-------|--------|
+| `cmd/backfillv1scanserial` | `go run ./cmd/backfillv1scanserial` | เติม serial จาก V1 ให้ scan_history ที่ยังว่าง |
+| `cmd/backfillv1userpoints` | `go run ./cmd/backfillv1userpoints` | เติม point snapshot จาก V1 ให้ user ที่ยังไม่มี ledger |
+
+## 9. Point Balance — Dual-Source Calculation
+
+เนื่องจาก user V1 บางส่วนไม่มี `point_ledger` (เช่น point=0 ใน V1) ระบบ V2 จึงคำนวณ balance แบบ fallback:
+
+```
+1. ถ้ามี point_ledger → ใช้ balance_after ล่าสุด
+2. ถ้าไม่มี → SUM(scan_history.points_earned WHERE success) - SUM(reward_reservations.point_cost WHERE CONFIRMED)
+```
+
+รองรับทั้ง user ที่มาจาก V1 (migrated) และ V2 (native) โดยอัตโนมัติ
+
+## 10. QR V1 Compatibility (สำหรับ Phase ถัดไป)
+
+### 10.1 สถานการณ์ปัจจุบัน
+
+- V1 ถูก down ชั่วคราว แต่สามารถเปิดให้กลับมารันได้
+- สินค้า V1 ที่มี QR code ยังวางขายในท้องตลาด **จำนวนมาก**
+- ลูกค้า scan QR V1 ผ่าน URL เช่น `qr.saversure.com?code=XXXXX`
+
+### 10.2 แนวทางที่พิจารณา
+
+**แนวทาง A — V1 Redirect + V2 Backend**
+- Route QR URL มาที่ V2
+- V2 lookup serial จาก `legacy_qr_code_serial` หรือ archive table
+- ให้ point เท่าเดิมตาม V1 product/QR config
+
+**แนวทาง B — V1 ยังรัน + Live Sync**
+- ปล่อย V1 ให้รับ scan ต่อไป
+- V2 ดึง scan ใหม่มาผ่าน Live Sync
+- เหมาะช่วง transition ที่ V2 ยังไม่พร้อมรับ scan ตรง
+
+ปัจจุบันใช้ **แนวทาง B** อยู่ — V1 สามารถเปิดกลับมาได้ + V2 Live Sync คอยกวาดข้อมูลล่าสุด
+
+### 10.3 QR Dump
+
+- `saversure_legacy_qrcodes_only.dump` — QR dataset จาก V1 (dump เสร็จแล้ว)
+- ยังไม่ได้ restore เข้า V2
+- ถ้าจะทำ แนวทาง A → ต้อง restore เป็น archive table แยก
+
+## 11. Checklist สถานะปัจจุบัน (2026-04-10)
+
+### ✅ เสร็จแล้ว
+- [x] Gap-only migration: customer, product, rewards, scan_history, redeem_history
+- [x] V1 Live Sync: users + scan_history (watermark-based)
+- [x] Legacy field backfill: serial, product name, status
+- [x] Point snapshot backfill: V1 users ที่มี point > 0
+- [x] Customer detail UI: รองรับ V1+V2 data source
+- [x] Scan history admin UI: แสดง serial, product, scan_type, V1/V2 badge
+- [x] Workspace rule + Skill สำหรับ V1→V2 transition
+
+### 🔄 กำลังดำเนินการ
+- [ ] V1 ยังปิดอยู่ — รอตัดสินใจเปิดกลับ
+- [ ] QR V1 compatibility layer ยังไม่ได้ implement
+
+### ⏳ ยังไม่ได้ทำ (Phase ถัดไป)
+- [ ] QR dataset import (restore `saversure_legacy_qrcodes_only.dump`)
+- [ ] QR V1 redirect/lookup service
+- [ ] Lucky Draw campaigns migration (57 campaigns + 330K histories)
+- [ ] Partner Shops migration (1,237 ร้าน)
+- [ ] News migration (36 บทความ)
+- [ ] Consumer frontend testing (LINE login, scan, redeem)
+
+## 12. ไฟล์อ้างอิง
+
+### Documents
+- `docs/v1-to-v2-cutover-runbook.md` — ไฟล์นี้
+- `docs/dev-migration-reset.md` — วิธี reset V2 จาก baseline
+- `backup/MIGRATION_LOG_V1_TO_V2.md` — Migration log รวม Phase 1-3
+
+### Backend Code
+- `backend/internal/migrationjob/` — Migration job runners (Phase 1)
+- `backend/internal/v1sync/` — V1 Live Sync service (Phase 3)
+- `backend/cmd/backfillv1scanserial/` — Backfill scan serial tool
+- `backend/cmd/backfillv1userpoints/` — Backfill user points tool
+- `backend/internal/customer/service.go` — Customer detail (dual-source balance)
+- `backend/internal/scanhistory/service.go` — Scan history list (CTE optimized)
+
+### Scripts
 - `scripts/create-v2-baseline-snapshot.ps1`
 - `scripts/reset-v2-from-baseline.ps1`
+
+### Config & Rules
+- `backend/.env` — V1 Live Sync config (`V1_LIVE_DB_*`)
+- `.cursor/rules/saversure-v2.mdc` — Workspace rule (V1→V2 awareness)

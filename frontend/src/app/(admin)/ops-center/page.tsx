@@ -113,33 +113,32 @@ export default function OpsCenterPage() {
   const [digest, setDigest] = useState<DigestSummary | null>(null);
   const [health, setHealth] = useState<V1SyncHealth | null>(null);
   const [loading, setLoading] = useState(true);
+  const [healthLoading, setHealthLoading] = useState(true);
   const [error, setError] = useState("");
   const [healthError, setHealthError] = useState("");
   const [syncAction, setSyncAction] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState("");
 
-  const fetchDigest = async () => {
-    setLoading(true);
-    setError("");
+  const fetchHealth = async (refresh = false) => {
+    setHealthLoading(true);
     setHealthError("");
     try {
-      const [digestResult, healthResult] = await Promise.allSettled([
-        api.get<DigestSummary>("/api/v1/ops/digest"),
-        api.get<V1SyncHealth>("/api/v1/v1-sync/health"),
-      ]);
+      const healthResult = await api.get<V1SyncHealth>(`/api/v1/v1-sync/health${refresh ? "?refresh=1" : ""}`);
+      setHealth(healthResult);
+    } catch (e: unknown) {
+      setHealth(null);
+      setHealthError(e instanceof Error ? e.message : "Failed to load V1 sync health");
+    } finally {
+      setHealthLoading(false);
+    }
+  };
 
-      if (digestResult.status === "fulfilled") {
-        setDigest(digestResult.value);
-      } else {
-        throw digestResult.reason;
-      }
-
-      if (healthResult.status === "fulfilled") {
-        setHealth(healthResult.value);
-      } else {
-        setHealth(null);
-        setHealthError(healthResult.reason instanceof Error ? healthResult.reason.message : "Failed to load V1 sync health");
-      }
+  const fetchDigest = async (refresh = false) => {
+    setLoading(true);
+    setError("");
+    try {
+      const digestResult = await api.get<DigestSummary>(`/api/v1/ops/digest${refresh ? "?refresh=1" : ""}`);
+      setDigest(digestResult);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load ops digest");
     } finally {
@@ -147,7 +146,10 @@ export default function OpsCenterPage() {
     }
   };
 
-  useEffect(() => { fetchDigest(); }, []);
+  useEffect(() => {
+    void fetchDigest();
+    void fetchHealth();
+  }, []);
 
   const triggerSync = async (entities: string[], label: string) => {
     setSyncAction(label);
@@ -163,7 +165,7 @@ export default function OpsCenterPage() {
         .map((item) => `${item.entity}: ${item.error ? `error` : `+${item.rows_synced}`}`)
         .join(" · ");
       setSyncMessage(hasError ? `Sync finished with warnings — ${summary}` : `Sync completed — ${summary}`);
-      await fetchDigest();
+      await Promise.all([fetchDigest(true), fetchHealth(true)]);
     } catch (e: unknown) {
       setSyncMessage(e instanceof Error ? e.message : "Sync failed");
     } finally {
@@ -204,7 +206,7 @@ export default function OpsCenterPage() {
     return (
       <div className="bg-[#fce8e6] rounded-[var(--md-radius-lg)] p-6 text-center">
         <p className="text-[#c5221f] text-[14px]">{error}</p>
-        <button onClick={fetchDigest} className="mt-3 text-[13px] text-[#1a73e8] hover:underline">
+        <button onClick={() => { void fetchDigest(true); }} className="mt-3 text-[13px] text-[#1a73e8] hover:underline">
           ลองใหม่
         </button>
       </div>
@@ -232,7 +234,10 @@ export default function OpsCenterPage() {
           </p>
         </div>
         <button
-          onClick={fetchDigest}
+          onClick={() => {
+            void fetchDigest(true);
+            void fetchHealth(true);
+          }}
           className="h-[40px] px-5 border border-[var(--md-outline-variant)] text-[var(--md-on-surface)] rounded-[var(--md-radius-xl)] text-[14px] font-medium hover:bg-[var(--md-surface-dim)] transition-all flex items-center gap-2"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
@@ -304,7 +309,11 @@ export default function OpsCenterPage() {
           >
             {syncAction === "redeem" ? "Syncing..." : "Sync Redeem Now"}
           </button>
-          {health ? (
+          {healthLoading ? (
+            <div className="px-3 py-1 rounded-full text-[12px] font-semibold bg-[#e8f0fe] text-[#1a73e8]">
+              loading...
+            </div>
+          ) : health ? (
             <div
               className="px-3 py-1 rounded-full text-[12px] font-semibold"
               style={{ backgroundColor: healthStyle.bg, color: healthStyle.text }}
@@ -331,7 +340,13 @@ export default function OpsCenterPage() {
           </div>
         )}
 
-        {health && (
+        {healthLoading ? (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="rounded-[var(--md-radius-md)] bg-[var(--md-surface-container)] h-[160px] animate-pulse" />
+            ))}
+          </div>
+        ) : health && (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
               <div className="rounded-[var(--md-radius-md)] bg-[var(--md-surface-container)] p-4">

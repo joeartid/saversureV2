@@ -23,7 +23,16 @@ func (h *Handler) GetDigest(c *gin.Context) {
 		return
 	}
 
-	digest, err := h.svc.GenerateDigest(c.Request.Context(), tenantID)
+	forceRefresh := c.Query("refresh") == "1"
+	var (
+		digest *DigestSummary
+		err    error
+	)
+	if forceRefresh {
+		digest, err = h.svc.GenerateDigestFresh(c.Request.Context(), tenantID)
+	} else {
+		digest, err = h.svc.GenerateDigest(c.Request.Context(), tenantID)
+	}
 	if err != nil {
 		apperror.Respond(c, err)
 		return
@@ -39,7 +48,16 @@ func (h *Handler) GetAlerts(c *gin.Context) {
 		return
 	}
 
-	digest, err := h.svc.GenerateDigest(c.Request.Context(), tenantID)
+	forceRefresh := c.Query("refresh") == "1"
+	var (
+		digest *DigestSummary
+		err    error
+	)
+	if forceRefresh {
+		digest, err = h.svc.GenerateDigestFresh(c.Request.Context(), tenantID)
+	} else {
+		digest, err = h.svc.GenerateDigest(c.Request.Context(), tenantID)
+	}
 	if err != nil {
 		apperror.Respond(c, err)
 		return

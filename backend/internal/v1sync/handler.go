@@ -62,7 +62,16 @@ func (h *Handler) Status(c *gin.Context) {
 }
 
 func (h *Handler) Health(c *gin.Context) {
-	report, err := h.svc.GetHealth(c.Request.Context())
+	forceRefresh := c.Query("refresh") == "1"
+	var (
+		report *HealthReport
+		err    error
+	)
+	if forceRefresh {
+		report, err = h.svc.GetHealthFresh(c.Request.Context())
+	} else {
+		report, err = h.svc.GetHealth(c.Request.Context())
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

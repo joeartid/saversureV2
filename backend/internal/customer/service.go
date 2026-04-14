@@ -32,6 +32,7 @@ type Customer struct {
 	ScanCount    int     `json:"scan_count"`
 	RedeemCount  int     `json:"redeem_count"`
 	CreatedAt    string  `json:"created_at"`
+	Tags         []CustomerTagBadge `json:"tags"`
 }
 
 type ListFilter struct {
@@ -45,6 +46,13 @@ type UpdateInput struct {
 	Province     *string `json:"province"`
 	Occupation   *string `json:"occupation"`
 	CustomerFlag *string `json:"customer_flag"`
+	AdminNotes   *string `json:"admin_notes"`
+}
+
+type CustomerTagBadge struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
 }
 
 func committedRedemptionStatusList() string {
@@ -164,6 +172,7 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Cu
 	defer rows.Close()
 
 	var customers []Customer
+	customerIDs := make([]string, 0)
 	for rows.Next() {
 		var c Customer
 		if err := rows.Scan(&c.ID, &c.TenantID, &c.Email, &c.Phone, &c.DisplayName, &c.FirstName, &c.LastName, &c.AvatarURL,
@@ -171,7 +180,19 @@ func (s *Service) List(ctx context.Context, tenantID string, f ListFilter) ([]Cu
 			&c.PointBalance, &c.ScanCount, &c.RedeemCount, &c.CreatedAt); err != nil {
 			return nil, 0, fmt.Errorf("scan customer: %w", err)
 		}
+		c.Tags = []CustomerTagBadge{}
 		customers = append(customers, c)
+		customerIDs = append(customerIDs, c.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	tagMap, err := s.loadCustomerTagsMap(ctx, tenantID, customerIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range customers {
+		customers[i].Tags = tagMap[customers[i].ID]
 	}
 	return customers, total, nil
 }
@@ -194,6 +215,11 @@ func (s *Service) GetByID(ctx context.Context, tenantID, id string) (*Customer, 
 	if err != nil {
 		return nil, fmt.Errorf("customer not found: %w", err)
 	}
+	tags, err := s.loadCustomerTags(ctx, tenantID, id)
+	if err != nil {
+		return nil, err
+	}
+	c.Tags = tags
 	return &c, nil
 }
 
@@ -236,6 +262,19 @@ func (s *Service) Update(ctx context.Context, tenantID, id string, input UpdateI
 			id, tenantID, *input.Occupation,
 		)
 	}
+	if input.AdminNotes != nil {
+		_, err := s.db.Exec(ctx,
+			`UPDATE users
+			 SET admin_notes = NULLIF($3, ''),
+			     admin_notes_updated_at = NOW(),
+			     updated_at = NOW()
+			 WHERE id = $1 AND tenant_id = $2`,
+			id, tenantID, *input.AdminNotes,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("update admin notes: %w", err)
+		}
+	}
 	return s.GetByID(ctx, tenantID, id)
 }
 
@@ -257,6 +296,7 @@ type DetailProfile struct {
 	Status        string  `json:"status"`
 	CreatedAt     string  `json:"created_at"`
 	LastLoginAt   *string `json:"last_login_at"`
+	AdminNotes    *string `json:"admin_notes"`
 }
 
 // ScanHistoryEntry is a single scan record for GetDetail.
@@ -329,6 +369,7 @@ type DetailResult struct {
 	PointLedger []PointLedgerEntry `json:"point_ledger"`
 	Redemptions []RedemptionEntry  `json:"redemptions"`
 	Addresses   []AddressEntry     `json:"addresses"`
+	Tags        []CustomerTagBadge `json:"tags"`
 }
 
 func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*DetailResult, error) {
@@ -338,14 +379,14 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 		        birth_date::text, gender, avatar_url,
 		        province, occupation, COALESCE(customer_flag, 'green'),
 		        COALESCE(phone_verified, false), status,
-		        created_at::text, last_login_at::text
+		        created_at::text, last_login_at::text, admin_notes
 		 FROM users WHERE id = $1 AND tenant_id = $2`,
 		customerID, tenantID,
 	).Scan(&profile.ID, &profile.Email, &profile.Phone, &profile.DisplayName, &profile.FirstName, &profile.LastName,
 		&profile.BirthDate, &profile.Gender, &profile.AvatarURL,
 		&profile.Province, &profile.Occupation, &profile.CustomerFlag,
 		&profile.PhoneVerified, &profile.Status,
-		&profile.CreatedAt, &profile.LastLoginAt)
+		&profile.CreatedAt, &profile.LastLoginAt, &profile.AdminNotes)
 	if err != nil {
 		return nil, fmt.Errorf("customer not found: %w", err)
 	}
@@ -491,6 +532,11 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 		}
 	}
 
+	tags, err := s.loadCustomerTags(ctx, tenantID, customerID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &DetailResult{
 		Profile:     profile,
 		Balance:     balance,
@@ -498,5 +544,52 @@ func (s *Service) GetDetail(ctx context.Context, tenantID, customerID string) (*
 		PointLedger: ledger,
 		Redemptions: redemptions,
 		Addresses:   addresses,
+		Tags:        tags,
 	}, nil
+}
+
+func (s *Service) loadCustomerTags(ctx context.Context, tenantID, customerID string) ([]CustomerTagBadge, error) {
+	tagMap, err := s.loadCustomerTagsMap(ctx, tenantID, []string{customerID})
+	if err != nil {
+		return nil, err
+	}
+	return tagMap[customerID], nil
+}
+
+func (s *Service) loadCustomerTagsMap(ctx context.Context, tenantID string, customerIDs []string) (map[string][]CustomerTagBadge, error) {
+	result := make(map[string][]CustomerTagBadge, len(customerIDs))
+	if len(customerIDs) == 0 {
+		return result, nil
+	}
+
+	rows, err := s.db.Query(ctx,
+		`SELECT cta.user_id::text, ct.id::text, ct.name, ct.color
+		 FROM customer_tag_assignments cta
+		 JOIN customer_tags ct ON ct.id = cta.tag_id
+		 WHERE cta.tenant_id = $1 AND cta.user_id = ANY($2::uuid[])
+		 ORDER BY ct.name ASC`,
+		tenantID, customerIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("load customer tags: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userID string
+		var tag CustomerTagBadge
+		if err := rows.Scan(&userID, &tag.ID, &tag.Name, &tag.Color); err != nil {
+			return nil, fmt.Errorf("scan customer tag: %w", err)
+		}
+		result[userID] = append(result[userID], tag)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, customerID := range customerIDs {
+		if result[customerID] == nil {
+			result[customerID] = []CustomerTagBadge{}
+		}
+	}
+	return result, nil
 }

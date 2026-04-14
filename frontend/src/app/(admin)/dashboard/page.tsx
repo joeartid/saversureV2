@@ -43,11 +43,8 @@ interface FunnelData {
 interface ActivityItem {
   id: string;
   type: "scan" | "redeem";
-  user_id?: string;
-  user_email?: string;
-  campaign_id?: string;
-  reward_name?: string;
-  points?: number;
+  user_name?: string;
+  detail?: string;
   created_at: string;
 }
 
@@ -62,30 +59,45 @@ export default function DashboardPage() {
   const [chartData, setChartData] = useState<ScanChartPoint[]>([]);
   const [funnel, setFunnel] = useState<FunnelData | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(true);
+  const [funnelLoading, setFunnelLoading] = useState(true);
+  const [activityLoading, setActivityLoading] = useState(true);
   const [chartGroup, setChartGroup] = useState("day");
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [sum, chart, funnelRes, activityRes] = await Promise.all([
-          api.get<Summary>("/api/v1/dashboard/summary").catch(() => null),
-          api.get<{ data: ScanChartPoint[] }>("/api/v1/dashboard/scan-chart?group_by=day").catch(() => null),
-          api.get<FunnelData>("/api/v1/dashboard/funnel").catch(() => null),
-          api.get<{ data: ActivityItem[] }>("/api/v1/dashboard/recent-activity?limit=10").catch(() => ({ data: [] as ActivityItem[] })),
-        ]);
+    void api
+      .get<Summary>("/api/v1/dashboard/summary")
+      .then((sum) => {
         if (sum && typeof sum === "object" && "campaigns" in sum) setSummary(sum);
-        if (chart && chart.data) setChartData(chart.data);
+      })
+      .catch(() => undefined)
+      .finally(() => setSummaryLoading(false));
+
+    void api
+      .get<{ data: ScanChartPoint[] }>("/api/v1/dashboard/scan-chart?group_by=day")
+      .then((chart) => {
+        if (chart?.data) setChartData(chart.data);
+      })
+      .catch(() => undefined)
+      .finally(() => setChartLoading(false));
+
+    void api
+      .get<FunnelData>("/api/v1/dashboard/funnel")
+      .then((funnelRes) => {
         if (funnelRes) setFunnel(funnelRes);
+      })
+      .catch(() => undefined)
+      .finally(() => setFunnelLoading(false));
+
+    void api
+      .get<{ data: ActivityItem[] }>("/api/v1/dashboard/recent-activity?limit=10")
+      .then((activityRes) => {
         if (activityRes?.data) setActivity(activityRes.data);
-      } catch {
-        // API might not be ready
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAll();
+      })
+      .catch(() => undefined)
+      .finally(() => setActivityLoading(false));
   }, []);
 
   const handleExport = async () => {
@@ -101,6 +113,7 @@ export default function DashboardPage() {
 
   const fetchChart = async (group: string) => {
     setChartGroup(group);
+    setChartLoading(true);
     try {
       const chart = await api.get<{ data: ScanChartPoint[] }>(
         `/api/v1/dashboard/scan-chart?group_by=${group}`
@@ -108,6 +121,8 @@ export default function DashboardPage() {
       if (chart?.data) setChartData(chart.data);
     } catch {
       // ignore
+    } finally {
+      setChartLoading(false);
     }
   };
 
@@ -210,7 +225,7 @@ export default function DashboardPage() {
                   {card.label}
                 </p>
                 <p className="text-[32px] font-medium text-[var(--md-on-surface)] mt-1 leading-none tracking-[-0.5px]">
-                  {loading ? <Skeleton /> : (card.value ?? 0).toLocaleString()}
+                  {summaryLoading ? <Skeleton /> : (card.value ?? 0).toLocaleString()}
                 </p>
                 <p className="text-[12px] text-[var(--md-on-surface-variant)] mt-2">
                   {card.sub}
@@ -260,7 +275,14 @@ export default function DashboardPage() {
         </div>
 
         <div className="h-[300px]">
-          {chartData.length > 0 ? (
+          {chartLoading ? (
+            <div className="h-full flex items-center justify-center text-[var(--md-on-surface-variant)]">
+              <div className="text-center">
+                <div className="animate-spin w-8 h-8 border-2 border-[var(--md-primary)] border-t-transparent rounded-full mx-auto mb-3" />
+                <p className="text-[14px]">Loading scan trend...</p>
+              </div>
+            </div>
+          ) : chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <defs>
@@ -320,7 +342,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Conversion Funnel */}
-      {funnel && (
+      {funnelLoading ? (
+        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-8">
+          <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] mb-5 tracking-[0.1px]">
+            Conversion Funnel
+          </h2>
+          <div className="h-[96px] rounded-[var(--md-radius-md)] bg-[var(--md-surface-container)] animate-pulse" />
+        </div>
+      ) : funnel ? (
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-8">
           <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] mb-5 tracking-[0.1px]">
             Conversion Funnel
@@ -350,10 +379,21 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Recent Activity Feed */}
-      {activity.length > 0 && (
+      {activityLoading ? (
+        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-8">
+          <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] mb-4 tracking-[0.1px]">
+            Recent Activity
+          </h2>
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="h-[52px] rounded-[var(--md-radius-md)] bg-[var(--md-surface-container)] animate-pulse" />
+            ))}
+          </div>
+        </div>
+      ) : activity.length > 0 && (
         <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] md-elevation-1 p-6 mb-8">
           <h2 className="text-[16px] font-medium text-[var(--md-on-surface)] mb-4 tracking-[0.1px]">
             Recent Activity
@@ -381,14 +421,10 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] text-[var(--md-on-surface)]">
-                    {item.type === "scan" ? (
-                      <>Scan by {item.user_email || "User"} {item.campaign_id && `(Campaign: ${item.campaign_id})`}</>
-                    ) : (
-                      <>Redeem: {item.reward_name || "Reward"} {item.points != null && `(${item.points} pts)`}</>
-                    )}
+                    {item.detail || `${item.type === "scan" ? "Scan" : "Redeem"} by ${item.user_name || "User"}`}
                   </p>
                   <p className="text-[11px] text-[var(--md-on-surface-variant)] mt-0.5">
-                    {new Date(item.created_at).toLocaleString()}
+                    {(item.user_name || "User")} · {new Date(item.created_at).toLocaleString()}
                   </p>
                 </div>
               </div>
