@@ -551,6 +551,11 @@ func main() {
 		crmRoutes.POST("/broadcasts/preview", crmHandler.PreviewBroadcast)
 		crmRoutes.GET("/broadcasts", crmHandler.ListBroadcasts)
 		crmRoutes.POST("/broadcasts", crmHandler.CreateBroadcast)
+		crmRoutes.GET("/triggers", crmHandler.ListTriggers)
+		crmRoutes.POST("/triggers", crmHandler.CreateTrigger)
+		crmRoutes.PUT("/triggers/:id", crmHandler.UpdateTrigger)
+		crmRoutes.DELETE("/triggers/:id", crmHandler.DeleteTrigger)
+		crmRoutes.POST("/automation/run", crmHandler.RunAutomation)
 	}
 
 	// Dashboard

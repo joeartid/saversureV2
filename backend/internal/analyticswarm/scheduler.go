@@ -41,6 +41,7 @@ func (s *Scheduler) run(ctx context.Context) {
 	s.warmHealth(ctx)
 	s.warmCRM(ctx)
 	s.warmCRMAnalytics(ctx)
+	s.runCRMAutomation(ctx)
 	s.processBroadcasts(ctx)
 
 	dashboardTicker := time.NewTicker(1 * time.Minute)
@@ -58,6 +59,9 @@ func (s *Scheduler) run(ctx context.Context) {
 	cohortTicker := time.NewTicker(24 * time.Hour)
 	defer cohortTicker.Stop()
 
+	automationTicker := time.NewTicker(1 * time.Hour)
+	defer automationTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -71,6 +75,8 @@ func (s *Scheduler) run(ctx context.Context) {
 			s.warmCRM(ctx)
 		case <-cohortTicker.C:
 			s.warmCRMAnalytics(ctx)
+		case <-automationTicker.C:
+			s.runCRMAutomation(ctx)
 		case <-broadcastTicker.C:
 			s.processBroadcasts(ctx)
 		}
@@ -179,6 +185,25 @@ func (s *Scheduler) warmCRMAnalytics(parent context.Context) {
 			return s.dashboard.RefreshCustomerCohorts(ctx, tenantID)
 		}, "crm cohorts", tenantID)
 		slog.Info("analytics warm: crm analytics refreshed", "tenant_id", tenantID, "duration", time.Since(start).Round(time.Millisecond).String())
+	}
+}
+
+func (s *Scheduler) runCRMAutomation(parent context.Context) {
+	if s.crm == nil {
+		return
+	}
+	tenantIDs, err := s.listTenantIDs(parent)
+	if err != nil {
+		slog.Warn("analytics warm: list tenants for crm automation failed", "error", err)
+		return
+	}
+	for _, tenantID := range tenantIDs {
+		start := time.Now()
+		s.runWarmStep(parent, 4*time.Minute, func(ctx context.Context) error {
+			_, err := s.crm.RunLifecycleAutomation(ctx, tenantID)
+			return err
+		}, "crm automation", tenantID)
+		slog.Info("analytics warm: crm automation processed", "tenant_id", tenantID, "duration", time.Since(start).Round(time.Millisecond).String())
 	}
 }
 

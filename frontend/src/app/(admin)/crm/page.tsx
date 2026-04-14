@@ -108,6 +108,34 @@ interface BroadcastCampaign {
   updated_at: string;
 }
 
+interface CRMTrigger {
+  id: string;
+  name: string;
+  event_type: string;
+  delay_hours: number;
+  action_type: string;
+  action_payload: Record<string, unknown>;
+  active: boolean;
+  fired_count: number;
+  last_fired_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface AutomationRunSummary {
+  point_expiry: {
+    processed_entries: number;
+    expired_points: number;
+    notified_users: number;
+  };
+  triggers: {
+    processed_triggers: number;
+    sent: number;
+    skipped: number;
+    failed: number;
+  };
+}
+
 const defaultSegmentRules = JSON.stringify(
   {
     operator: "AND",
@@ -126,6 +154,7 @@ export default function CRMPage() {
   const [distribution, setDistribution] = useState<RFMDistributionItem[]>([]);
   const [rfmCustomers, setRfmCustomers] = useState<RFMSnapshot[]>([]);
   const [broadcasts, setBroadcasts] = useState<BroadcastCampaign[]>([]);
+  const [triggers, setTriggers] = useState<CRMTrigger[]>([]);
   const [selectedRisk, setSelectedRisk] = useState("");
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>("");
   const [previewRows, setPreviewRows] = useState<SegmentPreviewCustomer[]>([]);
@@ -138,6 +167,9 @@ export default function CRMPage() {
   const [broadcastPreview, setBroadcastPreview] = useState<BroadcastPreviewSummary | null>(null);
   const [broadcastPreviewLoading, setBroadcastPreviewLoading] = useState(false);
   const [broadcastSaving, setBroadcastSaving] = useState(false);
+  const [triggerSaving, setTriggerSaving] = useState(false);
+  const [automationRunning, setAutomationRunning] = useState(false);
+  const [lastAutomationRun, setLastAutomationRun] = useState<AutomationRunSummary | null>(null);
 
   const [tagName, setTagName] = useState("");
   const [tagColor, setTagColor] = useState("#6366f1");
@@ -152,15 +184,23 @@ export default function CRMPage() {
   const [broadcastScheduledAt, setBroadcastScheduledAt] = useState("");
   const [broadcastConfirmText, setBroadcastConfirmText] = useState("");
   const [broadcastHighRiskAck, setBroadcastHighRiskAck] = useState(false);
+  const [triggerName, setTriggerName] = useState("");
+  const [triggerEventType, setTriggerEventType] = useState("signup");
+  const [triggerDelayHours, setTriggerDelayHours] = useState("1");
+  const [triggerActionType, setTriggerActionType] = useState("notification");
+  const [triggerMessageTitle, setTriggerMessageTitle] = useState("แจ้งเตือนจาก Saversure");
+  const [triggerMessageBody, setTriggerMessageBody] = useState("สวัสดี {{first_name}}");
+  const [triggerTagID, setTriggerTagID] = useState("");
 
   const loadAll = async (riskLevel = selectedRisk) => {
     setLoading(true);
     try {
-      const [tagsRes, segmentsRes, distRes, broadcastsRes, customersRes] = await Promise.all([
+      const [tagsRes, segmentsRes, distRes, broadcastsRes, triggersRes, customersRes] = await Promise.all([
         api.get<{ data: Tag[] }>("/api/v1/crm/tags"),
         api.get<{ data: Segment[] }>("/api/v1/crm/segments"),
         api.get<{ data: RFMDistributionItem[] }>("/api/v1/crm/rfm/distribution"),
         api.get<{ data: BroadcastCampaign[] }>("/api/v1/crm/broadcasts?limit=20"),
+        api.get<{ data: CRMTrigger[] }>("/api/v1/crm/triggers"),
         api.get<{ data: RFMSnapshot[] }>(
           `/api/v1/crm/rfm/customers?limit=20${riskLevel ? `&risk_level=${encodeURIComponent(riskLevel)}` : ""}`,
         ),
@@ -169,6 +209,7 @@ export default function CRMPage() {
       setSegments(segmentsRes.data || []);
       setDistribution(distRes.data || []);
       setBroadcasts(broadcastsRes.data || []);
+      setTriggers(triggersRes.data || []);
       setRfmCustomers(customersRes.data || []);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "โหลดข้อมูล CRM ไม่สำเร็จ");
@@ -382,6 +423,90 @@ export default function CRMPage() {
       toast.error(err instanceof Error ? err.message : "สร้าง broadcast ไม่สำเร็จ");
     } finally {
       setBroadcastSaving(false);
+    }
+  };
+
+  const handleCreateTrigger = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!triggerName.trim()) {
+      toast.error("กรุณาระบุชื่อ trigger");
+      return;
+    }
+    if (triggerActionType === "tag_assign" && !triggerTagID) {
+      toast.error("กรุณาเลือก tag สำหรับ tag assign");
+      return;
+    }
+    setTriggerSaving(true);
+    try {
+      const payload =
+        triggerActionType === "tag_assign"
+          ? { tag_id: triggerTagID }
+          : triggerActionType === "line_message"
+            ? { message: triggerMessageBody }
+            : { title: triggerMessageTitle, body: triggerMessageBody, type: "system" };
+      await api.post("/api/v1/crm/triggers", {
+        name: triggerName.trim(),
+        event_type: triggerEventType,
+        delay_hours: Number(triggerDelayHours || 0),
+        action_type: triggerActionType,
+        action_payload: payload,
+        active: true,
+      });
+      setTriggerName("");
+      setTriggerEventType("signup");
+      setTriggerDelayHours("1");
+      setTriggerActionType("notification");
+      setTriggerMessageTitle("แจ้งเตือนจาก Saversure");
+      setTriggerMessageBody("สวัสดี {{first_name}}");
+      setTriggerTagID("");
+      await loadAll(selectedRisk);
+      toast.success("สร้าง trigger แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "สร้าง trigger ไม่สำเร็จ");
+    } finally {
+      setTriggerSaving(false);
+    }
+  };
+
+  const handleToggleTrigger = async (trigger: CRMTrigger) => {
+    try {
+      await api.put(`/api/v1/crm/triggers/${trigger.id}`, {
+        name: trigger.name,
+        event_type: trigger.event_type,
+        delay_hours: trigger.delay_hours,
+        action_type: trigger.action_type,
+        action_payload: trigger.action_payload,
+        active: !trigger.active,
+      });
+      await loadAll(selectedRisk);
+      toast.success(trigger.active ? "ปิด trigger แล้ว" : "เปิด trigger แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "อัปเดต trigger ไม่สำเร็จ");
+    }
+  };
+
+  const handleDeleteTrigger = async (trigger: CRMTrigger) => {
+    if (!confirm(`ลบ trigger "${trigger.name}" ?`)) return;
+    try {
+      await api.delete(`/api/v1/crm/triggers/${trigger.id}`);
+      await loadAll(selectedRisk);
+      toast.success("ลบ trigger แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ลบ trigger ไม่สำเร็จ");
+    }
+  };
+
+  const handleRunAutomation = async () => {
+    setAutomationRunning(true);
+    try {
+      const res = await api.post<AutomationRunSummary>("/api/v1/crm/automation/run", {});
+      setLastAutomationRun(res);
+      await loadAll(selectedRisk);
+      toast.success("รัน automation แล้ว");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "รัน automation ไม่สำเร็จ");
+    } finally {
+      setAutomationRunning(false);
     }
   };
 
@@ -943,6 +1068,180 @@ export default function CRMPage() {
                     {item.scheduled_at && <div>scheduled: {new Date(item.scheduled_at).toLocaleString("th-TH")}</div>}
                     {item.completed_at && <div>completed: {new Date(item.completed_at).toLocaleString("th-TH")}</div>}
                     {item.last_error && <div className="mt-1 text-red-500">error: {item.last_error}</div>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
+        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Lifecycle Automation</h2>
+              <p className="mt-1 text-[12px] text-[var(--md-on-surface-variant)]">
+                ใช้สำหรับ point expiry, pre-expiry notify และ simple CRM triggers เช่น welcome / inactive / point expiring
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRunAutomation}
+              disabled={automationRunning}
+              className="h-[40px] px-4 rounded-[var(--md-radius-xl)] bg-[var(--md-primary)] text-white text-[13px] font-medium disabled:opacity-60"
+            >
+              {automationRunning ? "Running..." : "Run Automation Now"}
+            </button>
+          </div>
+
+          {lastAutomationRun && (
+            <div className="mb-4 rounded-[16px] border border-[var(--md-outline-variant)] bg-[var(--md-surface-container-low)] p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[12px] text-[var(--md-on-surface)]">
+                <div className="rounded-[12px] bg-[var(--md-surface)] px-3 py-2">
+                  <div>expired entries: {lastAutomationRun.point_expiry.processed_entries.toLocaleString()}</div>
+                  <div>expired points: {lastAutomationRun.point_expiry.expired_points.toLocaleString()}</div>
+                  <div>pre-expiry users notified: {lastAutomationRun.point_expiry.notified_users.toLocaleString()}</div>
+                </div>
+                <div className="rounded-[12px] bg-[var(--md-surface)] px-3 py-2">
+                  <div>processed triggers: {lastAutomationRun.triggers.processed_triggers.toLocaleString()}</div>
+                  <div>sent: {lastAutomationRun.triggers.sent.toLocaleString()}</div>
+                  <div>skipped: {lastAutomationRun.triggers.skipped.toLocaleString()}</div>
+                  <div>failed: {lastAutomationRun.triggers.failed.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleCreateTrigger} className="space-y-3">
+            <input
+              value={triggerName}
+              onChange={(e) => setTriggerName(e.target.value)}
+              placeholder="ชื่อ trigger เช่น Welcome หลังสมัคร / At risk 30 วัน"
+              className="h-[40px] w-full px-4 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[13px]"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <select
+                value={triggerEventType}
+                onChange={(e) => setTriggerEventType(e.target.value)}
+                className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+              >
+                <option value="signup">signup</option>
+                <option value="first_scan">first_scan</option>
+                <option value="days_inactive_30">days_inactive_30</option>
+                <option value="days_inactive_90">days_inactive_90</option>
+                <option value="point_expiring_7d">point_expiring_7d</option>
+              </select>
+              <input
+                type="number"
+                min="0"
+                value={triggerDelayHours}
+                onChange={(e) => setTriggerDelayHours(e.target.value)}
+                placeholder="delay hours"
+                className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+              />
+              <select
+                value={triggerActionType}
+                onChange={(e) => setTriggerActionType(e.target.value)}
+                className="h-[40px] rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+              >
+                <option value="notification">notification</option>
+                <option value="line_message">line_message</option>
+                <option value="tag_assign">tag_assign</option>
+              </select>
+            </div>
+
+            {triggerActionType === "tag_assign" ? (
+              <select
+                value={triggerTagID}
+                onChange={(e) => setTriggerTagID(e.target.value)}
+                className="h-[40px] w-full rounded-[var(--md-radius-xl)] border border-[var(--md-outline-variant)] bg-transparent px-3 text-[13px]"
+              >
+                <option value="">เลือก tag</option>
+                {tags.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                {triggerActionType === "notification" && (
+                  <input
+                    value={triggerMessageTitle}
+                    onChange={(e) => setTriggerMessageTitle(e.target.value)}
+                    placeholder="หัวข้อ notification"
+                    className="h-[40px] w-full px-4 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[13px]"
+                  />
+                )}
+                <textarea
+                  value={triggerMessageBody}
+                  onChange={(e) => setTriggerMessageBody(e.target.value)}
+                  placeholder={
+                    triggerActionType === "line_message"
+                      ? "ข้อความ LINE เช่น สวัสดี {{first_name}}"
+                      : "ข้อความแจ้งเตือน เช่น สวัสดี {{first_name}}"
+                  }
+                  className="min-h-[110px] w-full px-4 py-3 border border-[var(--md-outline-variant)] rounded-[var(--md-radius-xl)] bg-transparent text-[13px]"
+                />
+              </>
+            )}
+
+            <div className="rounded-[14px] bg-[var(--md-surface-container)] px-3 py-2 text-[12px] text-[var(--md-on-surface-variant)]">
+              รองรับ placeholder: <span className="font-mono">{"{{first_name}}"}</span>, <span className="font-mono">{"{{points}}"}</span>, <span className="font-mono">{"{{expires_at}}"}</span>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={triggerSaving}
+                className="h-[40px] px-4 rounded-[var(--md-radius-xl)] bg-[var(--md-primary)] text-white text-[13px] font-medium disabled:opacity-60"
+              >
+                {triggerSaving ? "Saving..." : "Create Trigger"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="bg-[var(--md-surface)] rounded-[var(--md-radius-lg)] p-5 md-elevation-1">
+          <div className="mb-4">
+            <h2 className="text-[18px] font-medium text-[var(--md-on-surface)]">Trigger List</h2>
+          </div>
+          <div className="space-y-3">
+            {triggers.length === 0 ? (
+              <p className="text-[13px] text-[var(--md-on-surface-variant)]">ยังไม่มี trigger</p>
+            ) : (
+              triggers.map((trigger) => (
+                <div key={trigger.id} className="rounded-[14px] border border-[var(--md-outline-variant)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-medium text-[var(--md-on-surface)]">{trigger.name}</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--md-on-surface-variant)]">
+                        <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">{trigger.event_type}</span>
+                        <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">{trigger.action_type}</span>
+                        <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">delay {trigger.delay_hours}h</span>
+                        <span className="rounded-full bg-[var(--md-surface-container)] px-2 py-0.5">fired {trigger.fired_count.toLocaleString()}</span>
+                      </div>
+                      <p className="mt-2 text-[11px] text-[var(--md-on-surface-variant)]">
+                        {JSON.stringify(trigger.action_payload)}
+                      </p>
+                      {trigger.last_fired_at && (
+                        <p className="mt-1 text-[11px] text-[var(--md-on-surface-variant)]">
+                          last fired: {new Date(trigger.last_fired_at).toLocaleString("th-TH")}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${trigger.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-700"}`}>
+                      {trigger.active ? "active" : "inactive"}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex gap-3 text-[12px]">
+                    <button type="button" onClick={() => handleToggleTrigger(trigger)} className="text-[var(--md-primary)] hover:underline">
+                      {trigger.active ? "Pause" : "Resume"}
+                    </button>
+                    <button type="button" onClick={() => handleDeleteTrigger(trigger)} className="text-red-500 hover:underline">
+                      ลบ
+                    </button>
                   </div>
                 </div>
               ))

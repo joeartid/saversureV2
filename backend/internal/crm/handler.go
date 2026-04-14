@@ -258,3 +258,64 @@ func (h *Handler) ListBroadcasts(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": items})
 }
+
+func (h *Handler) ListTriggers(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	items, err := h.svc.ListTriggers(c.Request.Context(), tenantID)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": items})
+}
+
+func (h *Handler) CreateTrigger(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	var input TriggerInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	item, err := h.svc.CreateTrigger(c.Request.Context(), tenantID, input)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, item)
+}
+
+func (h *Handler) UpdateTrigger(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	triggerID := c.Param("id")
+	var input TriggerInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		apperror.RespondValidation(c, err.Error())
+		return
+	}
+	item, err := h.svc.UpdateTrigger(c.Request.Context(), tenantID, triggerID, input)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+func (h *Handler) DeleteTrigger(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	triggerID := c.Param("id")
+	if err := h.svc.DeleteTrigger(c.Request.Context(), tenantID, triggerID); err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+func (h *Handler) RunAutomation(c *gin.Context) {
+	tenantID := c.GetString("tenant_id")
+	summary, err := h.svc.RunLifecycleAutomation(c.Request.Context(), tenantID)
+	if err != nil {
+		apperror.Respond(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}
